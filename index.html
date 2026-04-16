@@ -6,3 +6,441 @@
 <title>TekStream Quote Generator</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ts-dark: #003658; --ts-blue: #5B94CB; --ts-grey: #717174; --ts-black: #131112;
+    --bg: #f4f3f0; --surface: #ffffff;
+    --border: rgba(0,0,0,0.09); --border-md: rgba(0,0,0,0.15);
+    --text: #131112; --muted: #717174; --light: #aaa;
+    --r: 10px; --rs: 6px;
+  }
+  body { font-family:'Roboto',sans-serif; background:var(--bg); color:var(--text); font-size:14px; line-height:1.5; min-height:100vh; padding:20px; }
+
+  /* Header */
+  .hdr { background:var(--ts-dark); border-radius:var(--r); padding:0 24px; height:60px; display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+  .hdr-logo { height:42px; object-fit:contain; }
+  .hdr-tag { color:rgba(255,255,255,0.45); font-size:11px; font-weight:500; letter-spacing:.08em; text-transform:uppercase; }
+  .hdr-accent { height:4px; background:var(--ts-blue); border-radius:0 0 var(--r) var(--r); margin-top:-4px; margin-bottom:20px; }
+
+  /* Layout */
+  .layout { display:grid; grid-template-columns:340px 1fr; gap:14px; align-items:start; }
+
+  /* Panel */
+  .panel { background:var(--surface); border:0.5px solid var(--border); border-radius:var(--r); padding:18px; margin-bottom:14px; }
+  .panel:last-child { margin-bottom:0; }
+  .pt { font-size:10px; font-weight:700; color:var(--ts-blue); text-transform:uppercase; letter-spacing:.1em; margin-bottom:14px; }
+
+  /* Form */
+  label { display:block; font-size:11px; color:var(--muted); margin-bottom:3px; margin-top:11px; }
+  label:first-of-type { margin-top:0; }
+  input[type=text],input[type=number],input[type=date],textarea {
+    width:100%; padding:7px 10px; border:0.5px solid var(--border-md); border-radius:var(--rs);
+    font-family:'Roboto',sans-serif; font-size:13px; color:var(--text); background:#fafafa; outline:none; transition:border-color .15s;
+  }
+  input:focus,textarea:focus { border-color:var(--ts-blue); background:#fff; }
+  textarea { resize:vertical; min-height:60px; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .hr { border:none; border-top:0.5px solid var(--border); margin:12px 0; }
+  .hint { font-size:10px; color:var(--light); margin-top:3px; }
+
+  /* Logo row */
+  .logo-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .logo-thumb { height:28px; max-width:120px; object-fit:contain; background:var(--ts-dark); border-radius:4px; padding:3px 8px; }
+  .btn-lnk { background:none; border:none; color:var(--ts-blue); font-size:11px; cursor:pointer; font-family:'Roboto',sans-serif; text-decoration:underline; padding:0; }
+
+  /* Buttons */
+  .btn { width:100%; padding:10px 16px; border:none; border-radius:var(--rs); font-family:'Roboto',sans-serif; font-size:13px; font-weight:500; cursor:pointer; margin-top:8px; transition:opacity .15s,background .15s; }
+  .btn:disabled { opacity:.35; cursor:not-allowed; }
+  .btn-dark { background:var(--ts-dark); color:#fff; }
+  .btn-dark:hover:not(:disabled) { background:#004e7a; }
+
+  /* Line items */
+  table { width:100%; border-collapse:collapse; font-size:12px; table-layout:fixed; }
+  th { text-align:left; font-size:10px; font-weight:500; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); padding:6px 8px; border-bottom:0.5px solid var(--border); }
+  td { padding:5px 8px; border-bottom:0.5px solid var(--border); vertical-align:middle; overflow:hidden; }
+  td input { border:none; background:transparent; padding:2px 0; font-size:12px; width:100%; font-family:'Roboto',sans-serif; outline:none; }
+  td input:focus { border-bottom:1px solid var(--ts-blue); }
+  tr:hover td { background:#fafbfc; }
+  .del { background:none; border:none; color:#ccc; cursor:pointer; font-size:13px; padding:2px 4px; border-radius:3px; }
+  .del:hover { color:#e74c3c; background:#fef0f0; }
+  .add-row { font-size:12px; color:var(--ts-blue); background:none; border:none; cursor:pointer; padding:6px 8px; margin-top:4px; font-family:'Roboto',sans-serif; }
+  .add-row:hover { text-decoration:underline; }
+
+  /* Totals */
+  .totals { margin-top:12px; text-align:right; }
+  .trow { display:flex; justify-content:flex-end; gap:20px; padding:3px 8px; font-size:13px; color:var(--muted); }
+  .trow.grand { font-weight:700; font-size:15px; color:var(--ts-dark); border-top:1px solid var(--border-md); padding-top:8px; margin-top:4px; }
+
+  .empty { text-align:center; padding:28px 12px; color:var(--light); font-size:12px; line-height:1.8; }
+  .footer { text-align:center; font-size:10px; color:var(--light); margin-top:14px; }
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <img class="hdr-logo" id="hdrLogo" src="" alt="TekStream" onerror="this.style.display='none';document.getElementById('hdrWord').style.display='block'">
+  <span id="hdrWord" style="color:#fff;font-size:18px;font-weight:700;display:none">TekStream</span>
+  <span class="hdr-tag">VAD Quote Generator</span>
+  <button onclick="newQuote()" style="background:rgba(255,255,255,0.15);border:0.5px solid rgba(255,255,255,0.3);color:#fff;padding:6px 14px;border-radius:6px;font-family:Roboto,sans-serif;font-size:12px;cursor:pointer;">New Quote</button>
+</div>
+<div class="hdr-accent"></div>
+
+<div class="layout">
+  <!-- LEFT -->
+  <div>
+
+
+    <div class="panel">
+      <div class="pt">Quote Details</div>
+      <label>Customer / company</label>
+      <input type="text" id="customerName" placeholder="MARTA">
+      <label>Contact name</label>
+      <input type="text" id="contactName" placeholder="Adrian Carter">
+      <label>Contact email</label>
+      <input type="text" id="contactEmail" placeholder="acarter@itsmarta.com">
+      <label>Quote number</label>
+      <input type="text" id="quoteNumber">
+      <div class="row2">
+        <div><label>Quote date</label><input type="date" id="quoteDate"></div>
+        <div><label>Expiration date</label><input type="date" id="expiryDate"></div>
+      </div>
+      <label>Margin %</label>
+      <input type="number" id="marginPct" value="15" min="0" max="100" step="0.5" oninput="recalcAll()">
+      <div class="hint" id="marginHint">15% margin applied</div>
+      <hr class="hr">
+      <label>VAD Quote PDF</label>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+        <input type="file" id="vadPdf" accept=".pdf" style="display:none" onchange="extractVAD(this)">
+        <button onclick="document.getElementById('vadPdf').click()" class="btn btn-outline" style="width:auto;padding:7px 14px;margin-top:0;">Upload VAD PDF</button>
+        <span id="extractStatus" style="font-size:11px;color:var(--muted)">No file selected</span>
+      </div>
+      <label>Cover note</label>
+      <textarea id="notes" placeholder="Thank you for the opportunity. This quote is valid for 30 days..."></textarea>
+      <label>Payment terms</label>
+      <input type="text" id="terms" value="Net 30">
+      <label>Prepared by — company</label>
+      <input type="text" id="preparedByCompany" placeholder="TekStream">
+      <label>Prepared by — name</label>
+      <input type="text" id="preparedBy" placeholder="Matt Clemmons">
+      <label>Prepared by — email</label>
+      <input type="text" id="preparedByEmail" placeholder="matt.clemmons@tekstream.com">
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div>
+    <div class="panel">
+      <div class="pt">Line Items</div>
+      <div id="liArea"><div class="empty">Add line items manually below,<br>or paste data from your VAD quote.</div></div>
+      <button class="add-row" onclick="addRow()">+ Add line item</button>
+      <div class="totals" id="totals"></div>
+      <hr class="hr">
+      <button class="btn btn-dark" onclick="downloadPdf()">Download PDF quote ↓</button>
+    </div>
+  </div>
+</div>
+
+<div class="footer">TekStream Quote Generator · Runs entirely in your browser · No data sent externally</div>
+
+<script>
+// ── Embedded TekStream logo (full color, dark bg) ──────────────────────────
+const EMBEDDED_LOGO = './logo.png';
+
+window.logoDataUrl = EMBEDDED_LOGO;
+window.lineItems = [];
+
+// ── Init ──────────────────────────────────────────────────────────────
+(async function() {
+  const t = new Date().toISOString().split('T')[0];
+  const e = new Date(Date.now()+30*864e5).toISOString().split('T')[0];
+  document.getElementById('quoteDate').value = t;
+  document.getElementById('expiryDate').value = e;
+  document.getElementById('quoteNumber').value = 'TS-'+new Date().getFullYear()+'-'+String(Math.floor(Math.random()*900)+100);
+  // Load logo from URL
+  try {
+    const resp = await fetch(EMBEDDED_LOGO);
+    const blob = await resp.blob();
+    window.logoDataUrl = await new Promise(res => { const r = new FileReader(); r.onload = e => res(e.target.result); r.readAsDataURL(blob); });
+    document.getElementById('hdrLogo').src = window.logoDataUrl;
+    document.getElementById('hdrLogo').style.display = 'block';
+    document.getElementById('hdrWord').style.display = 'none';
+  } catch(e) { window.logoDataUrl = null; }
+})();
+
+// ── Logo ──────────────────────────────────────────────────────────────
+function handleLogo(input) {
+  const f = input.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = e => {
+    window.logoDataUrl = e.target.result;
+    document.getElementById('hdrLogo').src = window.logoDataUrl;
+    document.getElementById('hdrLogo').style.display = 'block';
+    document.getElementById('hdrWord').style.display = 'none';
+  };
+  r.readAsDataURL(f);
+}
+
+// ── Line Items ────────────────────────────────────────────────────────
+function addRow() { window.lineItems.push({sku:'',description:'',qty:1,unit_price:0}); render(); }
+function removeRow(i) { window.lineItems.splice(i,1); render(); }
+function escH(s) { return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function cprice(vad,m) { return (!vad||vad<=0||m>=100)?0:vad/(1-m/100); }
+function fmt(n) { return n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+function render() {
+  const m = parseFloat(document.getElementById('marginPct').value)||0;
+  const area = document.getElementById('liArea');
+  if(!window.lineItems.length) {
+    area.innerHTML='<div class="empty">No items yet. Click "+ Add line item" below.</div>';
+    document.getElementById('totals').innerHTML=''; return;
+  }
+  let html=`<table><colgroup>
+    <col style="width:14%"><col style="width:42%"><col style="width:9%">
+    <col style="width:15%"><col style="width:15%"><col style="width:5%">
+  </colgroup>
+  <thead><tr><th>SKU</th><th>Description</th><th>Qty</th><th>VAD Price</th><th>Customer</th><th></th></tr></thead><tbody>`;
+  window.lineItems.forEach((it,i)=>{
+    const cp=cprice(it.unit_price,m), ext=cp*it.qty;
+    html+=`<tr>
+      <td><input value="${escH(it.sku)}" oninput="lineItems[${i}].sku=this.value"></td>
+      <td><input value="${escH(it.description)}" oninput="lineItems[${i}].description=this.value"></td>
+      <td><input type="number" value="${it.qty}" min="1" style="width:44px" oninput="lineItems[${i}].qty=+this.value;recalcAll()"></td>
+      <td><input type="number" value="${it.unit_price.toFixed(2)}" step="0.01" min="0" oninput="lineItems[${i}].unit_price=+this.value;recalcAll()"></td>
+      <td style="color:var(--muted);font-size:12px">${ext>0?'$'+fmt(ext):'—'}</td>
+      <td><button class="del" onclick="removeRow(${i})">✕</button></td>
+    </tr>`;
+  });
+  area.innerHTML=html+'</tbody></table>';
+  const sub=window.lineItems.reduce((s,it)=>s+cprice(it.unit_price,m)*it.qty,0);
+  document.getElementById('totals').innerHTML=`
+    <div class="trow"><span>Subtotal</span><span>$${fmt(sub)}</span></div>
+    <div class="trow grand"><span>Total (USD)</span><span>$${fmt(sub)}</span></div>`;
+}
+
+function recalcAll() {
+  const m=parseFloat(document.getElementById('marginPct').value)||0;
+  document.getElementById('marginHint').textContent=m>0?`${m}% margin applied`:'';
+  render();
+}
+
+// ── New Quote ────────────────────────────────────────────────────────
+function newQuote() {
+  ['customerName','contactName','contactEmail','preparedByCompany','preparedBy','preparedByEmail','notes','terms'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('terms').value = 'Net 30';
+  document.getElementById('marginPct').value = '15';
+  document.getElementById('marginHint').textContent = '15% margin applied';
+  document.getElementById('quoteNumber').value = 'TS-'+new Date().getFullYear()+'-'+String(Math.floor(Math.random()*900)+100);
+  const today = new Date().toISOString().split('T')[0];
+  const exp = new Date(Date.now()+30*864e5).toISOString().split('T')[0];
+  document.getElementById('quoteDate').value = today;
+  document.getElementById('expiryDate').value = exp;
+  window.lineItems = [];
+  render();
+  document.getElementById('extractStatus').textContent = 'No file selected';
+  document.getElementById('vadPdf').value = '';
+}
+
+// ── VAD PDF Extraction ────────────────────────────────────────────────
+async function extractVAD(input) {
+  const file = input.files[0]; if (!file) return;
+  document.getElementById('extractStatus').textContent = 'Extracting…';
+
+  try {
+    const b64 = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = e => res(e.target.result.split(',')[1]);
+      r.onerror = rej;
+      r.readAsDataURL(file);
+    });
+
+    const resp = await fetch('/.netlify/functions/extract', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pdfBase64: b64 })
+    });
+
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.error || resp.status); }
+    const parsed = await resp.json();
+
+    // Populate Prepared By (TO = TekStream)
+    if (parsed.to) {
+      document.getElementById('preparedByCompany').value = parsed.to.company || '';
+      document.getElementById('preparedBy').value = parsed.to.name || '';
+      document.getElementById('preparedByEmail').value = parsed.to.email || '';
+    }
+    // Populate Prepared For (FOR = end customer)
+    if (parsed.for) {
+      document.getElementById('customerName').value = parsed.for.company || '';
+      document.getElementById('contactName').value = parsed.for.name || '';
+      document.getElementById('contactEmail').value = parsed.for.email || '';
+    }
+    // Populate line items
+    if (parsed.lineItems?.length) {
+      window.loadLineItems(parsed.lineItems);
+    }
+
+    document.getElementById('extractStatus').textContent = `✓ Extracted ${parsed.lineItems?.length || 0} line items`;
+  } catch(e) {
+    document.getElementById('extractStatus').textContent = 'Error: ' + e.message;
+  }
+}
+
+// Allow external loading of line items (e.g. from Claude chat)
+window.loadLineItems = function(items) {
+  window.lineItems = items.map(it=>({
+    sku:String(it.sku||''),
+    description:String(it.description||''),
+    qty:parseFloat(it.qty)||1,
+    unit_price:parseFloat(String(it.unit_price||'0').replace(/[$,]/g,''))||0
+  }));
+  render();
+};
+
+// ── PDF Download ──────────────────────────────────────────────────────
+async function downloadPdf() {
+  const {jsPDF} = window.jspdf;
+  const m  = parseFloat(document.getElementById('marginPct').value)||0;
+  const cn = document.getElementById('customerName').value||'Customer';
+  const co = document.getElementById('contactName').value||'';
+  const qn = document.getElementById('quoteNumber').value||'TS-QUOTE';
+  const qd = document.getElementById('quoteDate').value;
+  const ed = document.getElementById('expiryDate').value;
+  const nt = document.getElementById('notes').value;
+  const tm = document.getElementById('terms').value||'Net 30';
+  const pb = document.getElementById('preparedBy').value||'TekStream';
+
+  const doc = new jsPDF({unit:'pt',format:'letter'});
+  const W=612, L=48, R=564;
+
+  // Header bar
+  doc.setFillColor(0,54,88); doc.rect(0,0,W,68,'F');
+  try {
+    const logoImg = new Image();
+    await new Promise((res, rej) => { logoImg.onload = res; logoImg.onerror = rej; logoImg.src = window.logoDataUrl; });
+    const logoH = 46;
+    const logoW = logoImg.naturalWidth * (logoH / logoImg.naturalHeight);
+    doc.addImage(window.logoDataUrl, 'PNG', L, 11, logoW, logoH);
+  } catch(e) { doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(255,255,255); doc.text('TekStream',L,36); }
+  // Accent stripe
+  doc.setFillColor(91,148,203); doc.rect(0,68,W,5,'F');
+
+  // Quote meta (top right)
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(255,255,255);
+  doc.text(`Quote #  ${qn}`,R,28,{align:'right'});
+  doc.setFont('helvetica','normal');
+  doc.text(`Date:  ${qd}`,R,42,{align:'right'});
+  doc.text(`Expires:  ${ed}`,R,56,{align:'right'});
+
+  // Title
+  doc.setFont('helvetica','bold'); doc.setFontSize(22); doc.setTextColor(0,54,88);
+  doc.text('Quote',L,108);
+
+  // Bill-to card
+  doc.setFillColor(235,243,251); doc.roundedRect(L,118,210,58,3,3,'F');
+  doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(91,148,203);
+  doc.text('PREPARED FOR',L+10,133);
+  const ce  = document.getElementById('contactEmail').value || '';
+  const pbc = document.getElementById('preparedByCompany').value || 'TekStream';
+  const pbe = document.getElementById('preparedByEmail').value || '';
+  doc.setFillColor(235,243,251); doc.roundedRect(L,118,210,70,3,3,'F');
+  doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(91,148,203);
+  doc.text('PREPARED FOR',L+10,133);
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(0,54,88);
+  doc.text(cn,L+10,149);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(113,113,116);
+  if(co) doc.text(co,L+10,161);
+  if(ce) doc.text(ce,L+10,173);
+
+  // Prepared by
+  doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(91,148,203);
+  doc.text('PREPARED BY',R-200,133);
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(0,54,88);
+  doc.text(pbc,R-200,149);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(113,113,116);
+  if(pb)  doc.text(pb, R-200,161);
+  if(pbe) doc.text(pbe,R-200,173);
+
+  let y=210;
+  if(nt){
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(60,60,60);
+    const lines=doc.splitTextToSize(nt,R-L);
+    doc.text(lines,L,y); y+=lines.length*13+14;
+  }
+
+  // Table header
+  // Column layout: SKU=20%, Desc=fills, Qty+Price+Ext fixed
+  const skuW   = (R-L) * 0.20;       // 20% fixed for SKU
+  const fixedW = 42 + 68 + 64;       // Qty + UnitPrice + Extended
+  const descW  = (R-L) - skuW - fixedW - 12; // remaining for description
+  const colSku  = L + 6;
+  const colDesc = L + skuW + 6;
+  const colQty  = R - 64 - 68 - 6;
+  const colPrice= R - 64 - 4;
+  const colExt  = R - 4;
+  const rowPad  = 5; // padding top/bottom inside each row
+  const lineH   = 11; // line height per text line
+
+  // Header
+  doc.setFillColor(0,54,88); doc.rect(L,y,R-L,20,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(255,255,255);
+  doc.text('SKU',       colSku,  y+14);
+  doc.text('Description',colDesc, y+14);
+  doc.text('Qty',       colQty,  y+14, {align:'right'});
+  doc.text('Unit Price',colPrice, y+14, {align:'right'});
+  doc.text('Extended',  colExt,  y+14, {align:'right'});
+  y += 20;
+
+  let subtotal = 0;
+  doc.setFont('helvetica','normal');
+  lineItems.forEach((it, idx) => {
+    const cp  = cprice(it.unit_price, m), ext = cp * it.qty;
+    subtotal += ext;
+
+    // Wrap both SKU and description, use whichever needs more lines
+    const skuLines  = doc.splitTextToSize(it.sku  || '', skuW - 6);
+    const descLines = doc.splitTextToSize(it.description || '', descW - 6);
+    const numLines  = Math.max(skuLines.length, descLines.length, 1);
+    const rowH      = numLines * lineH + rowPad * 2;
+
+    if (idx % 2 === 1) { doc.setFillColor(235,243,251); doc.rect(L, y, R-L, rowH, 'F'); }
+
+    doc.setTextColor(19,17,18); doc.setFontSize(9);
+    doc.text(skuLines,  colSku,  y + rowPad + lineH - 2);
+    doc.text(descLines, colDesc, y + rowPad + lineH - 2);
+    // Right-aligned single-line values — vertically centered
+    const midY = y + rowH / 2 + 3;
+    doc.text(it.qty.toLocaleString(), colQty,  midY, {align:'right'});
+    doc.text(cp  > 0 ? '$'+cp.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—', colPrice, midY, {align:'right'});
+    doc.text(ext > 0 ? '$'+fmt(ext)       : '—', colExt,   midY, {align:'right'});
+    y += rowH;
+  });
+
+  // Total
+  y+=6;
+  doc.setDrawColor(91,148,203); doc.setLineWidth(0.5); doc.line(R-190,y,R,y); y+=14;
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(0,54,88);
+  doc.text('Total (USD)',R-186,y);
+  doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});
+
+  // Footer text
+  y+=28;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(113,113,116);
+  doc.text('Payment terms: '+tm,L,y); y+=12;
+  doc.text('This quote is valid through the expiration date above. All prices are in USD.',L,y); y+=12;
+  doc.text('Quote subject to change without notice. Contact your TekStream representative with questions.',L,y);
+
+  // Footer bar
+  doc.setFillColor(0,54,88); doc.rect(0,748,W,6,'F');
+  doc.setFillColor(91,148,203); doc.rect(0,754,W,14,'F');
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(255,255,255);
+  doc.text('Copyright © TekStream Solutions, LLC 2026  |  tekstream.com  |  Confidential',W/2,763,{align:'center'});
+
+  doc.save(`${qn} - ${cn}.pdf`);
+}
+</script>
+</body>
+</html>
