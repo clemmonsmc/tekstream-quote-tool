@@ -246,6 +246,7 @@ async function downloadPdf(){
   var pbc=document.getElementById('preparedByCompany').value||'TekStream Solutions';
   var pbe=document.getElementById('preparedByEmail').value||'';
   var logoSrc=document.getElementById('hdrLogo').src;
+  var pdfGroups=groupByYear(window.lineItems);
   var doc=new jsPDF({unit:'pt',format:'letter'});
   var W=612,L=48,R=564;
   doc.setFillColor(0,54,88);doc.rect(0,0,W,68,'F');
@@ -273,9 +274,16 @@ async function downloadPdf(){
   doc.text('Start',colSt+dateW,y+14,{align:'right'});doc.text('End',colEd+dateW,y+14,{align:'right'});
   doc.text('Qty',colQty+qtyW,y+14,{align:'right'});doc.text('Unit Price',colPr+priceW,y+14,{align:'right'});doc.text('Extended',colEx,y+14,{align:'right'});
   y+=20;var subtotal=0;doc.setFont('helvetica','normal');
-    var pdfGroups=groupByYear(window.lineItems);
+    var PAGE_H=792,MARGIN_BOTTOM=100;
+  function newPageIfNeeded(neededH) {
+    if(y+neededH > PAGE_H-MARGIN_BOTTOM) {
+      doc.addPage();
+      y=48;
+    }
+  }
   function renderPdfRow(it,idx,altRow){
     var cp=cprice(it.unit_price,m),ext=cp*it.qty;subtotal+=ext;
+    newPageIfNeeded(30);
     var skuL=doc.splitTextToSize(it.sku||'',skuW-4),descL=doc.splitTextToSize(it.description||'',descW-4);
     var nL=Math.max(skuL.length,descL.length,1),rowH=nL*11+10;
     if(altRow){doc.setFillColor(235,243,251);doc.rect(L,y,R-L,rowH,'F');}
@@ -300,6 +308,7 @@ async function downloadPdf(){
       var grpSubtotal=0,prevSubtotal=subtotal;
       grp.items.forEach(function(it,idx){ renderPdfRow(it,idx,idx%2===1); });
       grpSubtotal=subtotal-prevSubtotal;
+      newPageIfNeeded(20);
       doc.setFillColor(235,243,251);doc.rect(L,y,R-L,14,'F');
       doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(0,54,88);
       doc.text(grp.label+' Subtotal',colPr+priceW,y+10,{align:'right'});
@@ -307,6 +316,7 @@ async function downloadPdf(){
       y+=18;
     });
   }
+  newPageIfNeeded(80);
   y+=6;doc.setDrawColor(91,148,203);doc.setLineWidth(0.5);doc.line(R-190,y,R,y);y+=14;
   doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);
   doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});
