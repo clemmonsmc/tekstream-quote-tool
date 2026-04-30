@@ -103,23 +103,62 @@ function fmt(n){return n.toLocaleString('en-US',{minimumFractionDigits:2,maximum
 function addRow(){window.lineItems.push({sku:'',description:'',qty:1,unit_price:0,start_date:'',end_date:''});render();}
 function removeRow(i){window.lineItems.splice(i,1);render();}
 
+
+function groupByYear(items) {
+  var years = [], groups = {};
+  items.forEach(function(it) {
+    var yr = it.start_date ? it.start_date.substring(0,4) : '__none__';
+    if (!groups[yr]) { groups[yr] = []; years.push(yr); }
+    groups[yr].push(it);
+  });
+  var realYears = years.filter(function(y){ return y !== '__none__'; });
+  if (realYears.length <= 1) return null;
+  years.sort(function(a,b){ return a==='__none__'?1:b==='__none__'?-1:a.localeCompare(b); });
+  return years.map(function(yr, idx) {
+    return { label: yr==='__none__'?'Other':'Year '+(idx+1)+' ('+yr+')', items: groups[yr] };
+  });
+}
+
+function renderRow(it, i, m) {
+  var cp=cprice(it.unit_price,m), ext=cp*it.qty;
+  var h = '<tr>';
+  h += '<td><input value="'+escH(it.sku)+'" oninput="lineItems['+i+'].sku=this.value" autocomplete="off"></td>';
+  h += '<td><input value="'+escH(it.description)+'" oninput="lineItems['+i+'].description=this.value" autocomplete="off"></td>';
+  h += '<td><input type="number" value="'+it.qty+'" min="1" style="width:50px" oninput="lineItems['+i+'].qty=+this.value;recalcAll()" autocomplete="off"></td>';
+  h += '<td><input type="number" value="'+it.unit_price.toFixed(2)+'" step="0.01" min="0" oninput="lineItems['+i+'].unit_price=+this.value;recalcAll()" autocomplete="off"></td>';
+  h += '<td><input type="date" value="'+escH(it.start_date||'')+'" style="width:105px" oninput="lineItems['+i+'].start_date=this.value"></td>';
+  h += '<td><input type="date" value="'+escH(it.end_date||'')+'" style="width:105px" oninput="lineItems['+i+'].end_date=this.value"></td>';
+  h += '<td class="muted">'+(ext>0?'$'+fmt(ext):'\u2014')+'</td>';
+  h += '<td><button class="del" onclick="removeRow('+i+')">✕</button></td>';
+  h += '</tr>';
+  return h;
+}
 function render(){
   var m=parseFloat(document.getElementById('marginPct').value)||0;
   var area=document.getElementById('liArea');
   if(!window.lineItems.length){area.innerHTML='<div class="empty">Add line items manually or upload a VAD quote.</div>';document.getElementById('totals').innerHTML='';updateMarginDollar(m,0,0);return;}
-  var h='<table><colgroup><col style="width:11%"><col style="width:28%"><col style="width:6%"><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:22%"><col style="width:5%"></colgroup><thead><tr><th>SKU</th><th>Description</th><th>Qty</th><th>VAD Price</th><th>Start</th><th>End</th><th>Customer</th><th></th></tr></thead><tbody>';
-  window.lineItems.forEach(function(it,i){
-    var cp=cprice(it.unit_price,m),ext=cp*it.qty;
-    h+='<tr><td><input value="'+escH(it.sku)+'" oninput="lineItems['+i+'].sku=this.value" autocomplete="off"></td>';
-    h+='<td><input value="'+escH(it.description)+'" oninput="lineItems['+i+'].description=this.value" autocomplete="off"></td>';
-    h+='<td><input type="number" value="'+it.qty+'" min="1" style="width:50px" oninput="lineItems['+i+'].qty=+this.value;recalcAll()" autocomplete="off"></td>';
-    h+='<td><input type="number" value="'+it.unit_price.toFixed(2)+'" step="0.01" min="0" oninput="lineItems['+i+'].unit_price=+this.value;recalcAll()" autocomplete="off"></td>';
-    h+='<td><input type="date" value="'+escH(it.start_date||'')+'" style="width:105px" oninput="lineItems['+i+'].start_date=this.value"></td>';
-    h+='<td><input type="date" value="'+escH(it.end_date||'')+'" style="width:105px" oninput="lineItems['+i+'].end_date=this.value"></td>';
-    h+='<td class="muted">'+(ext>0?'$'+fmt(ext):'—')+'</td>';
-    h+='<td><button class="del" onclick="removeRow('+i+')">✕</button></td></tr>';
-  });
-  area.innerHTML=h+'</tbody></table>';
+  var tblHdr='<table><colgroup><col style="width:11%"><col style="width:28%"><col style="width:6%"><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:22%"><col style="width:5%"></colgroup><thead><tr><th>SKU</th><th>Description</th><th>Qty</th><th>VAD Price</th><th>Start</th><th>End</th><th>Customer</th><th></th></tr></thead><tbody>';
+  var h = '';
+  var groups = groupByYear(window.lineItems);
+  if (!groups) {
+    h += tblHdr;
+    window.lineItems.forEach(function(it,i){ h += renderRow(it,i,m); });
+    h += '</tbody></table>';
+  } else {
+    groups.forEach(function(grp) {
+      h += tblHdr;
+      h += '<tr><td colspan="8" style="background:#003658;color:#fff;font-weight:700;font-size:12px;padding:7px 8px;letter-spacing:.05em">'+grp.label+'</td></tr>';
+      var grpTotal = 0;
+      grp.items.forEach(function(it) {
+        var i = window.lineItems.indexOf(it);
+        grpTotal += cprice(it.unit_price,m)*it.qty;
+        h += renderRow(it,i,m);
+      });
+      h += '<tr style="background:#EBF3FB"><td colspan="6" style="text-align:right;font-size:12px;font-weight:600;padding:6px 8px;color:#003658">'+grp.label+' Subtotal</td><td style="font-size:12px;font-weight:700;color:#003658;padding:6px 4px">$'+fmt(grpTotal)+'</td><td></td></tr>';
+      h += '</tbody></table><div style="margin-bottom:12px"></div>';
+    });
+  }
+  area.innerHTML = h;
   var vadTotal=window.lineItems.reduce(function(s,it){return s+it.unit_price*it.qty;},0);
   var sub=window.lineItems.reduce(function(s,it){return s+cprice(it.unit_price,m)*it.qty;},0);
   document.getElementById('totals').innerHTML='<div class="trow"><span>Subtotal</span><span>$'+fmt(sub)+'</span></div><div class="trow grand"><span>Total (USD)</span><span>$'+fmt(sub)+'</span></div>';
@@ -234,20 +273,40 @@ async function downloadPdf(){
   doc.text('Start',colSt+dateW,y+14,{align:'right'});doc.text('End',colEd+dateW,y+14,{align:'right'});
   doc.text('Qty',colQty+qtyW,y+14,{align:'right'});doc.text('Unit Price',colPr+priceW,y+14,{align:'right'});doc.text('Extended',colEx,y+14,{align:'right'});
   y+=20;var subtotal=0;doc.setFont('helvetica','normal');
-  window.lineItems.forEach(function(it,idx){
+    var pdfGroups=groupByYear(window.lineItems);
+  function renderPdfRow(it,idx,altRow){
     var cp=cprice(it.unit_price,m),ext=cp*it.qty;subtotal+=ext;
     var skuL=doc.splitTextToSize(it.sku||'',skuW-4),descL=doc.splitTextToSize(it.description||'',descW-4);
     var nL=Math.max(skuL.length,descL.length,1),rowH=nL*11+10;
-    if(idx%2===1){doc.setFillColor(235,243,251);doc.rect(L,y,R-L,rowH,'F');}
-    doc.setTextColor(19,17,18);doc.setFontSize(8.5);doc.text(skuL,colSku,y+9);doc.text(descL,colDesc,y+9);
+    if(altRow){doc.setFillColor(235,243,251);doc.rect(L,y,R-L,rowH,'F');}
+    doc.setFont('helvetica','normal');doc.setTextColor(19,17,18);doc.setFontSize(8.5);
+    doc.text(skuL,colSku,y+9);doc.text(descL,colDesc,y+9);
     var mid=y+rowH/2+3;
     if(it.start_date)doc.text(it.start_date,colSt+dateW,mid,{align:'right'});
     if(it.end_date)doc.text(it.end_date,colEd+dateW,mid,{align:'right'});
     doc.text(it.qty.toLocaleString(),colQty+qtyW,mid,{align:'right'});
-    doc.text(cp>0?'$'+fmt(cp):'—',colPr+priceW,mid,{align:'right'});
-    doc.text(ext>0?'$'+fmt(ext):'—',colEx,mid,{align:'right'});
+    doc.text(cp>0?'$'+fmt(cp):'\u2014',colPr+priceW,mid,{align:'right'});
+    doc.text(ext>0?'$'+fmt(ext):'\u2014',colEx,mid,{align:'right'});
     y+=rowH;
-  });
+  }
+  if(!pdfGroups){
+    window.lineItems.forEach(function(it,idx){ renderPdfRow(it,idx,idx%2===1); });
+  } else {
+    pdfGroups.forEach(function(grp){
+      doc.setFillColor(0,54,88);doc.rect(L,y,R-L,16,'F');
+      doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);
+      doc.text(grp.label,L+6,y+11);
+      y+=16;
+      var grpSubtotal=0,prevSubtotal=subtotal;
+      grp.items.forEach(function(it,idx){ renderPdfRow(it,idx,idx%2===1); });
+      grpSubtotal=subtotal-prevSubtotal;
+      doc.setFillColor(235,243,251);doc.rect(L,y,R-L,14,'F');
+      doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(0,54,88);
+      doc.text(grp.label+' Subtotal',colPr+priceW,y+10,{align:'right'});
+      doc.text('$'+fmt(grpSubtotal),colEx,y+10,{align:'right'});
+      y+=18;
+    });
+  }
   y+=6;doc.setDrawColor(91,148,203);doc.setLineWidth(0.5);doc.line(R-190,y,R,y);y+=14;
   doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);
   doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});
