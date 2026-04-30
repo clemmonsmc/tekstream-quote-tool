@@ -177,20 +177,19 @@ window.loadLineItems=function(items){
 
 async function emailQuote(){
   await downloadPdf();
-  var cn=document.getElementById('customerName').value||'Customer';
-  var co=document.getElementById('contactName').value||'';
-  var ce=document.getElementById('contactEmail').value||'';
-  var qn=document.getElementById('quoteNumber').value||'TS-QUOTE';
-  var ed=document.getElementById('expiryDate').value||'';
-  var nt=document.getElementById('notes').value||'';
-  var body=(co?'Hi '+co.split(' ')[0]+',':'Hi,')+'
-
-Please find attached our quote '+qn+' for '+cn+(ed?' valid through '+ed:'')+'.'
-
-'+(nt?nt+'
-
-':'')+"Please don't hesitate to reach out with any questions. We look forward to the opportunity to work with you.";
-  window.location.href='mailto:'+encodeURIComponent(ce)+'?subject='+encodeURIComponent('TekStream Quote '+qn+' for '+cn)+'&body='+encodeURIComponent(body);
+  var cn=document.getElementById("customerName").value||"Customer";
+  var co=document.getElementById("contactName").value||"";
+  var ce=document.getElementById("contactEmail").value||"";
+  var qn=document.getElementById("quoteNumber").value||"TS-QUOTE";
+  var ed=document.getElementById("expiryDate").value||"";
+  var nt=document.getElementById("notes").value||"";
+  var greeting=co?"Hi "+co.split(" ")[0]+",":"Hi,";
+  var parts=[greeting,""];
+  parts.push("Please find attached our quote "+qn+" for "+cn+(ed?" valid through "+ed:"")+".","");
+  if(nt){parts.push(nt,"");}
+  parts.push("Please don't hesitate to reach out with any questions. We look forward to the opportunity to work with you.");
+  var body=parts.join("\n");
+  window.location.href="mailto:"+encodeURIComponent(ce)+"?subject="+encodeURIComponent("TekStream Quote "+qn+" for "+cn)+"&body="+encodeURIComponent(body);
 }
 
 async function downloadPdf(){
@@ -211,10 +210,7 @@ async function downloadPdf(){
   var doc=new jsPDF({unit:'pt',format:'letter'});
   var W=612,L=48,R=564;
   doc.setFillColor(0,54,88);doc.rect(0,0,W,68,'F');
-  if(logoSrc&&logoSrc.startsWith('data:')){
-    try{var li=new Image();await new Promise(function(res,rej){li.onload=res;li.onerror=rej;li.src=logoSrc;});doc.addImage(logoSrc,'PNG',L,11,li.naturalWidth*(46/li.naturalHeight),46);}
-    catch(e){doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(255,255,255);doc.text('TekStream',L,36);}
-  }
+  if(logoSrc&&logoSrc.startsWith('data:')){try{var li=new Image();await new Promise(function(res,rej){li.onload=res;li.onerror=rej;li.src=logoSrc;});doc.addImage(logoSrc,'PNG',L,11,li.naturalWidth*(46/li.naturalHeight),46);}catch(e){doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(255,255,255);doc.text('TekStream',L,36);}}
   doc.setFillColor(91,148,203);doc.rect(0,68,W,5,'F');
   doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);
   doc.text('Quote #  '+qn,R,28,{align:'right'});doc.setFont('helvetica','normal');doc.text('Date:  '+qd,R,42,{align:'right'});doc.text('Expires:  '+ed,R,56,{align:'right'});
