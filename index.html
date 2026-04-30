@@ -4,442 +4,265 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TekStream Quote Generator</title>
-<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --ts-dark: #003658; --ts-blue: #5B94CB; --ts-grey: #717174; --ts-black: #131112;
-    --bg: #f4f3f0; --surface: #ffffff;
-    --border: rgba(0,0,0,0.09); --border-md: rgba(0,0,0,0.15);
-    --text: #131112; --muted: #717174; --light: #aaa;
-    --r: 10px; --rs: 6px;
-  }
-  body { font-family:'Roboto',sans-serif; background:var(--bg); color:var(--text); font-size:14px; line-height:1.5; min-height:100vh; padding:20px; }
-
-  /* Header */
-  .hdr { background:var(--ts-dark); border-radius:var(--r); padding:0 24px; height:60px; display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
-  .hdr-logo { height:42px; object-fit:contain; }
-  .hdr-tag { color:rgba(255,255,255,0.45); font-size:11px; font-weight:500; letter-spacing:.08em; text-transform:uppercase; }
-  .hdr-accent { height:4px; background:var(--ts-blue); border-radius:0 0 var(--r) var(--r); margin-top:-4px; margin-bottom:20px; }
-
-  /* Layout */
-  .layout { display:grid; grid-template-columns:340px 1fr; gap:14px; align-items:start; }
-
-  /* Panel */
-  .panel { background:var(--surface); border:0.5px solid var(--border); border-radius:var(--r); padding:18px; margin-bottom:14px; }
-  .panel:last-child { margin-bottom:0; }
-  .pt { font-size:10px; font-weight:700; color:var(--ts-blue); text-transform:uppercase; letter-spacing:.1em; margin-bottom:14px; }
-
-  /* Form */
-  label { display:block; font-size:11px; color:var(--muted); margin-bottom:3px; margin-top:11px; }
-  label:first-of-type { margin-top:0; }
-  input[type=text],input[type=number],input[type=date],textarea {
-    width:100%; padding:7px 10px; border:0.5px solid var(--border-md); border-radius:var(--rs);
-    font-family:'Roboto',sans-serif; font-size:13px; color:var(--text); background:#fafafa; outline:none; transition:border-color .15s;
-  }
-  input:focus,textarea:focus { border-color:var(--ts-blue); background:#fff; }
-  textarea { resize:vertical; min-height:60px; }
-  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  .hr { border:none; border-top:0.5px solid var(--border); margin:12px 0; }
-  .hint { font-size:10px; color:var(--light); margin-top:3px; }
-
-  /* Logo row */
-  .logo-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
-  .logo-thumb { height:28px; max-width:120px; object-fit:contain; background:var(--ts-dark); border-radius:4px; padding:3px 8px; }
-  .btn-lnk { background:none; border:none; color:var(--ts-blue); font-size:11px; cursor:pointer; font-family:'Roboto',sans-serif; text-decoration:underline; padding:0; }
-
-  /* Buttons */
-  .btn { width:100%; padding:10px 16px; border:none; border-radius:var(--rs); font-family:'Roboto',sans-serif; font-size:13px; font-weight:500; cursor:pointer; margin-top:8px; transition:opacity .15s,background .15s; }
-  .btn:disabled { opacity:.35; cursor:not-allowed; }
-  .btn-dark { background:var(--ts-dark); color:#fff; }
-  .btn-dark:hover:not(:disabled) { background:#004e7a; }
-
-  /* Line items */
-  table { width:100%; border-collapse:collapse; font-size:12px; table-layout:fixed; }
-  th { text-align:left; font-size:10px; font-weight:500; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); padding:6px 8px; border-bottom:0.5px solid var(--border); }
-  td { padding:5px 8px; border-bottom:0.5px solid var(--border); vertical-align:middle; overflow:hidden; }
-  td input { border:none; background:transparent; padding:2px 0; font-size:12px; width:100%; font-family:'Roboto',sans-serif; outline:none; }
-  td input:focus { border-bottom:1px solid var(--ts-blue); }
-  tr:hover td { background:#fafbfc; }
-  .del { background:none; border:none; color:#ccc; cursor:pointer; font-size:13px; padding:2px 4px; border-radius:3px; }
-  .del:hover { color:#e74c3c; background:#fef0f0; }
-  .add-row { font-size:12px; color:var(--ts-blue); background:none; border:none; cursor:pointer; padding:6px 8px; margin-top:4px; font-family:'Roboto',sans-serif; }
-  .add-row:hover { text-decoration:underline; }
-
-  /* Totals */
-  .totals { margin-top:12px; text-align:right; }
-  .trow { display:flex; justify-content:flex-end; gap:20px; padding:3px 8px; font-size:13px; color:var(--muted); }
-  .trow.grand { font-weight:700; font-size:15px; color:var(--ts-dark); border-top:1px solid var(--border-md); padding-top:8px; margin-top:4px; }
-
-  .empty { text-align:center; padding:28px 12px; color:var(--light); font-size:12px; line-height:1.8; }
-  .footer { text-align:center; font-size:10px; color:var(--light); margin-top:14px; }
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;color:#13110F;font-size:14px}
+.hdr{background:#003658;display:flex;align-items:center;padding:0 24px;height:68px;gap:16px;position:relative}
+.hdr::after{content:'';position:absolute;left:0;right:0;top:68px;height:5px;background:#5B94CB}
+.hdr-logo{height:46px}.hdr-tag{color:rgba(255,255,255,.65);font-size:13px;letter-spacing:.08em;text-transform:uppercase;flex:1;text-align:center}
+.btn{background:#003658;color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600}.btn:hover{background:#004f7a}
+.btn-sm{padding:6px 12px;font-size:12px}
+.layout{display:grid;grid-template-columns:320px 1fr;gap:20px;padding:28px 24px;max-width:1400px;margin:0 auto}
+.card{background:#fff;border-radius:10px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.section-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5B94CB;margin-bottom:12px}
+.field{margin-bottom:14px}.field label{display:block;font-size:12px;color:#717174;margin-bottom:4px}
+.field input,.field textarea{width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:7px 10px;font-size:13px;color:#13110F;background:#fff;outline:none;transition:border-color .15s}
+.field input:focus,.field textarea:focus{border-color:#5B94CB}.field textarea{resize:vertical;min-height:72px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.upload-row{display:flex;align-items:center;gap:10px}.upload-status{font-size:12px;color:#717174}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#003658;color:#fff;padding:9px 8px;text-align:left;font-weight:600;font-size:11px}
+td{padding:5px 3px;border-bottom:1px solid #f0f2f5;vertical-align:middle}
+tr:nth-child(even) td{background:#EBF3FB}
+td input{border:1.5px solid #e2e8f0;border-radius:4px;padding:4px 5px;font-size:12px;width:100%;background:#fff}
+td input:focus{border-color:#5B94CB;outline:none}td input[type=date]{font-size:11px}
+.del{background:none;border:none;color:#c00;cursor:pointer;font-size:14px;padding:2px 6px}
+.muted{color:#717174;font-size:12px}
+.trow{display:flex;justify-content:flex-end;gap:40px;padding:3px 0;font-size:13px}
+.trow.grand{font-size:16px;font-weight:700;color:#003658}
+.empty{color:#717174;text-align:center;padding:40px;font-size:13px}
+.btn-row{display:flex;gap:10px;margin-top:16px}.dl-btn{flex:1;padding:13px;font-size:15px;border-radius:8px}
 </style>
 </head>
 <body>
-
 <div class="hdr">
-  <img class="hdr-logo" id="hdrLogo" src="" alt="TekStream" onerror="this.style.display='none';document.getElementById('hdrWord').style.display='block'">
-  <span id="hdrWord" style="color:#fff;font-size:18px;font-weight:700;display:none">TekStream</span>
+  <img class="hdr-logo" id="hdrLogo" src="data:image/png;base64,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" alt="TekStream">
   <span class="hdr-tag">VAD Quote Generator</span>
-  <button onclick="newQuote()" style="background:rgba(255,255,255,0.15);border:0.5px solid rgba(255,255,255,0.3);color:#fff;padding:6px 14px;border-radius:6px;font-family:Roboto,sans-serif;font-size:12px;cursor:pointer;">New Quote</button>
+  <button class="btn" style="border:1.5px solid rgba(255,255,255,.4);background:transparent" onclick="newQuote()">New Quote</button>
 </div>
-<div class="hdr-accent"></div>
-
 <div class="layout">
-  <!-- LEFT -->
-  <div>
-
-
-    <div class="panel">
-      <div class="pt">Quote Details</div>
-      <label>Customer / company</label>
-      <input type="text" id="customerName" placeholder="MARTA">
-      <label>Contact name</label>
-      <input type="text" id="contactName" placeholder="Adrian Carter">
-      <label>Contact email</label>
-      <input type="text" id="contactEmail" placeholder="acarter@itsmarta.com">
-      <label>Quote number</label>
-      <input type="text" id="quoteNumber">
-      <div class="row2">
-        <div><label>Quote date</label><input type="date" id="quoteDate"></div>
-        <div><label>Expiration date</label><input type="date" id="expiryDate"></div>
-      </div>
-      <label>Margin %</label>
-      <input type="number" id="marginPct" value="15" min="0" max="100" step="0.5" oninput="recalcAll()">
-      <div class="hint" id="marginHint">15% margin applied</div>
-      <hr class="hr">
-      <label>VAD Quote PDF</label>
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
-        <input type="file" id="vadPdf" accept=".pdf" style="display:none" onchange="extractVAD(this)">
-        <button onclick="document.getElementById('vadPdf').click()" class="btn btn-outline" style="width:auto;padding:7px 14px;margin-top:0;">Upload VAD PDF</button>
-        <span id="extractStatus" style="font-size:11px;color:var(--muted)">No file selected</span>
-      </div>
-      <label>Cover note</label>
-      <textarea id="notes" placeholder="Thank you for the opportunity. This quote is valid for 30 days..."></textarea>
-      <label>Payment terms</label>
-      <input type="text" id="terms" value="Net 30">
-      <label>Prepared by — company</label>
-      <input type="text" id="preparedByCompany" placeholder="TekStream">
-      <label>Prepared by — name</label>
-      <input type="text" id="preparedBy" placeholder="Matt Clemmons">
-      <label>Prepared by — email</label>
-      <input type="text" id="preparedByEmail" placeholder="matt.clemmons@tekstream.com">
+  <div class="card">
+    <div class="section-label">Quote Details</div>
+    <div class="field"><label>Customer / company</label><input id="customerName" autocomplete="off" placeholder="ACME Corp"></div>
+    <div class="field"><label>Contact name</label><input id="contactName" autocomplete="off"></div>
+    <div class="field"><label>Contact email</label><input id="contactEmail" autocomplete="off"></div>
+    <div class="field"><label>Quote number</label><input id="quoteNumber" autocomplete="off"></div>
+    <div class="field-row">
+      <div class="field"><label>Quote date</label><input id="quoteDate" type="date"></div>
+      <div class="field"><label>Expiration date</label><input id="expiryDate" type="date" oninput="this.style.borderColor=this.value?'':'#e53e3e'"></div>
     </div>
+    <div class="field">
+      <label>Margin %</label>
+      <input id="marginPct" type="number" value="15" min="0" max="99" step="0.5" autocomplete="off" oninput="recalcAll()">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
+        <span id="marginHint" style="font-size:11px;color:#717174">15% margin applied</span>
+        <span id="marginDollar" style="font-size:11px;font-weight:600;color:#003658"></span>
+      </div>
+    </div>
+    <div class="field">
+      <label>VAD Quote (PDF or Excel)</label>
+      <input type="file" id="vadPdf" accept=".pdf,.xlsx,.xls" style="display:none" onchange="extractVAD(this)">
+      <div class="upload-row">
+        <button class="btn" onclick="document.getElementById('vadPdf').click()">Upload VAD Quote</button>
+        <span id="extractStatus" class="upload-status">No file selected</span>
+      </div>
+    </div>
+    <div class="field"><label>Personalized note</label><textarea id="notes" autocomplete="off" placeholder="Thank you for the opportunity..."></textarea></div>
+    <div class="field"><label>Payment terms</label><input id="terms" autocomplete="off" value="Net 30"></div>
+    <div class="field"><label>Prepared by — company</label><input id="preparedByCompany" autocomplete="off" value="TekStream Solutions"></div>
+    <div class="field"><label>Prepared by — name</label><input id="preparedBy" autocomplete="off"></div>
+    <div class="field"><label>Prepared by — email</label><input id="preparedByEmail" autocomplete="off"></div>
   </div>
-
-  <!-- RIGHT -->
-  <div>
-    <div class="panel">
-      <div class="pt">Line Items</div>
-      <div id="liArea"><div class="empty">Add line items manually below,<br>or paste data from your VAD quote.</div></div>
-      <button class="add-row" onclick="addRow()">+ Add line item</button>
-      <div class="totals" id="totals"></div>
-      <hr class="hr">
-      <button class="btn btn-dark" onclick="downloadPdf()">Download PDF quote ↓</button>
+  <div class="card">
+    <div class="section-label" style="margin-bottom:14px">Line Items</div>
+    <div id="liArea"><div class="empty">Add line items manually or upload a VAD quote.</div></div>
+    <div id="totals"></div>
+    <div style="margin-top:10px"><button class="btn btn-sm" style="background:transparent;border:1.5px solid #003658;color:#003658" onclick="addRow()">+ Add line item</button></div>
+    <div class="btn-row">
+      <button class="btn dl-btn" onclick="downloadPdf()">Download PDF quote ↓</button>
+      <button class="btn dl-btn" style="background:#5B94CB" onclick="emailQuote()">Email Quote ✉</button>
     </div>
   </div>
 </div>
-
-<div class="footer">TekStream Quote Generator · Runs entirely in your browser · No data sent externally</div>
-
 <script>
-// ── Embedded TekStream logo (full color, dark bg) ──────────────────────────
-const EMBEDDED_LOGO = './logo.png';
-
-window.logoDataUrl = EMBEDDED_LOGO;
 window.lineItems = [];
 
-// ── Init ──────────────────────────────────────────────────────────────
-(async function() {
-  const t = new Date().toISOString().split('T')[0];
-  const e = new Date(Date.now()+30*864e5).toISOString().split('T')[0];
-  document.getElementById('quoteDate').value = t;
-  document.getElementById('expiryDate').value = e;
-  document.getElementById('quoteNumber').value = 'TS-'+new Date().getFullYear()+'-'+String(Math.floor(Math.random()*900)+100);
-  // Load logo from URL
-  try {
-    const resp = await fetch(EMBEDDED_LOGO);
-    const blob = await resp.blob();
-    window.logoDataUrl = await new Promise(res => { const r = new FileReader(); r.onload = e => res(e.target.result); r.readAsDataURL(blob); });
-    document.getElementById('hdrLogo').src = window.logoDataUrl;
-    document.getElementById('hdrLogo').style.display = 'block';
-    document.getElementById('hdrWord').style.display = 'none';
-  } catch(e) { window.logoDataUrl = null; }
-})();
-
-// ── Logo ──────────────────────────────────────────────────────────────
-function handleLogo(input) {
-  const f = input.files[0]; if(!f) return;
-  const r = new FileReader();
-  r.onload = e => {
-    window.logoDataUrl = e.target.result;
-    document.getElementById('hdrLogo').src = window.logoDataUrl;
-    document.getElementById('hdrLogo').style.display = 'block';
-    document.getElementById('hdrWord').style.display = 'none';
-  };
-  r.readAsDataURL(f);
-}
-
-// ── Line Items ────────────────────────────────────────────────────────
-function addRow() { window.lineItems.push({sku:'',description:'',qty:1,unit_price:0}); render(); }
-function removeRow(i) { window.lineItems.splice(i,1); render(); }
-function escH(s) { return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
-function cprice(vad,m) { return (!vad||vad<=0||m>=100)?0:vad/(1-m/100); }
-function fmt(n) { return n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-
-function render() {
-  const m = parseFloat(document.getElementById('marginPct').value)||0;
-  const area = document.getElementById('liArea');
-  if(!window.lineItems.length) {
-    area.innerHTML='<div class="empty">No items yet. Click "+ Add line item" below.</div>';
-    document.getElementById('totals').innerHTML=''; return;
-  }
-  let html=`<table><colgroup>
-    <col style="width:14%"><col style="width:42%"><col style="width:9%">
-    <col style="width:15%"><col style="width:15%"><col style="width:5%">
-  </colgroup>
-  <thead><tr><th>SKU</th><th>Description</th><th>Qty</th><th>VAD Price</th><th>Customer</th><th></th></tr></thead><tbody>`;
-  window.lineItems.forEach((it,i)=>{
-    const cp=cprice(it.unit_price,m), ext=cp*it.qty;
-    html+=`<tr>
-      <td><input value="${escH(it.sku)}" oninput="lineItems[${i}].sku=this.value"></td>
-      <td><input value="${escH(it.description)}" oninput="lineItems[${i}].description=this.value"></td>
-      <td><input type="number" value="${it.qty}" min="1" style="width:44px" oninput="lineItems[${i}].qty=+this.value;recalcAll()"></td>
-      <td><input type="number" value="${it.unit_price.toFixed(2)}" step="0.01" min="0" oninput="lineItems[${i}].unit_price=+this.value;recalcAll()"></td>
-      <td style="color:var(--muted);font-size:12px">${ext>0?'$'+fmt(ext):'—'}</td>
-      <td><button class="del" onclick="removeRow(${i})">✕</button></td>
-    </tr>`;
-  });
-  area.innerHTML=html+'</tbody></table>';
-  const sub=window.lineItems.reduce((s,it)=>s+cprice(it.unit_price,m)*it.qty,0);
-  document.getElementById('totals').innerHTML=`
-    <div class="trow"><span>Subtotal</span><span>$${fmt(sub)}</span></div>
-    <div class="trow grand"><span>Total (USD)</span><span>$${fmt(sub)}</span></div>`;
-}
-
-function recalcAll() {
-  const m=parseFloat(document.getElementById('marginPct').value)||0;
-  document.getElementById('marginHint').textContent=m>0?`${m}% margin applied`:'';
-  render();
-}
-
-// ── New Quote ────────────────────────────────────────────────────────
-function newQuote() {
-  ['customerName','contactName','contactEmail','preparedByCompany','preparedBy','preparedByEmail','notes','terms'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
-  document.getElementById('terms').value = 'Net 30';
-  document.getElementById('marginPct').value = '15';
-  document.getElementById('marginHint').textContent = '15% margin applied';
-  document.getElementById('quoteNumber').value = 'TS-'+new Date().getFullYear()+'-'+String(Math.floor(Math.random()*900)+100);
-  const today = new Date().toISOString().split('T')[0];
-  const exp = new Date(Date.now()+30*864e5).toISOString().split('T')[0];
+(function init() {
+  var today = new Date().toISOString().split('T')[0];
+  var exp = new Date(Date.now() + 30 * 864e5).toISOString().split('T')[0];
   document.getElementById('quoteDate').value = today;
   document.getElementById('expiryDate').value = exp;
-  window.lineItems = [];
+  document.getElementById('quoteNumber').value = 'TS-' + new Date().getFullYear() + '-' + (Math.floor(Math.random() * 900) + 100);
+})();
+
+function escH(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+function cprice(vad,m){return(!vad||vad<=0||m>=100)?0:vad/(1-m/100);}
+function fmt(n){return n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+function addRow(){window.lineItems.push({sku:'',description:'',qty:1,unit_price:0,start_date:'',end_date:''});render();}
+function removeRow(i){window.lineItems.splice(i,1);render();}
+
+function render(){
+  var m=parseFloat(document.getElementById('marginPct').value)||0;
+  var area=document.getElementById('liArea');
+  if(!window.lineItems.length){area.innerHTML='<div class="empty">Add line items manually or upload a VAD quote.</div>';document.getElementById('totals').innerHTML='';updateMarginDollar(m,0,0);return;}
+  var h='<table><colgroup><col style="width:11%"><col style="width:28%"><col style="width:6%"><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:22%"><col style="width:5%"></colgroup><thead><tr><th>SKU</th><th>Description</th><th>Qty</th><th>VAD Price</th><th>Start</th><th>End</th><th>Customer</th><th></th></tr></thead><tbody>';
+  window.lineItems.forEach(function(it,i){
+    var cp=cprice(it.unit_price,m),ext=cp*it.qty;
+    h+='<tr><td><input value="'+escH(it.sku)+'" oninput="lineItems['+i+'].sku=this.value" autocomplete="off"></td>';
+    h+='<td><input value="'+escH(it.description)+'" oninput="lineItems['+i+'].description=this.value" autocomplete="off"></td>';
+    h+='<td><input type="number" value="'+it.qty+'" min="1" style="width:50px" oninput="lineItems['+i+'].qty=+this.value;recalcAll()" autocomplete="off"></td>';
+    h+='<td><input type="number" value="'+it.unit_price.toFixed(2)+'" step="0.01" min="0" oninput="lineItems['+i+'].unit_price=+this.value;recalcAll()" autocomplete="off"></td>';
+    h+='<td><input type="date" value="'+escH(it.start_date||'')+'" style="width:105px" oninput="lineItems['+i+'].start_date=this.value"></td>';
+    h+='<td><input type="date" value="'+escH(it.end_date||'')+'" style="width:105px" oninput="lineItems['+i+'].end_date=this.value"></td>';
+    h+='<td class="muted">'+(ext>0?'$'+fmt(ext):'—')+'</td>';
+    h+='<td><button class="del" onclick="removeRow('+i+')">✕</button></td></tr>';
+  });
+  area.innerHTML=h+'</tbody></table>';
+  var vadTotal=window.lineItems.reduce(function(s,it){return s+it.unit_price*it.qty;},0);
+  var sub=window.lineItems.reduce(function(s,it){return s+cprice(it.unit_price,m)*it.qty;},0);
+  document.getElementById('totals').innerHTML='<div class="trow"><span>Subtotal</span><span>$'+fmt(sub)+'</span></div><div class="trow grand"><span>Total (USD)</span><span>$'+fmt(sub)+'</span></div>';
+  updateMarginDollar(m,sub,vadTotal);
+}
+
+function updateMarginDollar(m,custTotal,vadTotal){
+  var el=document.getElementById('marginDollar');
+  if(el)el.textContent=(m>0&&custTotal>vadTotal)?'$'+fmt(custTotal-vadTotal):'';
+}
+
+function recalcAll(){
+  var m=parseFloat(document.getElementById('marginPct').value)||0;
+  document.getElementById('marginHint').textContent=m>0?m+'% margin applied':'';
   render();
-  document.getElementById('extractStatus').textContent = 'No file selected';
-  document.getElementById('vadPdf').value = '';
 }
 
-// ── VAD PDF Extraction ────────────────────────────────────────────────
-async function extractVAD(input) {
-  const file = input.files[0]; if (!file) return;
-  document.getElementById('extractStatus').textContent = 'Extracting…';
-
-  try {
-    const b64 = await new Promise((res, rej) => {
-      const r = new FileReader();
-      r.onload = e => res(e.target.result.split(',')[1]);
-      r.onerror = rej;
-      r.readAsDataURL(file);
-    });
-
-    const resp = await fetch('/.netlify/functions/extract', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pdfBase64: b64 })
-    });
-
-    if (!resp.ok) { const e = await resp.json(); throw new Error(e.error || resp.status); }
-    const parsed = await resp.json();
-
-    // Populate Prepared By (TO = TekStream)
-    if (parsed.to) {
-      document.getElementById('preparedByCompany').value = parsed.to.company || '';
-      document.getElementById('preparedBy').value = parsed.to.name || '';
-      document.getElementById('preparedByEmail').value = parsed.to.email || '';
-    }
-    // Populate Prepared For (FOR = end customer)
-    if (parsed.for) {
-      document.getElementById('customerName').value = parsed.for.company || '';
-      document.getElementById('contactName').value = parsed.for.name || '';
-      document.getElementById('contactEmail').value = parsed.for.email || '';
-    }
-    // Populate line items
-    if (parsed.lineItems?.length) {
-      window.loadLineItems(parsed.lineItems);
-    }
-
-    document.getElementById('extractStatus').textContent = `✓ Extracted ${parsed.lineItems?.length || 0} line items`;
-  } catch(e) {
-    document.getElementById('extractStatus').textContent = 'Error: ' + e.message;
-  }
+function newQuote(){
+  ['customerName','contactName','contactEmail','notes','preparedBy','preparedByEmail'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('preparedByCompany').value='TekStream Solutions';
+  document.getElementById('terms').value='Net 30';
+  document.getElementById('marginPct').value='15';
+  document.getElementById('marginHint').textContent='15% margin applied';
+  document.getElementById('marginDollar').textContent='';
+  document.getElementById('quoteNumber').value='TS-'+new Date().getFullYear()+'-'+(Math.floor(Math.random()*900)+100);
+  var today=new Date().toISOString().split('T')[0],exp=new Date(Date.now()+30*864e5).toISOString().split('T')[0];
+  document.getElementById('quoteDate').value=today;document.getElementById('expiryDate').value=exp;
+  document.getElementById('expiryDate').style.borderColor='';
+  window.lineItems=[];render();
+  document.getElementById('extractStatus').textContent='No file selected';
+  document.getElementById('vadPdf').value='';
 }
 
-// Allow external loading of line items (e.g. from Claude chat)
-window.loadLineItems = function(items) {
-  window.lineItems = items.map(it=>({
-    sku:String(it.sku||''),
-    description:String(it.description||''),
-    qty:parseFloat(it.qty)||1,
-    unit_price:parseFloat(String(it.unit_price||'0').replace(/[$,]/g,''))||0
-  }));
+async function extractVAD(input){
+  var file=input.files[0];if(!file)return;
+  document.getElementById('extractStatus').textContent='Extracting…';
+  try{
+    var b64=await new Promise(function(res,rej){var r=new FileReader();r.onload=function(e){res(e.target.result.split(',')[1]);};r.onerror=rej;r.readAsDataURL(file);});
+    var resp=await fetch('/api/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileBase64:b64,fileType:file.type,fileName:file.name})});
+    if(!resp.ok){var e=await resp.json();throw new Error(e.error||resp.status);}
+    var parsed=await resp.json();
+    if(parsed.to)document.getElementById('preparedByCompany').value=parsed.to.company||'';
+    if(parsed.for){document.getElementById('customerName').value=parsed.for.company||'';document.getElementById('contactName').value=parsed.for.name||'';document.getElementById('contactEmail').value=parsed.for.email||'';}
+    if(parsed.quote_expire_date){document.getElementById('expiryDate').value=parsed.quote_expire_date;document.getElementById('expiryDate').style.borderColor='';}
+    else{document.getElementById('expiryDate').value='';document.getElementById('expiryDate').style.borderColor='#e53e3e';}
+    if(parsed.lineItems&&parsed.lineItems.length)window.loadLineItems(parsed.lineItems);
+    document.getElementById('extractStatus').textContent='✓ Extracted '+(parsed.lineItems&&parsed.lineItems.length||0)+' line items'+(parsed.vad?' ('+parsed.vad+')':'');
+  }catch(e){document.getElementById('extractStatus').textContent='Error: '+e.message;}
+}
+
+window.loadLineItems=function(items){
+  window.lineItems=items.map(function(it){return{sku:String(it.sku||''),description:String(it.description||''),qty:parseFloat(it.qty)||1,unit_price:parseFloat(String(it.unit_price||'0').replace(/[$,]/g,''))||0,start_date:String(it.start_date||''),end_date:String(it.end_date||'')};});
   render();
 };
 
-// ── PDF Download ──────────────────────────────────────────────────────
-async function downloadPdf() {
-  const {jsPDF} = window.jspdf;
-  const m  = parseFloat(document.getElementById('marginPct').value)||0;
-  const cn = document.getElementById('customerName').value||'Customer';
-  const co = document.getElementById('contactName').value||'';
-  const qn = document.getElementById('quoteNumber').value||'TS-QUOTE';
-  const qd = document.getElementById('quoteDate').value;
-  const ed = document.getElementById('expiryDate').value;
-  const nt = document.getElementById('notes').value;
-  const tm = document.getElementById('terms').value||'Net 30';
-  const pb = document.getElementById('preparedBy').value||'TekStream';
+async function emailQuote(){
+  await downloadPdf();
+  var cn=document.getElementById('customerName').value||'Customer';
+  var co=document.getElementById('contactName').value||'';
+  var ce=document.getElementById('contactEmail').value||'';
+  var qn=document.getElementById('quoteNumber').value||'TS-QUOTE';
+  var ed=document.getElementById('expiryDate').value||'';
+  var nt=document.getElementById('notes').value||'';
+  var body=(co?'Hi '+co.split(' ')[0]+',':'Hi,')+'
 
-  const doc = new jsPDF({unit:'pt',format:'letter'});
-  const W=612, L=48, R=564;
+Please find attached our quote '+qn+' for '+cn+(ed?' valid through '+ed:'')+'.'
 
-  // Header bar
-  doc.setFillColor(0,54,88); doc.rect(0,0,W,68,'F');
-  try {
-    const logoImg = new Image();
-    await new Promise((res, rej) => { logoImg.onload = res; logoImg.onerror = rej; logoImg.src = window.logoDataUrl; });
-    const logoH = 46;
-    const logoW = logoImg.naturalWidth * (logoH / logoImg.naturalHeight);
-    doc.addImage(window.logoDataUrl, 'PNG', L, 11, logoW, logoH);
-  } catch(e) { doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(255,255,255); doc.text('TekStream',L,36); }
-  // Accent stripe
-  doc.setFillColor(91,148,203); doc.rect(0,68,W,5,'F');
+'+(nt?nt+'
 
-  // Quote meta (top right)
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(255,255,255);
-  doc.text(`Quote #  ${qn}`,R,28,{align:'right'});
-  doc.setFont('helvetica','normal');
-  doc.text(`Date:  ${qd}`,R,42,{align:'right'});
-  doc.text(`Expires:  ${ed}`,R,56,{align:'right'});
+':'')+"Please don't hesitate to reach out with any questions. We look forward to the opportunity to work with you.";
+  window.location.href='mailto:'+encodeURIComponent(ce)+'?subject='+encodeURIComponent('TekStream Quote '+qn+' for '+cn)+'&body='+encodeURIComponent(body);
+}
 
-  // Title
-  doc.setFont('helvetica','bold'); doc.setFontSize(22); doc.setTextColor(0,54,88);
-  doc.text('Quote',L,108);
-
-  // Bill-to card
-  doc.setFillColor(235,243,251); doc.roundedRect(L,118,210,58,3,3,'F');
-  doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(91,148,203);
-  doc.text('PREPARED FOR',L+10,133);
-  const ce  = document.getElementById('contactEmail').value || '';
-  const pbc = document.getElementById('preparedByCompany').value || 'TekStream';
-  const pbe = document.getElementById('preparedByEmail').value || '';
-  doc.setFillColor(235,243,251); doc.roundedRect(L,118,210,70,3,3,'F');
-  doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(91,148,203);
-  doc.text('PREPARED FOR',L+10,133);
-  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(0,54,88);
-  doc.text(cn,L+10,149);
-  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(113,113,116);
-  if(co) doc.text(co,L+10,161);
-  if(ce) doc.text(ce,L+10,173);
-
-  // Prepared by
-  doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(91,148,203);
-  doc.text('PREPARED BY',R-200,133);
-  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(0,54,88);
-  doc.text(pbc,R-200,149);
-  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(113,113,116);
-  if(pb)  doc.text(pb, R-200,161);
-  if(pbe) doc.text(pbe,R-200,173);
-
-  let y=210;
-  if(nt){
-    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(60,60,60);
-    const lines=doc.splitTextToSize(nt,R-L);
-    doc.text(lines,L,y); y+=lines.length*13+14;
+async function downloadPdf(){
+  var jsPDF=window.jspdf.jsPDF;
+  var m=parseFloat(document.getElementById('marginPct').value)||0;
+  var cn=document.getElementById('customerName').value||'Customer';
+  var co=document.getElementById('contactName').value||'';
+  var ce=document.getElementById('contactEmail').value||'';
+  var qn=document.getElementById('quoteNumber').value||'TS-QUOTE';
+  var qd=document.getElementById('quoteDate').value;
+  var ed=document.getElementById('expiryDate').value;
+  var nt=document.getElementById('notes').value;
+  var tm=document.getElementById('terms').value||'Net 30';
+  var pb=document.getElementById('preparedBy').value||'';
+  var pbc=document.getElementById('preparedByCompany').value||'TekStream Solutions';
+  var pbe=document.getElementById('preparedByEmail').value||'';
+  var logoSrc=document.getElementById('hdrLogo').src;
+  var doc=new jsPDF({unit:'pt',format:'letter'});
+  var W=612,L=48,R=564;
+  doc.setFillColor(0,54,88);doc.rect(0,0,W,68,'F');
+  if(logoSrc&&logoSrc.startsWith('data:')){
+    try{var li=new Image();await new Promise(function(res,rej){li.onload=res;li.onerror=rej;li.src=logoSrc;});doc.addImage(logoSrc,'PNG',L,11,li.naturalWidth*(46/li.naturalHeight),46);}
+    catch(e){doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(255,255,255);doc.text('TekStream',L,36);}
   }
-
-  // Table header
-  // Column layout: SKU=20%, Desc=fills, Qty+Price+Ext fixed
-  const skuW   = (R-L) * 0.20;       // 20% fixed for SKU
-  const fixedW = 42 + 68 + 64;       // Qty + UnitPrice + Extended
-  const descW  = (R-L) - skuW - fixedW - 12; // remaining for description
-  const colSku  = L + 6;
-  const colDesc = L + skuW + 6;
-  const colQty  = R - 64 - 68 - 6;
-  const colPrice= R - 64 - 4;
-  const colExt  = R - 4;
-  const rowPad  = 5; // padding top/bottom inside each row
-  const lineH   = 11; // line height per text line
-
-  // Header
-  doc.setFillColor(0,54,88); doc.rect(L,y,R-L,20,'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(255,255,255);
-  doc.text('SKU',       colSku,  y+14);
-  doc.text('Description',colDesc, y+14);
-  doc.text('Qty',       colQty,  y+14, {align:'right'});
-  doc.text('Unit Price',colPrice, y+14, {align:'right'});
-  doc.text('Extended',  colExt,  y+14, {align:'right'});
-  y += 20;
-
-  let subtotal = 0;
-  doc.setFont('helvetica','normal');
-  lineItems.forEach((it, idx) => {
-    const cp  = cprice(it.unit_price, m), ext = cp * it.qty;
-    subtotal += ext;
-
-    // Wrap both SKU and description, use whichever needs more lines
-    const skuLines  = doc.splitTextToSize(it.sku  || '', skuW - 6);
-    const descLines = doc.splitTextToSize(it.description || '', descW - 6);
-    const numLines  = Math.max(skuLines.length, descLines.length, 1);
-    const rowH      = numLines * lineH + rowPad * 2;
-
-    if (idx % 2 === 1) { doc.setFillColor(235,243,251); doc.rect(L, y, R-L, rowH, 'F'); }
-
-    doc.setTextColor(19,17,18); doc.setFontSize(9);
-    doc.text(skuLines,  colSku,  y + rowPad + lineH - 2);
-    doc.text(descLines, colDesc, y + rowPad + lineH - 2);
-    // Right-aligned single-line values — vertically centered
-    const midY = y + rowH / 2 + 3;
-    doc.text(it.qty.toLocaleString(), colQty,  midY, {align:'right'});
-    doc.text(cp  > 0 ? '$'+cp.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—', colPrice, midY, {align:'right'});
-    doc.text(ext > 0 ? '$'+fmt(ext)       : '—', colExt,   midY, {align:'right'});
-    y += rowH;
+  doc.setFillColor(91,148,203);doc.rect(0,68,W,5,'F');
+  doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);
+  doc.text('Quote #  '+qn,R,28,{align:'right'});doc.setFont('helvetica','normal');doc.text('Date:  '+qd,R,42,{align:'right'});doc.text('Expires:  '+ed,R,56,{align:'right'});
+  doc.setFont('helvetica','bold');doc.setFontSize(22);doc.setTextColor(0,54,88);doc.text('Quote',L,108);
+  doc.setFillColor(235,243,251);doc.roundedRect(L,118,210,70,3,3,'F');
+  doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(91,148,203);doc.text('PREPARED FOR',L+10,133);
+  doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(0,54,88);doc.text(cn,L+10,149);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(113,113,116);
+  if(co)doc.text(co,L+10,161);if(ce)doc.text(ce,L+10,173);
+  doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(91,148,203);doc.text('PREPARED BY',R-200,133);
+  doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(0,54,88);doc.text(pbc,R-200,149);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(113,113,116);
+  if(pb)doc.text(pb,R-200,161);if(pbe)doc.text(pbe,R-200,173);
+  var y=210;
+  if(nt){doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(60,60,60);var lines=doc.splitTextToSize(nt,R-L);doc.text(lines,L,y);y+=lines.length*13+14;}
+  var skuW=(R-L)*0.13,dateW=50,qtyW=30,priceW=62,extW=70,descW=(R-L)-skuW-dateW*2-qtyW-priceW-extW-10;
+  var colSku=L+4,colDesc=L+skuW+4,colSt=colDesc+descW+2,colEd=colSt+dateW+2,colQty=colEd+dateW+2,colPr=colQty+qtyW+4,colEx=R-4;
+  doc.setFillColor(0,54,88);doc.rect(L,y,R-L,20,'F');
+  doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(255,255,255);
+  doc.text('SKU',colSku,y+14);doc.text('Description',colDesc,y+14);
+  doc.text('Start',colSt+dateW,y+14,{align:'right'});doc.text('End',colEd+dateW,y+14,{align:'right'});
+  doc.text('Qty',colQty+qtyW,y+14,{align:'right'});doc.text('Unit Price',colPr+priceW,y+14,{align:'right'});doc.text('Extended',colEx,y+14,{align:'right'});
+  y+=20;var subtotal=0;doc.setFont('helvetica','normal');
+  window.lineItems.forEach(function(it,idx){
+    var cp=cprice(it.unit_price,m),ext=cp*it.qty;subtotal+=ext;
+    var skuL=doc.splitTextToSize(it.sku||'',skuW-4),descL=doc.splitTextToSize(it.description||'',descW-4);
+    var nL=Math.max(skuL.length,descL.length,1),rowH=nL*11+10;
+    if(idx%2===1){doc.setFillColor(235,243,251);doc.rect(L,y,R-L,rowH,'F');}
+    doc.setTextColor(19,17,18);doc.setFontSize(8.5);doc.text(skuL,colSku,y+9);doc.text(descL,colDesc,y+9);
+    var mid=y+rowH/2+3;
+    if(it.start_date)doc.text(it.start_date,colSt+dateW,mid,{align:'right'});
+    if(it.end_date)doc.text(it.end_date,colEd+dateW,mid,{align:'right'});
+    doc.text(it.qty.toLocaleString(),colQty+qtyW,mid,{align:'right'});
+    doc.text(cp>0?'$'+fmt(cp):'—',colPr+priceW,mid,{align:'right'});
+    doc.text(ext>0?'$'+fmt(ext):'—',colEx,mid,{align:'right'});
+    y+=rowH;
   });
-
-  // Total
-  y+=6;
-  doc.setDrawColor(91,148,203); doc.setLineWidth(0.5); doc.line(R-190,y,R,y); y+=14;
-  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(0,54,88);
-  doc.text('Total (USD)',R-186,y);
-  doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});
-
-  // Footer text
-  y+=28;
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(113,113,116);
-  doc.text('Payment terms: '+tm,L,y); y+=12;
-  doc.text('This quote is valid through the expiration date above. All prices are in USD.',L,y); y+=12;
-  doc.text('Quote subject to change without notice. Contact your TekStream representative with questions.',L,y);
-
-  // Footer bar
-  doc.setFillColor(0,54,88); doc.rect(0,748,W,6,'F');
-  doc.setFillColor(91,148,203); doc.rect(0,754,W,14,'F');
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(255,255,255);
-  doc.text('Copyright © TekStream Solutions, LLC 2026  |  tekstream.com  |  Confidential',W/2,763,{align:'center'});
-
-  doc.save(`${qn} - ${cn}.pdf`);
+  y+=6;doc.setDrawColor(91,148,203);doc.setLineWidth(0.5);doc.line(R-190,y,R,y);y+=14;
+  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);
+  doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});
+  y+=28;doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(113,113,116);
+  doc.text('Payment terms: '+tm,L,y);y+=12;
+  doc.text('This quote is valid through the expiration date above. All prices are in USD.',L,y);y+=12;
+  doc.text('Quote subject to change without notice.',L,y);
+  doc.setFillColor(0,54,88);doc.rect(0,748,W,6,'F');doc.setFillColor(91,148,203);doc.rect(0,754,W,14,'F');
+  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(255,255,255);
+  doc.text('Copyright © TekStream Solutions, LLC 2026 | tekstream.com | Confidential',W/2,763,{align:'center'});
+  doc.save(qn+' - '+cn+'.pdf');
 }
 </script>
 </body>
