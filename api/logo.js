@@ -1,0 +1,1 @@
+module.exports=async function(req,res){const r=await fetch('https://joyful-griffin-7f411d.netlify.app/logo.png');const b=await r.arrayBuffer();res.setHeader('Content-Type','image/png');res.setHeader('Cache-Control','public,max-age=86400');res.setHeader('Access-Control-Allow-Origin','*');res.end(Buffer.from(b));};
