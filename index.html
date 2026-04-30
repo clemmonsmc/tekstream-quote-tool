@@ -186,6 +186,8 @@ function restoreQuoteState(s){
   document.getElementById('preparedBy').value=s.preparedBy||'';
   document.getElementById('preparedByEmail').value=s.preparedByEmail||'';
   window.lineItems=s.lineItems||[];render();
+  // Always re-apply rep settings so name/email are never overwritten by saved state
+  loadRepSettings();
 }
 function saveQuote(){
   var state=getQuoteState();
