@@ -344,6 +344,137 @@ async function emailQuote(){
   parts.push("Please don't hesitate to reach out with any questions. We look forward to the opportunity to work with you.");
   window.location.href='mailto:'+encodeURIComponent(ce)+'?subject='+encodeURIComponent('TekStream Quote '+qn+' for '+cn)+'&body='+encodeURIComponent(parts.join('\n'));
 }
+
+async function previewPdf(){
+  var pdfGroups=groupByYear(window.lineItems);
+  var jsPDF=window.jspdf.jsPDF;
+  var m=parseFloat(document.getElementById('marginPct').value)||0;
+  var cn=document.getElementById('customerName').value||'Customer';
+  var co=document.getElementById('contactName').value||'';
+  var ce=document.getElementById('contactEmail').value||'';
+  var qn=document.getElementById('quoteNumber').value||'TS-QUOTE';
+  var qd=document.getElementById('quoteDate').value;
+  var ed=document.getElementById('expiryDate').value;
+  var nt=document.getElementById('notes').value;
+  var tm=document.getElementById('terms').value||'Net 30';
+  var pb=document.getElementById('preparedBy').value||'';
+  var pbc=document.getElementById('preparedByCompany').value||'TekStream';
+  var pbe=document.getElementById('preparedByEmail').value||'';
+  var logoSrc=window.logoDataUrl||'';
+  var doc=new jsPDF({unit:'pt',format:'letter'});
+  var W=612,L=48,R=564;
+  doc.setFillColor(0,54,88);doc.rect(0,0,W,68,'F');
+  if(logoSrc&&logoSrc.startsWith('data:')){try{var li=new Image();await new Promise(function(res,rej){li.onload=res;li.onerror=rej;li.src=logoSrc;});doc.addImage(logoSrc,'PNG',L,11,li.naturalWidth*(46/li.naturalHeight),46);}catch(e){doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(255,255,255);doc.text('TekStream',L,36);}}
+  doc.setFillColor(91,148,203);doc.rect(0,68,W,5,'F');
+  doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);
+  doc.text('Quote #  '+qn,R,28,{align:'right'});doc.setFont('helvetica','normal');doc.text('Date:  '+qd,R,42,{align:'right'});doc.text('Expires:  '+ed,R,56,{align:'right'});
+  doc.setFont('helvetica','bold');doc.setFontSize(22);doc.setTextColor(0,54,88);doc.text('Quote',L,108);
+  doc.setFillColor(235,243,251);doc.roundedRect(L,118,210,70,3,3,'F');
+  doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(91,148,203);doc.text('PREPARED FOR',L+10,133);
+  doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(0,54,88);doc.text(cn,L+10,149);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(113,113,116);
+  if(co)doc.text(co,L+10,161);if(ce)doc.text(ce,L+10,173);
+  doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(91,148,203);doc.text('PREPARED BY',R-200,133);
+  doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(0,54,88);doc.text(pbc,R-200,149);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(113,113,116);
+  if(pb)doc.text(pb,R-200,161);if(pbe)doc.text(pbe,R-200,173);
+  var y=210;
+  if(nt){doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(60,60,60);var lines=doc.splitTextToSize(nt,R-L);doc.text(lines,L,y);y+=lines.length*13+14;}
+  var skuW=(R-L)*0.13,dateW=50,qtyW=30,priceW=62,extW=70,descW=(R-L)-skuW-dateW*2-qtyW-priceW-extW-10;
+  var colSku=L+4,colDesc=L+skuW+4,colSt=colDesc+descW+2,colEd=colSt+dateW+2,colQty=colEd+dateW+2,colPr=colQty+qtyW+4,colEx=R-4;
+  function newPageIfNeeded(n){if(y+n>692){doc.addPage();y=48;}}
+  function drawColHeaders(){doc.setFillColor(0,54,88);doc.rect(L,y,R-L,20,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(255,255,255);doc.text('SKU',colSku,y+14);doc.text('Description',colDesc,y+14);doc.text('Start',colSt+dateW,y+14,{align:'right'});doc.text('End',colEd+dateW,y+14,{align:'right'});doc.text('Qty',colQty+qtyW,y+14,{align:'right'});doc.text('Unit Price',colPr+priceW,y+14,{align:'right'});doc.text('Extended',colEx,y+14,{align:'right'});y+=20;}
+  var subtotal=0;
+  function renderPdfRow(it,idx,alt){var cp=cprice(it.unit_price,m),ext=cp*it.qty;subtotal+=ext;var skuL=doc.splitTextToSize(it.sku||'',skuW-4),descL=doc.splitTextToSize(it.description||'',descW-4);var nL=Math.max(skuL.length,descL.length,1),rowH=nL*11+10;newPageIfNeeded(rowH);if(alt){doc.setFillColor(235,243,251);doc.rect(L,y,R-L,rowH,'F');}doc.setFont('helvetica','normal');doc.setTextColor(19,17,18);doc.setFontSize(8.5);doc.text(skuL,colSku,y+9);doc.text(descL,colDesc,y+9);var mid=y+rowH/2+3;if(it.start_date)doc.text(it.start_date,colSt+dateW,mid,{align:'right'});if(it.end_date)doc.text(it.end_date,colEd+dateW,mid,{align:'right'});doc.text(it.qty.toLocaleString(),colQty+qtyW,mid,{align:'right'});doc.text(cp>0?'$'+fmt(cp):'\u2014',colPr+priceW,mid,{align:'right'});doc.text(ext>0?'$'+fmt(ext):'\u2014',colEx,mid,{align:'right'});y+=rowH;}
+  if(!pdfGroups){drawColHeaders();window.lineItems.forEach(function(it,i){renderPdfRow(it,i,i%2===1);});}
+  else{pdfGroups.forEach(function(grp){newPageIfNeeded(36);doc.setFillColor(91,148,203);doc.rect(L,y,R-L,16,'F');doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);doc.text(grp.label,L+6,y+11);y+=16;drawColHeaders();var prev=subtotal;grp.items.forEach(function(it,i){renderPdfRow(it,i,i%2===1);});var gs=subtotal-prev;newPageIfNeeded(20);doc.setFillColor(235,243,251);doc.rect(L,y,R-L,14,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(0,54,88);doc.text(grp.label+' Subtotal',colPr+priceW,y+10,{align:'right'});doc.text('$'+fmt(gs),colEx,y+10,{align:'right'});y+=18;});}
+  newPageIfNeeded(80);
+  y+=6;doc.setDrawColor(91,148,203);doc.setLineWidth(0.5);doc.line(R-190,y,R,y);y+=14;
+  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);
+  doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});
+  y+=28;doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(113,113,116);
+  doc.text('Payment terms: '+tm+(pdfGroups?'  |  Invoiced annually':''),L,y);y+=12;
+  doc.text('This quote is valid through the expiration date above. All prices are in USD.',L,y);y+=12;
+  doc.text('Quote subject to change without notice.',L,y);
+  doc.setFillColor(0,54,88);doc.rect(0,748,W,6,'F');doc.setFillColor(91,148,203);doc.rect(0,754,W,14,'F');
+  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(255,255,255);
+  doc.text('Copyright \u00A9 TekStream Solutions, LLC 2026 | tekstream.com | Confidential',W/2,763,{align:'center'});
+  window.open(doc.output('bloburl'), '_blank');
+}
+
+async function previewPdf(){
+  var pdfGroups=groupByYear(window.lineItems);
+  var jsPDF=window.jspdf.jsPDF;
+  var m=parseFloat(document.getElementById('marginPct').value)||0;
+  var cn=document.getElementById('customerName').value||'Customer';
+  var co=document.getElementById('contactName').value||'';
+  var ce=document.getElementById('contactEmail').value||'';
+  var qn=document.getElementById('quoteNumber').value||'TS-QUOTE';
+  var qd=document.getElementById('quoteDate').value;
+  var ed=document.getElementById('expiryDate').value;
+  var nt=document.getElementById('notes').value;
+  var tm=document.getElementById('terms').value||'Net 30';
+  var pb=document.getElementById('preparedBy').value||'';
+  var pbc=document.getElementById('preparedByCompany').value||'TekStream';
+  var pbe=document.getElementById('preparedByEmail').value||'';
+  var logoSrc=window.logoDataUrl||'';
+  var doc=new jsPDF({unit:'pt',format:'letter'});
+  var W=612,L=48,R=564;
+  doc.setFillColor(0,54,88);doc.rect(0,0,W,68,'F');
+  if(logoSrc&&logoSrc.startsWith('data:')){try{var li=new Image();await new Promise(function(res,rej){li.onload=res;li.onerror=rej;li.src=logoSrc;});doc.addImage(logoSrc,'PNG',L,11,li.naturalWidth*(46/li.naturalHeight),46);}catch(e){doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(255,255,255);doc.text('TekStream',L,36);}}
+  doc.setFillColor(91,148,203);doc.rect(0,68,W,5,'F');
+  doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);
+  doc.text('Quote #  '+qn,R,28,{align:'right'});doc.setFont('helvetica','normal');doc.text('Date:  '+qd,R,42,{align:'right'});doc.text('Expires:  '+ed,R,56,{align:'right'});
+  doc.setFont('helvetica','bold');doc.setFontSize(22);doc.setTextColor(0,54,88);doc.text('Quote',L,108);
+  doc.setFillColor(235,243,251);doc.roundedRect(L,118,210,70,3,3,'F');
+  doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(91,148,203);doc.text('PREPARED FOR',L+10,133);
+  doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(0,54,88);doc.text(cn,L+10,149);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(113,113,116);
+  if(co)doc.text(co,L+10,161);if(ce)doc.text(ce,L+10,173);
+  doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(91,148,203);doc.text('PREPARED BY',R-200,133);
+  doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(0,54,88);doc.text(pbc,R-200,149);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(113,113,116);
+  if(pb)doc.text(pb,R-200,161);if(pbe)doc.text(pbe,R-200,173);
+  var y=210;
+  if(nt){doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(60,60,60);var lines=doc.splitTextToSize(nt,R-L);doc.text(lines,L,y);y+=lines.length*13+14;}
+  var skuW=(R-L)*0.13,dateW=50,qtyW=30,priceW=62,extW=70,descW=(R-L)-skuW-dateW*2-qtyW-priceW-extW-10;
+  var colSku=L+4,colDesc=L+skuW+4,colSt=colDesc+descW+2,colEd=colSt+dateW+2,colQty=colEd+dateW+2,colPr=colQty+qtyW+4,colEx=R-4;
+  function newPageIfNeeded(n){if(y+n>692){doc.addPage();y=48;}}
+  function drawColHeaders(){doc.setFillColor(0,54,88);doc.rect(L,y,R-L,20,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(255,255,255);doc.text('SKU',colSku,y+14);doc.text('Description',colDesc,y+14);doc.text('Start',colSt+dateW,y+14,{align:'right'});doc.text('End',colEd+dateW,y+14,{align:'right'});doc.text('Qty',colQty+qtyW,y+14,{align:'right'});doc.text('Unit Price',colPr+priceW,y+14,{align:'right'});doc.text('Extended',colEx,y+14,{align:'right'});y+=20;}
+  var subtotal=0;
+  function renderPdfRow(it,idx,alt){
+    var cp=cprice(it.unit_price,m),ext=cp*it.qty;subtotal+=ext;
+    var skuL=doc.splitTextToSize(it.sku||'',skuW-4),descL=doc.splitTextToSize(it.description||'',descW-4);
+    var nL=Math.max(skuL.length,descL.length,1),rowH=nL*11+10;
+    newPageIfNeeded(rowH);
+    if(alt){doc.setFillColor(235,243,251);doc.rect(L,y,R-L,rowH,'F');}
+    doc.setFont('helvetica','normal');doc.setTextColor(19,17,18);doc.setFontSize(8.5);
+    doc.text(skuL,colSku,y+9);doc.text(descL,colDesc,y+9);
+    var mid=y+rowH/2+3;
+    if(it.start_date)doc.text(it.start_date,colSt+dateW,mid,{align:'right'});
+    if(it.end_date)doc.text(it.end_date,colEd+dateW,mid,{align:'right'});
+    doc.text(it.qty.toLocaleString(),colQty+qtyW,mid,{align:'right'});
+    doc.text(cp>0?'$'+fmt(cp):'\u2014',colPr+priceW,mid,{align:'right'});
+    doc.text(ext>0?'$'+fmt(ext):'\u2014',colEx,mid,{align:'right'});
+    y+=rowH;
+  }
+  if(!pdfGroups){drawColHeaders();window.lineItems.forEach(function(it,i){renderPdfRow(it,i,i%2===1);});}
+  else{pdfGroups.forEach(function(grp){newPageIfNeeded(36);doc.setFillColor(91,148,203);doc.rect(L,y,R-L,16,'F');doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);doc.text(grp.label,L+6,y+11);y+=16;drawColHeaders();var prev=subtotal;grp.items.forEach(function(it,i){renderPdfRow(it,i,i%2===1);});var gs=subtotal-prev;newPageIfNeeded(20);doc.setFillColor(235,243,251);doc.rect(L,y,R-L,14,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(0,54,88);doc.text(grp.label+' Subtotal',colPr+priceW,y+10,{align:'right'});doc.text('$'+fmt(gs),colEx,y+10,{align:'right'});y+=18;});}
+  newPageIfNeeded(80);
+  y+=6;doc.setDrawColor(91,148,203);doc.setLineWidth(0.5);doc.line(R-190,y,R,y);y+=14;
+  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);
+  doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});
+  y+=28;doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(113,113,116);
+  doc.text('Payment terms: '+tm+(pdfGroups?'  |  Invoiced annually':''),L,y);y+=12;
+  doc.text('This quote is valid through the expiration date above. All prices are in USD.',L,y);y+=12;
+  doc.text('Quote subject to change without notice.',L,y);
+  doc.setFillColor(0,54,88);doc.rect(0,748,W,6,'F');doc.setFillColor(91,148,203);doc.rect(0,754,W,14,'F');
+  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(255,255,255);
+  doc.text('Copyright \u00A9 TekStream Solutions, LLC 2026 | tekstream.com | Confidential',W/2,763,{align:'center'});
+  // Open in new tab instead of downloading
+  window.open(doc.output('bloburl'), '_blank');
+}
+
 async function downloadPdf(){
   var pdfGroups=groupByYear(window.lineItems);
   var jsPDF=window.jspdf.jsPDF;
