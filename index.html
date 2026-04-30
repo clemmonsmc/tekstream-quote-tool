@@ -115,7 +115,7 @@ function groupByYear(items) {
   if (realYears.length <= 1) return null;
   years.sort(function(a,b){ return a==='__none__'?1:b==='__none__'?-1:a.localeCompare(b); });
   return years.map(function(yr, idx) {
-    return { label: yr==='__none__'?'Other':'Year '+(idx+1)+' ('+yr+')', items: groups[yr] };
+    return { label: yr==='__none__'?'Other':'Payment '+(idx+1)+' ('+yr+')', items: groups[yr] };
   });
 }
 
