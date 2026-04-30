@@ -146,8 +146,8 @@ function render(){
     h += '</tbody></table>';
   } else {
     groups.forEach(function(grp) {
+      h += '<div style="background:#5B94CB;color:#fff;font-weight:700;font-size:12px;padding:7px 12px;letter-spacing:.06em;border-radius:6px 6px 0 0;margin-top:8px">'+grp.label+'</div>';
       h += tblHdr;
-      h += '<tr><td colspan="8" style="background:#003658;color:#fff;font-weight:700;font-size:12px;padding:7px 8px;letter-spacing:.05em">'+grp.label+'</td></tr>';
       var grpTotal = 0;
       grp.items.forEach(function(it) {
         var i = window.lineItems.indexOf(it);
@@ -293,7 +293,7 @@ async function downloadPdf(){
     window.lineItems.forEach(function(it,idx){ renderPdfRow(it,idx,idx%2===1); });
   } else {
     pdfGroups.forEach(function(grp){
-      doc.setFillColor(0,54,88);doc.rect(L,y,R-L,16,'F');
+      doc.setFillColor(91,148,203);doc.rect(L,y,R-L,16,'F');
       doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);
       doc.text(grp.label,L+6,y+11);
       y+=16;
@@ -311,7 +311,7 @@ async function downloadPdf(){
   doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);
   doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});
   y+=28;doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(113,113,116);
-  doc.text('Payment terms: '+tm,L,y);y+=12;
+  var tmLine='Payment terms: '+tm+(pdfGroups?'  |  Invoiced annually':'');doc.text(tmLine,L,y);y+=12;
   doc.text('This quote is valid through the expiration date above. All prices are in USD.',L,y);y+=12;
   doc.text('Quote subject to change without notice.',L,y);
   doc.setFillColor(0,54,88);doc.rect(0,748,W,6,'F');doc.setFillColor(91,148,203);doc.rect(0,754,W,14,'F');
