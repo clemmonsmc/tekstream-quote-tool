@@ -6,44 +6,406 @@
 <title>TekStream Quote Generator</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;color:#13110F;font-size:14px}.hdr{background:#003658;display:flex;align-items:center;padding:0 24px;height:68px;gap:16px;position:relative}.hdr::after{content:'';position:absolute;left:0;right:0;top:68px;height:5px;background:#5B94CB}.hdr-logo{height:46px}.hdr-tag{color:rgba(255,255,255,.65);font-size:13px;letter-spacing:.08em;text-transform:uppercase;flex:1;text-align:center}.btn{background:#003658;color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600}.btn:hover{background:#004f7a}.btn-sm{padding:6px 12px;font-size:12px}.wrap{max-width:1400px;margin:0 auto;padding:20px 24px 0}.rep-card{background:#fff;border-radius:10px;padding:16px 20px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:12px}.layout{display:grid;grid-template-columns:320px 1fr;gap:20px;padding:12px 24px 28px;max-width:1400px;margin:0 auto}.left-col{display:flex;flex-direction:column;gap:16px}.card{background:#fff;border-radius:10px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.08)}.section-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5B94CB;margin-bottom:12px}.field{margin-bottom:14px}.field label{display:block;font-size:12px;color:#717174;margin-bottom:4px}.field input,.field textarea{width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:7px 10px;font-size:13px;color:#13110F;background:#fff;outline:none;transition:border-color .15s}.field input:focus,.field textarea:focus{border-color:#5B94CB}.field textarea{resize:vertical;min-height:72px}.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.upload-row{display:flex;align-items:center;gap:10px}.upload-status{font-size:12px;color:#717174}table{width:100%;border-collapse:collapse;font-size:12px}th{background:#003658;color:#fff;padding:9px 8px;text-align:left;font-weight:600;font-size:11px}td{padding:5px 3px;border-bottom:1px solid #f0f2f5;vertical-align:middle}tr:nth-child(even) td{background:#EBF3FB}td input{border:1.5px solid #e2e8f0;border-radius:4px;padding:4px 5px;font-size:12px;width:100%;background:#fff}td input:focus{border-color:#5B94CB;outline:none}td input[type=date]{font-size:11px}.del{background:none;border:none;color:#c00;cursor:pointer;font-size:14px;padding:2px 6px}.muted{color:#717174;font-size:12px}.trow{display:flex;justify-content:flex-end;gap:40px;padding:3px 0;font-size:13px}.trow.grand{font-size:16px;font-weight:700;color:#003658}.empty{color:#717174;text-align:center;padding:40px;font-size:13px}.btn-row{display:flex;gap:10px;margin-top:16px}.dl-btn{flex:1;padding:13px;font-size:15px;border-radius:8px}.saved-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0f2f5;cursor:pointer}.saved-item:last-child{border-bottom:none}.saved-item:hover .saved-label{color:#5B94CB}.saved-label{flex:1;font-size:13px;color:#13110F}.saved-meta{font-size:11px;color:#717174;white-space:nowrap}.saved-del{background:none;border:none;color:#c00;cursor:pointer;font-size:16px;padding:2px 6px;flex-shrink:0}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;color:#13110F;font-size:14px}
+.hdr{background:#003658;display:flex;align-items:center;padding:0 24px;height:68px;gap:16px;position:relative}
+.hdr::after{content:'';position:absolute;left:0;right:0;top:68px;height:5px;background:#5B94CB}
+.hdr-logo{height:46px}.hdr-tag{color:rgba(255,255,255,.65);font-size:13px;letter-spacing:.08em;text-transform:uppercase;flex:1;text-align:center}
+.btn{background:#003658;color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600}.btn:hover{background:#004f7a}
+.btn-sm{padding:6px 12px;font-size:12px}
+.wrap{max-width:1400px;margin:0 auto;padding:20px 24px 0}
+.rep-card{background:#fff;border-radius:10px;padding:16px 20px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:12px}
+.layout{display:grid;grid-template-columns:320px 1fr;gap:20px;padding:12px 24px 28px;max-width:1400px;margin:0 auto}
+.left-col{display:flex;flex-direction:column;gap:16px}
+.card{background:#fff;border-radius:10px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.section-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5B94CB;margin-bottom:12px}
+.field{margin-bottom:14px}.field label{display:block;font-size:12px;color:#717174;margin-bottom:4px}
+.field input,.field textarea{width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:7px 10px;font-size:13px;color:#13110F;background:#fff;outline:none;transition:border-color .15s}
+.field input:focus,.field textarea:focus{border-color:#5B94CB}.field textarea{resize:vertical;min-height:72px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.upload-row{display:flex;align-items:center;gap:10px}.upload-status{font-size:12px;color:#717174}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#003658;color:#fff;padding:9px 8px;text-align:left;font-weight:600;font-size:11px}
+td{padding:5px 3px;border-bottom:1px solid #f0f2f5;vertical-align:middle}
+tr:nth-child(even) td{background:#EBF3FB}
+td input{border:1.5px solid #e2e8f0;border-radius:4px;padding:4px 5px;font-size:12px;width:100%;background:#fff}
+td input:focus{border-color:#5B94CB;outline:none}td input[type=date]{font-size:11px}
+.del{background:none;border:none;color:#c00;cursor:pointer;font-size:14px;padding:2px 6px}
+.muted{color:#717174;font-size:12px}
+.trow{display:flex;justify-content:flex-end;gap:40px;padding:3px 0;font-size:13px}
+.trow.grand{font-size:16px;font-weight:700;color:#003658}
+.empty{color:#717174;text-align:center;padding:40px;font-size:13px}
+.btn-row{display:flex;gap:10px;margin-top:16px}.dl-btn{flex:1;padding:13px;font-size:15px;border-radius:8px}
+.saved-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0f2f5;cursor:pointer}
+.saved-item:last-child{border-bottom:none}
+.saved-item:hover .saved-label{color:#5B94CB}
+.saved-label{flex:1;font-size:13px;color:#13110F}
+.saved-meta{font-size:11px;color:#717174;white-space:nowrap}
+.saved-del{background:none;border:none;color:#c00;cursor:pointer;font-size:16px;padding:2px 6px;flex-shrink:0}
 </style>
 </head>
 <body>
-<div class="hdr"><img class="hdr-logo" id="hdrLogo" alt="TekStream"><span class="hdr-tag">VAD Quote Generator</span><button class="btn" style="border:1.5px solid rgba(255,255,255,.4);background:transparent" onclick="newQuote()">New Quote</button></div><div class="wrap"><div class="rep-card"><div class="section-label" style="margin-bottom:10px">Rep Settings</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="field" style="margin:0"><label>Your name</label><input id="repName" autocomplete="off" placeholder="Matt Clemmons" oninput="saveRepSettings()"></div><div class="field" style="margin:0"><label>Your email</label><input id="repEmail" autocomplete="off" placeholder="matt@tekstream.com" oninput="saveRepSettings()"></div></div></div></div><div class="layout"><div class="left-col"><div class="card"><div class="section-label">Quote Details</div><div class="field"><label>Customer / company</label><input id="customerName" autocomplete="off" placeholder="ACME Corp"></div><div class="field"><label>Contact name</label><input id="contactName" autocomplete="off"></div><div class="field"><label>Contact email</label><input id="contactEmail" autocomplete="off"></div><div class="field"><label>Quote number</label><input id="quoteNumber" autocomplete="off"></div><div class="field-row"><div class="field"><label>Quote date</label><input id="quoteDate" type="date"></div><div class="field"><label>Expiration date</label><input id="expiryDate" type="date" oninput="this.style.borderColor=this.value?'':'#e53e3e'"></div></div><div class="field"><label>Margin %</label><input id="marginPct" type="number" value="15" min="0" max="99" step="0.5" autocomplete="off" oninput="recalcAll()"><div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px"><span id="marginHint" style="font-size:11px;color:#717174">15% margin applied</span><span id="marginDollar" style="font-size:11px;font-weight:600;color:#003658"></span></div></div><div class="field"><label>VAD Quote (PDF or Excel)</label><input type="file" id="vadPdf" accept=".pdf,.xlsx,.xls" style="display:none" onchange="extractVAD(this)"><div class="upload-row"><button class="btn" onclick="document.getElementById('vadPdf').click()">Upload VAD Quote</button><span id="extractStatus" class="upload-status">No file selected</span></div></div><div class="field"><label>Personalized note</label><textarea id="notes" autocomplete="off" placeholder="Thank you for the opportunity..."></textarea></div><div class="field"><label>Payment terms</label><input id="terms" autocomplete="off" value="Net 30"></div><div class="field"><label>Prepared by &#8212; company</label><input id="preparedByCompany" autocomplete="off" value="TekStream Solutions"></div><div class="field"><label>Prepared by &#8212; name</label><input id="preparedBy" autocomplete="off"></div><div class="field"><label>Prepared by &#8212; email</label><input id="preparedByEmail" autocomplete="off"></div><button class="btn" style="width:100%;background:#5B94CB;padding:10px" onclick="saveQuote()">Save Quote</button></div><div class="card" id="savedCard" style="display:none"><div class="section-label">Saved Quotes</div><div id="savedList"></div></div></div><div class="card"><div class="section-label" style="margin-bottom:14px">Line Items</div><div id="liArea"><div class="empty">Add line items manually or upload a VAD quote.</div></div><div id="totals"></div><div style="margin-top:10px"><button class="btn btn-sm" style="background:transparent;border:1.5px solid #003658;color:#003658" onclick="addRow()">+ Add line item</button></div><div class="btn-row"><button class="btn dl-btn" onclick="downloadPdf()">Download PDF quote &#8595;</button><button class="btn dl-btn" style="background:#5B94CB" onclick="emailQuote()">Email Quote &#9993;</button></div></div></div>
+<div class="hdr">
+  <img class="hdr-logo" id="hdrLogo" alt="TekStream">
+  <span class="hdr-tag">VAD Quote Generator</span>
+  <button class="btn" style="border:1.5px solid rgba(255,255,255,.4);background:transparent" onclick="newQuote()">New Quote</button>
+</div>
+<div class="wrap">
+  <div class="rep-card">
+    <div class="section-label" style="margin-bottom:10px">Rep Settings</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="field" style="margin:0"><label>Your name</label><input id="repName" autocomplete="off" placeholder="Matt Clemmons" oninput="saveRepSettings()"></div>
+      <div class="field" style="margin:0"><label>Your email</label><input id="repEmail" autocomplete="off" placeholder="matt@tekstream.com" oninput="saveRepSettings()"></div>
+    </div>
+  </div>
+</div>
+<div class="layout">
+  <div class="left-col">
+    <div class="card">
+      <div class="section-label">Quote Details</div>
+      <div class="field"><label>Customer / company</label><input id="customerName" autocomplete="off" placeholder="ACME Corp"></div>
+      <div class="field"><label>Contact name</label><input id="contactName" autocomplete="off"></div>
+      <div class="field"><label>Contact email</label><input id="contactEmail" autocomplete="off"></div>
+      <div class="field"><label>Quote number</label><input id="quoteNumber" autocomplete="off"></div>
+      <div class="field-row">
+        <div class="field"><label>Quote date</label><input id="quoteDate" type="date"></div>
+        <div class="field"><label>Expiration date</label><input id="expiryDate" type="date" oninput="this.style.borderColor=this.value?'':\'#e53e3e\'"></div>
+      </div>
+      <div class="field">
+        <label>Margin %</label>
+        <input id="marginPct" type="number" value="15" min="0" max="99" step="0.5" autocomplete="off" oninput="recalcAll()">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
+          <span id="marginHint" style="font-size:11px;color:#717174">15% margin applied</span>
+          <span id="marginDollar" style="font-size:11px;font-weight:600;color:#003658"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label>VAD Quote (PDF or Excel)</label>
+        <input type="file" id="vadPdf" accept=".pdf,.xlsx,.xls" style="display:none" onchange="extractVAD(this)">
+        <div class="upload-row">
+          <button class="btn" onclick="document.getElementById('vadPdf').click()">Upload VAD Quote</button>
+          <span id="extractStatus" class="upload-status">No file selected</span>
+        </div>
+      </div>
+      <div class="field"><label>Personalized note</label><textarea id="notes" autocomplete="off" placeholder="Thank you for the opportunity..."></textarea></div>
+      <div class="field"><label>Payment terms</label><input id="terms" autocomplete="off" value="Net 30"></div>
+      <div class="field"><label>Prepared by &#8212; company</label><input id="preparedByCompany" autocomplete="off" value="TekStream Solutions"></div>
+      <div class="field"><label>Prepared by &#8212; name</label><input id="preparedBy" autocomplete="off"></div>
+      <div class="field"><label>Prepared by &#8212; email</label><input id="preparedByEmail" autocomplete="off"></div>
+      <button class="btn" style="width:100%;background:#5B94CB;padding:10px" onclick="saveQuote()">Save Quote</button>
+    </div>
+    <div class="card" id="savedCard" style="display:none">
+      <div class="section-label">Saved Quotes</div>
+      <div id="savedList"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="section-label" style="margin-bottom:14px">Line Items</div>
+    <div id="liArea"><div class="empty">Add line items manually or upload a VAD quote.</div></div>
+    <div id="totals"></div>
+    <div style="margin-top:10px"><button class="btn btn-sm" style="background:transparent;border:1.5px solid #003658;color:#003658" onclick="addRow()">+ Add line item</button></div>
+    <div class="btn-row">
+      <button class="btn dl-btn" onclick="downloadPdf()">Download PDF quote &#8595;</button>
+      <button class="btn dl-btn" style="background:#5B94CB" onclick="emailQuote()">Email Quote &#9993;</button>
+    </div>
+  </div>
+</div>
 <script>
-window.lineItems=[];window.logoDataUrl=null;
-(function init(){
-  fetch('/api/logo').then(function(r){return r.arrayBuffer();}).then(function(buf){var b=new Uint8Array(buf),s='';b.forEach(function(x){s+=String.fromCharCode(x);});window.logoDataUrl='data:image/png;base64,'+btoa(s);document.getElementById('hdrLogo').src=window.logoDataUrl;}).catch(function(){});
-  var today=new Date().toISOString().split('T')[0],exp=new Date(Date.now()+30*864e5).toISOString().split('T')[0];
-  document.getElementById('quoteDate').value=today;document.getElementById('expiryDate').value=exp;
+window.lineItems = [];
+window.logoDataUrl = null;
+
+(function init() {
+  fetch('/api/logo').then(function(r){return r.arrayBuffer();}).then(function(buf){
+    var b=new Uint8Array(buf),s='';b.forEach(function(x){s+=String.fromCharCode(x);});
+    window.logoDataUrl='data:image/png;base64,'+btoa(s);
+    document.getElementById('hdrLogo').src=window.logoDataUrl;
+  }).catch(function(){});
+  var today=new Date().toISOString().split('T')[0];
+  var exp=new Date(Date.now()+30*864e5).toISOString().split('T')[0];
+  document.getElementById('quoteDate').value=today;
+  document.getElementById('expiryDate').value=exp;
   document.getElementById('quoteNumber').value='TS-'+new Date().getFullYear()+'-'+(Math.floor(Math.random()*900)+100);
-  loadRepSettings();renderSavedQuotes();
+  loadRepSettings();
+  renderSavedQuotes();
 })();
+
 function escH(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
 function cprice(vad,m){return(!vad||vad<=0||m>=100)?0:vad/(1-m/100);}
 function fmt(n){return n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
-function saveRepSettings(){var name=document.getElementById('repName').value,email=document.getElementById('repEmail').value;localStorage.setItem('ts_rep_name',name);localStorage.setItem('ts_rep_email',email);document.getElementById('preparedBy').value=name;document.getElementById('preparedByEmail').value=email;}
-function loadRepSettings(){var name=localStorage.getItem('ts_rep_name')||'',email=localStorage.getItem('ts_rep_email')||'';if(name){document.getElementById('repName').value=name;document.getElementById('preparedBy').value=name;}if(email){document.getElementById('repEmail').value=email;document.getElementById('preparedByEmail').value=email;}}
-function getQuoteState(){return{customerName:document.getElementById('customerName').value,contactName:document.getElementById('contactName').value,contactEmail:document.getElementById('contactEmail').value,quoteNumber:document.getElementById('quoteNumber').value,quoteDate:document.getElementById('quoteDate').value,expiryDate:document.getElementById('expiryDate').value,marginPct:document.getElementById('marginPct').value,notes:document.getElementById('notes').value,terms:document.getElementById('terms').value,preparedByCompany:document.getElementById('preparedByCompany').value,preparedBy:document.getElementById('preparedBy').value,preparedByEmail:document.getElementById('preparedByEmail').value,lineItems:JSON.parse(JSON.stringify(window.lineItems))};}
-function restoreQuoteState(s){document.getElementById('customerName').value=s.customerName||'';document.getElementById('contactName').value=s.contactName||'';document.getElementById('contactEmail').value=s.contactEmail||'';document.getElementById('quoteNumber').value=s.quoteNumber||'';document.getElementById('quoteDate').value=s.quoteDate||'';document.getElementById('expiryDate').value=s.expiryDate||'';document.getElementById('expiryDate').style.borderColor=s.expiryDate?'':'#e53e3e';document.getElementById('marginPct').value=s.marginPct||'15';document.getElementById('marginHint').textContent=(s.marginPct||'15')+'% margin applied';document.getElementById('notes').value=s.notes||'';document.getElementById('terms').value=s.terms||'Net 30';document.getElementById('preparedByCompany').value=s.preparedByCompany||'TekStream Solutions';document.getElementById('preparedBy').value=s.preparedBy||'';document.getElementById('preparedByEmail').value=s.preparedByEmail||'';window.lineItems=s.lineItems||[];render();}
-function saveQuote(){var state=getQuoteState(),key=state.quoteNumber||('q'+Date.now());var saved=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');saved=saved.filter(function(q){return q.key!==key;});saved.unshift({key:key,quoteNumber:state.quoteNumber,customerName:state.customerName,savedAt:new Date().toLocaleString(),state:state});if(saved.length>20)saved=saved.slice(0,20);localStorage.setItem('ts_saved_quotes',JSON.stringify(saved));renderSavedQuotes();var btn=event.target,orig=btn.textContent;btn.textContent='✓ Saved';setTimeout(function(){btn.textContent=orig;},1500);}
-function loadQuote(key){var saved=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]'),entry=saved.find(function(q){return q.key===key;});if(entry)restoreQuoteState(entry.state);}
-function deleteSavedQuote(key){var saved=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');saved=saved.filter(function(q){return q.key!==key;});localStorage.setItem('ts_saved_quotes',JSON.stringify(saved));renderSavedQuotes();}
-function renderSavedQuotes(){var saved=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]'),card=document.getElementById('savedCard'),list=document.getElementById('savedList');if(!saved.length){card.style.display='none';return;}card.style.display='block';var h='';saved.forEach(function(q,i){h+='<div class="saved-item" data-idx="'+i+'"><div class="saved-label">'+escH(q.quoteNumber||q.key)+(q.customerName?' &mdash; '+escH(q.customerName):'')+'</div><div class="saved-meta">'+escH(q.savedAt)+'</div><button class="saved-del" data-del="'+i+'">&times;</button></div>';});list.innerHTML=h;list.onclick=function(e){var sv=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');var d=e.target.closest('[data-del]');if(d){e.stopPropagation();sv.splice(+d.dataset.del,1);localStorage.setItem('ts_saved_quotes',JSON.stringify(sv));renderSavedQuotes();return;}var it=e.target.closest('[data-idx]');if(it&&sv[+it.dataset.idx])restoreQuoteState(sv[+it.dataset.idx].state);};}
+
+function saveRepSettings(){
+  var name=document.getElementById('repName').value;
+  var email=document.getElementById('repEmail').value;
+  localStorage.setItem('ts_rep_name',name);
+  localStorage.setItem('ts_rep_email',email);
+  document.getElementById('preparedBy').value=name;
+  document.getElementById('preparedByEmail').value=email;
+}
+function loadRepSettings(){
+  var name=localStorage.getItem('ts_rep_name')||'';
+  var email=localStorage.getItem('ts_rep_email')||'';
+  if(name){document.getElementById('repName').value=name;document.getElementById('preparedBy').value=name;}
+  if(email){document.getElementById('repEmail').value=email;document.getElementById('preparedByEmail').value=email;}
+}
+
+function getQuoteState(){
+  return{customerName:document.getElementById('customerName').value,contactName:document.getElementById('contactName').value,contactEmail:document.getElementById('contactEmail').value,quoteNumber:document.getElementById('quoteNumber').value,quoteDate:document.getElementById('quoteDate').value,expiryDate:document.getElementById('expiryDate').value,marginPct:document.getElementById('marginPct').value,notes:document.getElementById('notes').value,terms:document.getElementById('terms').value,preparedByCompany:document.getElementById('preparedByCompany').value,preparedBy:document.getElementById('preparedBy').value,preparedByEmail:document.getElementById('preparedByEmail').value,lineItems:JSON.parse(JSON.stringify(window.lineItems))};
+}
+function restoreQuoteState(s){
+  document.getElementById('customerName').value=s.customerName||'';
+  document.getElementById('contactName').value=s.contactName||'';
+  document.getElementById('contactEmail').value=s.contactEmail||'';
+  document.getElementById('quoteNumber').value=s.quoteNumber||'';
+  document.getElementById('quoteDate').value=s.quoteDate||'';
+  document.getElementById('expiryDate').value=s.expiryDate||'';
+  document.getElementById('expiryDate').style.borderColor=s.expiryDate?'':'#e53e3e';
+  document.getElementById('marginPct').value=s.marginPct||'15';
+  document.getElementById('marginHint').textContent=(s.marginPct||'15')+'% margin applied';
+  document.getElementById('notes').value=s.notes||'';
+  document.getElementById('terms').value=s.terms||'Net 30';
+  document.getElementById('preparedByCompany').value=s.preparedByCompany||'TekStream Solutions';
+  document.getElementById('preparedBy').value=s.preparedBy||'';
+  document.getElementById('preparedByEmail').value=s.preparedByEmail||'';
+  window.lineItems=s.lineItems||[];render();
+}
+function saveQuote(){
+  var state=getQuoteState();
+  var key=state.quoteNumber||('q'+Date.now());
+  var saved=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
+  saved=saved.filter(function(q){return q.key!==key;});
+  saved.unshift({key:key,quoteNumber:state.quoteNumber,customerName:state.customerName,savedAt:new Date().toLocaleString(),state:state});
+  if(saved.length>20)saved=saved.slice(0,20);
+  localStorage.setItem('ts_saved_quotes',JSON.stringify(saved));
+  renderSavedQuotes();
+  var btn=event.target,orig=btn.textContent;
+  btn.textContent='✓ Saved';setTimeout(function(){btn.textContent=orig;},1500);
+}
+function loadQuote(key){
+  var saved=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
+  var entry=saved.find(function(q){return q.key===key;});
+  if(entry)restoreQuoteState(entry.state);
+}
+function deleteSavedQuote(key){
+  var saved=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
+  saved=saved.filter(function(q){return q.key!==key;});
+  localStorage.setItem('ts_saved_quotes',JSON.stringify(saved));
+  renderSavedQuotes();
+}
+function renderSavedQuotes(){
+  var saved=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
+  var card=document.getElementById('savedCard');
+  var list=document.getElementById('savedList');
+  if(!saved.length){card.style.display='none';return;}
+  card.style.display='block';
+  list.innerHTML='';
+  saved.forEach(function(q,i){
+    var row=document.createElement('div');
+    row.className='saved-item';
+    var lbl=document.createElement('div');
+    lbl.className='saved-label';
+    lbl.textContent=(q.quoteNumber||q.key)+(q.customerName?' — '+q.customerName:'');
+    var meta=document.createElement('div');
+    meta.className='saved-meta';
+    meta.textContent=q.savedAt||'';
+    var del=document.createElement('button');
+    del.className='saved-del';
+    del.innerHTML='&times;';
+    del.onclick=function(e){
+      e.stopPropagation();
+      var sv=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
+      sv.splice(i,1);
+      localStorage.setItem('ts_saved_quotes',JSON.stringify(sv));
+      renderSavedQuotes();
+    };
+    row.onclick=function(){
+      var sv=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
+      if(sv[i])restoreQuoteState(sv[i].state);
+    };
+    row.appendChild(lbl);row.appendChild(meta);row.appendChild(del);
+    list.appendChild(row);
+  });
+}
 function addRow(){window.lineItems.push({sku:'',description:'',qty:1,unit_price:0,start_date:'',end_date:''});render();}
 function removeRow(i){window.lineItems.splice(i,1);render();}
-function groupByYear(items){var years=[],groups={};items.forEach(function(it){var yr=it.start_date?it.start_date.substring(0,4):'__none__';if(!groups[yr]){groups[yr]=[];years.push(yr);}groups[yr].push(it);});var real=years.filter(function(y){return y!=='__none__';});if(real.length<=1)return null;years.sort(function(a,b){return a==='__none__'?1:b==='__none__'?-1:a.localeCompare(b);});return years.map(function(yr,i){return{label:yr==='__none__'?'Other':'Payment '+(i+1)+' ('+yr+')',items:groups[yr]};});}
-function renderRow(it,i,m){var cp=cprice(it.unit_price,m),ext=cp*it.qty,h='<tr>';h+='<td><input value="'+escH(it.sku)+'" oninput="lineItems['+i+'].sku=this.value" autocomplete="off"></td>';h+='<td><input value="'+escH(it.description)+'" oninput="lineItems['+i+'].description=this.value" autocomplete="off"></td>';h+='<td><input type="number" value="'+it.qty+'" min="1" style="width:50px" oninput="lineItems['+i+'].qty=+this.value;recalcAll()" autocomplete="off"></td>';h+='<td><input type="number" value="'+it.unit_price.toFixed(2)+'" step="0.01" min="0" oninput="lineItems['+i+'].unit_price=+this.value;recalcAll()" autocomplete="off"></td>';h+='<td><input type="date" value="'+escH(it.start_date||'')+'" style="width:105px" oninput="lineItems['+i+'].start_date=this.value"></td>';h+='<td><input type="date" value="'+escH(it.end_date||'')+'" style="width:105px" oninput="lineItems['+i+'].end_date=this.value"></td>';h+='<td class="muted">'+(ext>0?'$'+fmt(ext):'—')+'</td>';h+='<td><button class="del" onclick="removeRow('+i+')">✕</button></td></tr>';return h;}
-function render(){var m=parseFloat(document.getElementById('marginPct').value)||0,area=document.getElementById('liArea');if(!window.lineItems.length){area.innerHTML='<div class="empty">Add line items manually or upload a VAD quote.</div>';document.getElementById('totals').innerHTML='';updateMarginDollar(m,0,0);return;}var tbl='<table><colgroup><col style="width:11%"><col style="width:28%"><col style="width:6%"><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:22%"><col style="width:5%"></colgroup><thead><tr><th>SKU</th><th>Description</th><th>Qty</th><th>VAD Price</th><th>Start</th><th>End</th><th>Customer</th><th></th></tr></thead><tbody>',h='',groups=groupByYear(window.lineItems);if(!groups){h+=tbl;window.lineItems.forEach(function(it,i){h+=renderRow(it,i,m);});h+='</tbody></table>';}else{groups.forEach(function(grp){h+='<div style="background:#5B94CB;color:#fff;font-weight:700;font-size:12px;padding:7px 12px;letter-spacing:.06em;border-radius:6px 6px 0 0;margin-top:8px">'+grp.label+'</div>';h+=tbl;var gt=0;grp.items.forEach(function(it){var i=window.lineItems.indexOf(it);gt+=cprice(it.unit_price,m)*it.qty;h+=renderRow(it,i,m);});h+='<tr style="background:#EBF3FB"><td colspan="6" style="text-align:right;font-size:12px;font-weight:600;padding:6px 8px;color:#003658">'+grp.label+' Subtotal</td><td style="font-size:12px;font-weight:700;color:#003658;padding:6px 4px">$'+fmt(gt)+'</td><td></td></tr></tbody></table>';});}area.innerHTML=h;var vt=window.lineItems.reduce(function(s,it){return s+it.unit_price*it.qty;},0),sub=window.lineItems.reduce(function(s,it){return s+cprice(it.unit_price,m)*it.qty;},0);document.getElementById('totals').innerHTML='<div class="trow"><span>Subtotal</span><span>$'+fmt(sub)+'</span></div><div class="trow grand"><span>Total (USD)</span><span>$'+fmt(sub)+'</span></div>';updateMarginDollar(m,sub,vt);}
+
+function groupByYear(items){
+  var years=[],groups={};
+  items.forEach(function(it){var yr=it.start_date?it.start_date.substring(0,4):'__none__';if(!groups[yr]){groups[yr]=[];years.push(yr);}groups[yr].push(it);});
+  var real=years.filter(function(y){return y!=='__none__';});
+  if(real.length<=1)return null;
+  years.sort(function(a,b){return a==='__none__'?1:b==='__none__'?-1:a.localeCompare(b);});
+  return years.map(function(yr,i){return{label:yr==='__none__'?'Other':'Payment '+(i+1)+' ('+yr+')',items:groups[yr]};});
+}
+
+function renderRow(it,i,m){
+  var cp=cprice(it.unit_price,m),ext=cp*it.qty,h='<tr>';
+  h+='<td><input value="'+escH(it.sku)+'" oninput="lineItems['+i+'].sku=this.value" autocomplete="off"></td>';
+  h+='<td><input value="'+escH(it.description)+'" oninput="lineItems['+i+'].description=this.value" autocomplete="off"></td>';
+  h+='<td><input type="number" value="'+it.qty+'" min="1" style="width:50px" oninput="lineItems['+i+'].qty=+this.value;recalcAll()" autocomplete="off"></td>';
+  h+='<td><input type="number" value="'+it.unit_price.toFixed(2)+'" step="0.01" min="0" oninput="lineItems['+i+'].unit_price=+this.value;recalcAll()" autocomplete="off"></td>';
+  h+='<td><input type="date" value="'+escH(it.start_date||'')+'" style="width:105px" oninput="lineItems['+i+'].start_date=this.value"></td>';
+  h+='<td><input type="date" value="'+escH(it.end_date||'')+'" style="width:105px" oninput="lineItems['+i+'].end_date=this.value"></td>';
+  h+='<td class="muted">'+(ext>0?'$'+fmt(ext):'\u2014')+'</td>';
+  h+='<td><button class="del" onclick="removeRow('+i+')">\u2715</button></td></tr>';
+  return h;
+}
+
+function render(){
+  var m=parseFloat(document.getElementById('marginPct').value)||0;
+  var area=document.getElementById('liArea');
+  if(!window.lineItems.length){area.innerHTML='<div class="empty">Add line items manually or upload a VAD quote.</div>';document.getElementById('totals').innerHTML='';updateMarginDollar(m,0,0);return;}
+  var tbl='<table><colgroup><col style="width:11%"><col style="width:28%"><col style="width:6%"><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:22%"><col style="width:5%"></colgroup><thead><tr><th>SKU</th><th>Description</th><th>Qty</th><th>VAD Price</th><th>Start</th><th>End</th><th>Customer</th><th></th></tr></thead><tbody>';
+  var h='',groups=groupByYear(window.lineItems);
+  if(!groups){
+    h+=tbl;window.lineItems.forEach(function(it,i){h+=renderRow(it,i,m);});h+='</tbody></table>';
+  } else {
+    groups.forEach(function(grp){
+      h+='<div style="background:#5B94CB;color:#fff;font-weight:700;font-size:12px;padding:7px 12px;letter-spacing:.06em;border-radius:6px 6px 0 0;margin-top:8px">'+grp.label+'</div>';
+      h+=tbl;
+      var gt=0;
+      grp.items.forEach(function(it){var i=window.lineItems.indexOf(it);gt+=cprice(it.unit_price,m)*it.qty;h+=renderRow(it,i,m);});
+      h+='<tr style="background:#EBF3FB"><td colspan="6" style="text-align:right;font-size:12px;font-weight:600;padding:6px 8px;color:#003658">'+grp.label+' Subtotal</td><td style="font-size:12px;font-weight:700;color:#003658;padding:6px 4px">$'+fmt(gt)+'</td><td></td></tr>';
+      h+='</tbody></table>';
+    });
+  }
+  area.innerHTML=h;
+  var vt=window.lineItems.reduce(function(s,it){return s+it.unit_price*it.qty;},0);
+  var sub=window.lineItems.reduce(function(s,it){return s+cprice(it.unit_price,m)*it.qty;},0);
+  document.getElementById('totals').innerHTML='<div class="trow"><span>Subtotal</span><span>$'+fmt(sub)+'</span></div><div class="trow grand"><span>Total (USD)</span><span>$'+fmt(sub)+'</span></div>';
+  updateMarginDollar(m,sub,vt);
+}
 function updateMarginDollar(m,c,v){var el=document.getElementById('marginDollar');if(el)el.textContent=(m>0&&c>v)?'$'+fmt(c-v):'';}
 function recalcAll(){var m=parseFloat(document.getElementById('marginPct').value)||0;document.getElementById('marginHint').textContent=m>0?m+'% margin applied':'';render();}
-function newQuote(){['customerName','contactName','contactEmail','notes','preparedBy','preparedByEmail'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});document.getElementById('preparedByCompany').value='TekStream Solutions';document.getElementById('terms').value='Net 30';document.getElementById('marginPct').value='15';document.getElementById('marginHint').textContent='15% margin applied';document.getElementById('marginDollar').textContent='';document.getElementById('quoteNumber').value='TS-'+new Date().getFullYear()+'-'+(Math.floor(Math.random()*900)+100);var t=new Date().toISOString().split('T')[0],e=new Date(Date.now()+30*864e5).toISOString().split('T')[0];document.getElementById('quoteDate').value=t;document.getElementById('expiryDate').value=e;document.getElementById('expiryDate').style.borderColor='';window.lineItems=[];render();document.getElementById('extractStatus').textContent='No file selected';document.getElementById('vadPdf').value='';loadRepSettings();}
-async function extractVAD(input){var file=input.files[0];if(!file)return;document.getElementById('extractStatus').textContent='Extracting…';try{var b64=await new Promise(function(res,rej){var r=new FileReader();r.onload=function(e){res(e.target.result.split(',')[1]);};r.onerror=rej;r.readAsDataURL(file);});var resp=await fetch('/api/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileBase64:b64,fileType:file.type,fileName:file.name})});if(!resp.ok){var e=await resp.json();throw new Error(e.error||resp.status);}var parsed=await resp.json();if(parsed.to)document.getElementById('preparedByCompany').value=parsed.to.company||'';if(parsed.for){document.getElementById('customerName').value=parsed.for.company||'';document.getElementById('contactName').value=parsed.for.name||'';document.getElementById('contactEmail').value=parsed.for.email||'';}if(parsed.quote_expire_date){document.getElementById('expiryDate').value=parsed.quote_expire_date;document.getElementById('expiryDate').style.borderColor='';}else{document.getElementById('expiryDate').value='';document.getElementById('expiryDate').style.borderColor='#e53e3e';}if(parsed.lineItems&&parsed.lineItems.length)window.loadLineItems(parsed.lineItems);document.getElementById('extractStatus').textContent='✓ Extracted '+(parsed.lineItems&&parsed.lineItems.length||0)+' line items'+(parsed.vad?' ('+parsed.vad+')':'');}catch(e){document.getElementById('extractStatus').textContent='Error: '+e.message;}}
+function newQuote(){
+  ['customerName','contactName','contactEmail','notes','preparedBy','preparedByEmail'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('preparedByCompany').value='TekStream Solutions';
+  document.getElementById('terms').value='Net 30';
+  document.getElementById('marginPct').value='15';
+  document.getElementById('marginHint').textContent='15% margin applied';
+  document.getElementById('marginDollar').textContent='';
+  document.getElementById('quoteNumber').value='TS-'+new Date().getFullYear()+'-'+(Math.floor(Math.random()*900)+100);
+  var t=new Date().toISOString().split('T')[0],e=new Date(Date.now()+30*864e5).toISOString().split('T')[0];
+  document.getElementById('quoteDate').value=t;document.getElementById('expiryDate').value=e;
+  document.getElementById('expiryDate').style.borderColor='';
+  window.lineItems=[];render();
+  document.getElementById('extractStatus').textContent='No file selected';
+  document.getElementById('vadPdf').value='';
+  loadRepSettings();
+}
+async function extractVAD(input){
+  var file=input.files[0];if(!file)return;
+  document.getElementById('extractStatus').textContent='Extracting\u2026';
+  try{
+    var b64=await new Promise(function(res,rej){var r=new FileReader();r.onload=function(e){res(e.target.result.split(',')[1]);};r.onerror=rej;r.readAsDataURL(file);});
+    var resp=await fetch('/api/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileBase64:b64,fileType:file.type,fileName:file.name})});
+    if(!resp.ok){var e=await resp.json();throw new Error(e.error||resp.status);}
+    var parsed=await resp.json();
+    if(parsed.to)document.getElementById('preparedByCompany').value=parsed.to.company||'';
+    if(parsed.for){document.getElementById('customerName').value=parsed.for.company||'';document.getElementById('contactName').value=parsed.for.name||'';document.getElementById('contactEmail').value=parsed.for.email||'';}
+    if(parsed.quote_expire_date){document.getElementById('expiryDate').value=parsed.quote_expire_date;document.getElementById('expiryDate').style.borderColor='';}
+    else{document.getElementById('expiryDate').value='';document.getElementById('expiryDate').style.borderColor='#e53e3e';}
+    if(parsed.lineItems&&parsed.lineItems.length)window.loadLineItems(parsed.lineItems);
+    document.getElementById('extractStatus').textContent='\u2713 Extracted '+(parsed.lineItems&&parsed.lineItems.length||0)+' line items'+(parsed.vad?' ('+parsed.vad+')':'');
+  }catch(e){document.getElementById('extractStatus').textContent='Error: '+e.message;}
+}
 window.loadLineItems=function(items){window.lineItems=items.map(function(it){return{sku:String(it.sku||''),description:String(it.description||''),qty:parseFloat(it.qty)||1,unit_price:parseFloat(String(it.unit_price||'0').replace(/[$,]/g,''))||0,start_date:String(it.start_date||''),end_date:String(it.end_date||'')};});render();};
-async function emailQuote(){await downloadPdf();var cn=document.getElementById('customerName').value||'Customer',co=document.getElementById('contactName').value||'',ce=document.getElementById('contactEmail').value||'',qn=document.getElementById('quoteNumber').value||'TS-QUOTE',ed=document.getElementById('expiryDate').value||'',nt=document.getElementById('notes').value||'';var parts=[(co?'Hi '+co.split(' ')[0]+',':'Hi,'),''];parts.push('Please find attached our quote '+qn+' for '+cn+(ed?' valid through '+ed:'')+'.','');if(nt)parts.push(nt,'');parts.push("Please don't hesitate to reach out with any questions. We look forward to the opportunity to work with you.");window.location.href='mailto:'+encodeURIComponent(ce)+'?subject='+encodeURIComponent('TekStream Quote '+qn+' for '+cn)+'&body='+encodeURIComponent(parts.join('
-'));}
-async function downloadPdf(){var pdfGroups=groupByYear(window.lineItems);var jsPDF=window.jspdf.jsPDF;var m=parseFloat(document.getElementById('marginPct').value)||0,cn=document.getElementById('customerName').value||'Customer',co=document.getElementById('contactName').value||'',ce=document.getElementById('contactEmail').value||'',qn=document.getElementById('quoteNumber').value||'TS-QUOTE',qd=document.getElementById('quoteDate').value,ed=document.getElementById('expiryDate').value,nt=document.getElementById('notes').value,tm=document.getElementById('terms').value||'Net 30',pb=document.getElementById('preparedBy').value||'',pbc=document.getElementById('preparedByCompany').value||'TekStream Solutions',pbe=document.getElementById('preparedByEmail').value||'',logoSrc=window.logoDataUrl||'';var doc=new jsPDF({unit:'pt',format:'letter'});var W=612,L=48,R=564;doc.setFillColor(0,54,88);doc.rect(0,0,W,68,'F');if(logoSrc&&logoSrc.startsWith('data:')){try{var li=new Image();await new Promise(function(res,rej){li.onload=res;li.onerror=rej;li.src=logoSrc;});doc.addImage(logoSrc,'PNG',L,11,li.naturalWidth*(46/li.naturalHeight),46);}catch(e){doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(255,255,255);doc.text('TekStream',L,36);}}doc.setFillColor(91,148,203);doc.rect(0,68,W,5,'F');doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);doc.text('Quote #  '+qn,R,28,{align:'right'});doc.setFont('helvetica','normal');doc.text('Date:  '+qd,R,42,{align:'right'});doc.text('Expires:  '+ed,R,56,{align:'right'});doc.setFont('helvetica','bold');doc.setFontSize(22);doc.setTextColor(0,54,88);doc.text('Quote',L,108);doc.setFillColor(235,243,251);doc.roundedRect(L,118,210,70,3,3,'F');doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(91,148,203);doc.text('PREPARED FOR',L+10,133);doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(0,54,88);doc.text(cn,L+10,149);doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(113,113,116);if(co)doc.text(co,L+10,161);if(ce)doc.text(ce,L+10,173);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(91,148,203);doc.text('PREPARED BY',R-200,133);doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(0,54,88);doc.text(pbc,R-200,149);doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(113,113,116);if(pb)doc.text(pb,R-200,161);if(pbe)doc.text(pbe,R-200,173);var y=210;if(nt){doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(60,60,60);var lines=doc.splitTextToSize(nt,R-L);doc.text(lines,L,y);y+=lines.length*13+14;}var skuW=(R-L)*0.13,dateW=50,qtyW=30,priceW=62,extW=70,descW=(R-L)-skuW-dateW*2-qtyW-priceW-extW-10,colSku=L+4,colDesc=L+skuW+4,colSt=colDesc+descW+2,colEd=colSt+dateW+2,colQty=colEd+dateW+2,colPr=colQty+qtyW+4,colEx=R-4;function newPageIfNeeded(n){if(y+n>692){doc.addPage();y=48;}}function drawColHeaders(){doc.setFillColor(0,54,88);doc.rect(L,y,R-L,20,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(255,255,255);doc.text('SKU',colSku,y+14);doc.text('Description',colDesc,y+14);doc.text('Start',colSt+dateW,y+14,{align:'right'});doc.text('End',colEd+dateW,y+14,{align:'right'});doc.text('Qty',colQty+qtyW,y+14,{align:'right'});doc.text('Unit Price',colPr+priceW,y+14,{align:'right'});doc.text('Extended',colEx,y+14,{align:'right'});y+=20;}var subtotal=0;function renderPdfRow(it,idx,alt){var cp=cprice(it.unit_price,m),ext=cp*it.qty;subtotal+=ext;var skuL=doc.splitTextToSize(it.sku||'',skuW-4),descL=doc.splitTextToSize(it.description||'',descW-4),nL=Math.max(skuL.length,descL.length,1),rowH=nL*11+10;newPageIfNeeded(rowH);if(alt){doc.setFillColor(235,243,251);doc.rect(L,y,R-L,rowH,'F');}doc.setFont('helvetica','normal');doc.setTextColor(19,17,18);doc.setFontSize(8.5);doc.text(skuL,colSku,y+9);doc.text(descL,colDesc,y+9);var mid=y+rowH/2+3;if(it.start_date)doc.text(it.start_date,colSt+dateW,mid,{align:'right'});if(it.end_date)doc.text(it.end_date,colEd+dateW,mid,{align:'right'});doc.text(it.qty.toLocaleString(),colQty+qtyW,mid,{align:'right'});doc.text(cp>0?'$'+fmt(cp):'—',colPr+priceW,mid,{align:'right'});doc.text(ext>0?'$'+fmt(ext):'—',colEx,mid,{align:'right'});y+=rowH;}if(!pdfGroups){drawColHeaders();window.lineItems.forEach(function(it,i){renderPdfRow(it,i,i%2===1);});}else{pdfGroups.forEach(function(grp){newPageIfNeeded(36);doc.setFillColor(91,148,203);doc.rect(L,y,R-L,16,'F');doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);doc.text(grp.label,L+6,y+11);y+=16;drawColHeaders();var prev=subtotal;grp.items.forEach(function(it,i){renderPdfRow(it,i,i%2===1);});var gs=subtotal-prev;newPageIfNeeded(20);doc.setFillColor(235,243,251);doc.rect(L,y,R-L,14,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(0,54,88);doc.text(grp.label+' Subtotal',colPr+priceW,y+10,{align:'right'});doc.text('$'+fmt(gs),colEx,y+10,{align:'right'});y+=18;});}newPageIfNeeded(80);y+=6;doc.setDrawColor(91,148,203);doc.setLineWidth(0.5);doc.line(R-190,y,R,y);y+=14;doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});y+=28;doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(113,113,116);doc.text('Payment terms: '+tm+(pdfGroups?'  |  Invoiced annually':''),L,y);y+=12;doc.text('This quote is valid through the expiration date above. All prices are in USD.',L,y);y+=12;doc.text('Quote subject to change without notice.',L,y);doc.setFillColor(0,54,88);doc.rect(0,748,W,6,'F');doc.setFillColor(91,148,203);doc.rect(0,754,W,14,'F');doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(255,255,255);doc.text('Copyright © TekStream Solutions, LLC 2026 | tekstream.com | Confidential',W/2,763,{align:'center'});doc.save(qn+' - '+cn+'.pdf');}
+async function emailQuote(){
+  await downloadPdf();
+  var cn=document.getElementById('customerName').value||'Customer';
+  var co=document.getElementById('contactName').value||'';
+  var ce=document.getElementById('contactEmail').value||'';
+  var qn=document.getElementById('quoteNumber').value||'TS-QUOTE';
+  var ed=document.getElementById('expiryDate').value||'';
+  var nt=document.getElementById('notes').value||'';
+  var parts=[(co?'Hi '+co.split(' ')[0]+',':'Hi,'),''];
+  parts.push('Please find attached our quote '+qn+' for '+cn+(ed?' valid through '+ed:'')+'.','');
+  if(nt)parts.push(nt,'');
+  parts.push("Please don't hesitate to reach out with any questions. We look forward to the opportunity to work with you.");
+  window.location.href='mailto:'+encodeURIComponent(ce)+'?subject='+encodeURIComponent('TekStream Quote '+qn+' for '+cn)+'&body='+encodeURIComponent(parts.join('\n'));
+}
+async function downloadPdf(){
+  var pdfGroups=groupByYear(window.lineItems);
+  var jsPDF=window.jspdf.jsPDF;
+  var m=parseFloat(document.getElementById('marginPct').value)||0;
+  var cn=document.getElementById('customerName').value||'Customer';
+  var co=document.getElementById('contactName').value||'';
+  var ce=document.getElementById('contactEmail').value||'';
+  var qn=document.getElementById('quoteNumber').value||'TS-QUOTE';
+  var qd=document.getElementById('quoteDate').value;
+  var ed=document.getElementById('expiryDate').value;
+  var nt=document.getElementById('notes').value;
+  var tm=document.getElementById('terms').value||'Net 30';
+  var pb=document.getElementById('preparedBy').value||'';
+  var pbc=document.getElementById('preparedByCompany').value||'TekStream Solutions';
+  var pbe=document.getElementById('preparedByEmail').value||'';
+  var logoSrc=window.logoDataUrl||'';
+  var doc=new jsPDF({unit:'pt',format:'letter'});
+  var W=612,L=48,R=564;
+  doc.setFillColor(0,54,88);doc.rect(0,0,W,68,'F');
+  if(logoSrc&&logoSrc.startsWith('data:')){try{var li=new Image();await new Promise(function(res,rej){li.onload=res;li.onerror=rej;li.src=logoSrc;});doc.addImage(logoSrc,'PNG',L,11,li.naturalWidth*(46/li.naturalHeight),46);}catch(e){doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(255,255,255);doc.text('TekStream',L,36);}}
+  doc.setFillColor(91,148,203);doc.rect(0,68,W,5,'F');
+  doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);
+  doc.text('Quote #  '+qn,R,28,{align:'right'});doc.setFont('helvetica','normal');doc.text('Date:  '+qd,R,42,{align:'right'});doc.text('Expires:  '+ed,R,56,{align:'right'});
+  doc.setFont('helvetica','bold');doc.setFontSize(22);doc.setTextColor(0,54,88);doc.text('Quote',L,108);
+  doc.setFillColor(235,243,251);doc.roundedRect(L,118,210,70,3,3,'F');
+  doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(91,148,203);doc.text('PREPARED FOR',L+10,133);
+  doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(0,54,88);doc.text(cn,L+10,149);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(113,113,116);
+  if(co)doc.text(co,L+10,161);if(ce)doc.text(ce,L+10,173);
+  doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(91,148,203);doc.text('PREPARED BY',R-200,133);
+  doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(0,54,88);doc.text(pbc,R-200,149);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(113,113,116);
+  if(pb)doc.text(pb,R-200,161);if(pbe)doc.text(pbe,R-200,173);
+  var y=210;
+  if(nt){doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(60,60,60);var lines=doc.splitTextToSize(nt,R-L);doc.text(lines,L,y);y+=lines.length*13+14;}
+  var skuW=(R-L)*0.13,dateW=50,qtyW=30,priceW=62,extW=70,descW=(R-L)-skuW-dateW*2-qtyW-priceW-extW-10;
+  var colSku=L+4,colDesc=L+skuW+4,colSt=colDesc+descW+2,colEd=colSt+dateW+2,colQty=colEd+dateW+2,colPr=colQty+qtyW+4,colEx=R-4;
+  function newPageIfNeeded(n){if(y+n>692){doc.addPage();y=48;}}
+  function drawColHeaders(){doc.setFillColor(0,54,88);doc.rect(L,y,R-L,20,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(255,255,255);doc.text('SKU',colSku,y+14);doc.text('Description',colDesc,y+14);doc.text('Start',colSt+dateW,y+14,{align:'right'});doc.text('End',colEd+dateW,y+14,{align:'right'});doc.text('Qty',colQty+qtyW,y+14,{align:'right'});doc.text('Unit Price',colPr+priceW,y+14,{align:'right'});doc.text('Extended',colEx,y+14,{align:'right'});y+=20;}
+  var subtotal=0;
+  function renderPdfRow(it,idx,alt){
+    var cp=cprice(it.unit_price,m),ext=cp*it.qty;subtotal+=ext;
+    var skuL=doc.splitTextToSize(it.sku||'',skuW-4),descL=doc.splitTextToSize(it.description||'',descW-4);
+    var nL=Math.max(skuL.length,descL.length,1),rowH=nL*11+10;
+    newPageIfNeeded(rowH);
+    if(alt){doc.setFillColor(235,243,251);doc.rect(L,y,R-L,rowH,'F');}
+    doc.setFont('helvetica','normal');doc.setTextColor(19,17,18);doc.setFontSize(8.5);
+    doc.text(skuL,colSku,y+9);doc.text(descL,colDesc,y+9);
+    var mid=y+rowH/2+3;
+    if(it.start_date)doc.text(it.start_date,colSt+dateW,mid,{align:'right'});
+    if(it.end_date)doc.text(it.end_date,colEd+dateW,mid,{align:'right'});
+    doc.text(it.qty.toLocaleString(),colQty+qtyW,mid,{align:'right'});
+    doc.text(cp>0?'$'+fmt(cp):'\u2014',colPr+priceW,mid,{align:'right'});
+    doc.text(ext>0?'$'+fmt(ext):'\u2014',colEx,mid,{align:'right'});
+    y+=rowH;
+  }
+  if(!pdfGroups){drawColHeaders();window.lineItems.forEach(function(it,i){renderPdfRow(it,i,i%2===1);});}
+  else{
+    pdfGroups.forEach(function(grp){
+      newPageIfNeeded(36);
+      doc.setFillColor(91,148,203);doc.rect(L,y,R-L,16,'F');doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);doc.text(grp.label,L+6,y+11);y+=16;
+      drawColHeaders();
+      var prev=subtotal;
+      grp.items.forEach(function(it,i){renderPdfRow(it,i,i%2===1);});
+      var gs=subtotal-prev;
+      newPageIfNeeded(20);
+      doc.setFillColor(235,243,251);doc.rect(L,y,R-L,14,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(0,54,88);
+      doc.text(grp.label+' Subtotal',colPr+priceW,y+10,{align:'right'});doc.text('$'+fmt(gs),colEx,y+10,{align:'right'});y+=18;
+    });
+  }
+  newPageIfNeeded(80);
+  y+=6;doc.setDrawColor(91,148,203);doc.setLineWidth(0.5);doc.line(R-190,y,R,y);y+=14;
+  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);
+  doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});
+  y+=28;doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(113,113,116);
+  doc.text('Payment terms: '+tm+(pdfGroups?'  |  Invoiced annually':''),L,y);y+=12;
+  doc.text('This quote is valid through the expiration date above. All prices are in USD.',L,y);y+=12;
+  doc.text('Quote subject to change without notice.',L,y);
+  doc.setFillColor(0,54,88);doc.rect(0,748,W,6,'F');doc.setFillColor(91,148,203);doc.rect(0,754,W,14,'F');
+  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(255,255,255);
+  doc.text('Copyright \u00A9 TekStream Solutions, LLC 2026 | tekstream.com | Confidential',W/2,763,{align:'center'});
+  doc.save(qn+' - '+cn+'.pdf');
+}
 </script>
 </body>
 </html>
