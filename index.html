@@ -128,6 +128,16 @@ tr.drag-over td{border-top:2px solid #5B94CB}
     <div class="section-label" style="margin-bottom:14px">Line Items</div>
     <div id="liArea"><div class="empty">Add line items manually or upload a VAD quote.</div></div>
     <div id="totals"></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:8px;justify-content:flex-end">
+      <label style="font-size:12px;color:#717174;white-space:nowrap">Set total:</label>
+      <input id="setTotalInput" type="number" min="0" step="0.01" autocomplete="off"
+        placeholder="e.g. 84055.12"
+        style="width:130px;border:1.5px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:13px;outline:none"
+        onfocus="this.style.borderColor='#5B94CB'"
+        onblur="this.style.borderColor='#e2e8f0'"
+        onkeydown="if(event.key==='Enter')applySetTotal()">
+      <button class="btn btn-sm" style="background:#5B94CB" onclick="applySetTotal()">Apply</button>
+    </div>
     <div style="margin-top:10px"><button class="btn btn-sm" style="background:transparent;border:1.5px solid #003658;color:#003658" onclick="addRow()">+ Add line item</button></div>
     <div class="btn-row">
       <button class="btn dl-btn" onclick="downloadPdf()">Download PDF quote &#8595;</button>
@@ -365,6 +375,29 @@ function renderRow(it,i,m){
   h+='<button class="del" onclick="removeRow('+i+')">\u2715</button>';
   h+='</td></tr>';
   return h;
+}
+
+
+function applySetTotal(){
+  var target=parseFloat(document.getElementById('setTotalInput').value);
+  if(!target||isNaN(target)||target<=0){alert('Please enter a valid target total.');return;}
+  var m=parseFloat(document.getElementById('marginPct').value)||0;
+  // Calculate current VAD total per line
+  var vadTotals=window.lineItems.map(function(it){return it.unit_price*it.qty;});
+  var totalVad=vadTotals.reduce(function(s,v){return s+v;},0);
+  if(totalVad<=0){alert('Cannot set total: VAD prices are zero.');return;}
+  // Distribute target proportionally — each line gets its share of target
+  window.lineItems.forEach(function(it,i){
+    var proportion=vadTotals[i]/totalVad;
+    var lineTarget=proportion*target;
+    if(it.qty>0&&it.unit_price>0){
+      var lineUnitTarget=lineTarget/it.qty;
+      var newMargin=(1-it.unit_price/lineUnitTarget)*100;
+      it.margin=Math.round(newMargin*1000000)/1000000;
+    }
+  });
+  document.getElementById('setTotalInput').value='';
+  render();
 }
 
 function updateTotalsOnly(){
