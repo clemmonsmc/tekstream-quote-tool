@@ -350,7 +350,7 @@ function renderRow(it,i,m){
   h+='<td><input type="number" value="'+it.qty+'" min="1" style="width:50px" oninput="lineItems['+i+'].qty=+this.value;recalcAll()" autocomplete="off"></td>';
   h+='<td><input type="number" value="'+it.unit_price.toFixed(2)+'" step="0.01" min="0" oninput="lineItems['+i+'].unit_price=+this.value;recalcAll()" autocomplete="off"></td>';
   var mval=(it.margin!==null&&it.margin!==undefined&&it.margin!=='')?it.margin:'';
-  h+='<td><input type="number" value="'+mval+'" min="0" max="99" step="0.125" placeholder="'+m+'" style="width:52px" title="Line margin override" oninput="lineItems['+i+'].margin=this.value===\'\'?null:+this.value;recalcAll()" autocomplete="off"></td>';
+  h+='<td><input type="number" value="'+mval+'" min="0" max="99" step="0.125" placeholder="'+m+'" style="width:52px" title="Line margin override" onkeydown="if((event.key===\'ArrowUp\'||event.key===\'ArrowDown\')&&this.value===\'\'){this.value=+this.placeholder;}" oninput="lineItems['+i+'].margin=this.value===\'\'?null:+this.value;recalcAll()" autocomplete="off"></td>';
   var marginDollarLine=(cp-it.unit_price)*it.qty;
   h+='<td class="muted" style="text-align:right;padding-right:4px;font-size:11px;color:#2d7a4f">'+(marginDollarLine>0?'$'+fmt(marginDollarLine):'')+'</td>';
   h+='<td><input type="date" value="'+escH(it.start_date||'')+'" style="width:105px" oninput="lineItems['+i+'].start_date=this.value"></td>';
