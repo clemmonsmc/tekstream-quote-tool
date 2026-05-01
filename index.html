@@ -42,6 +42,8 @@ td input:focus{border-color:#5B94CB;outline:none}td input[type=date]{font-size:1
 .saved-label{flex:1;font-size:13px;color:#13110F}
 .saved-meta{font-size:11px;color:#717174;white-space:nowrap}
 .saved-del{background:none;border:none;color:#c00;cursor:pointer;font-size:16px;padding:2px 6px;flex-shrink:0}
+.drag-handle:active{cursor:grabbing}
+tr.drag-over td{border-top:2px solid #5B94CB}
 </style>
 </head>
 <body>
@@ -273,21 +275,57 @@ function moveRow(i,dir){
   var tmp=window.lineItems[i];window.lineItems[i]=window.lineItems[j];window.lineItems[j]=tmp;
   render();
 }
+function initDragDrop(){
+  var area=document.getElementById('liArea');
+  var dragIdx=null;
+  area.addEventListener('dragstart',function(e){
+    var handle=e.target.closest('.drag-handle');
+    if(!handle)return;
+    dragIdx=parseInt(handle.getAttribute('data-idx'));
+    e.dataTransfer.effectAllowed='move';
+    e.dataTransfer.setData('text/plain',dragIdx);
+  });
+  area.addEventListener('dragover',function(e){
+    e.preventDefault();
+    e.dataTransfer.dropEffect='move';
+    var row=e.target.closest('tr');
+    area.querySelectorAll('tr.drag-over').forEach(function(r){r.classList.remove('drag-over');});
+    if(row)row.classList.add('drag-over');
+  });
+  area.addEventListener('dragleave',function(e){
+    if(!e.relatedTarget||!area.contains(e.relatedTarget)){
+      area.querySelectorAll('tr.drag-over').forEach(function(r){r.classList.remove('drag-over');});
+    }
+  });
+  area.addEventListener('drop',function(e){
+    e.preventDefault();
+    area.querySelectorAll('tr.drag-over').forEach(function(r){r.classList.remove('drag-over');});
+    var row=e.target.closest('tr[data-row]');
+    if(!row||dragIdx===null)return;
+    var dropIdx=parseInt(row.getAttribute('data-row'));
+    if(dropIdx===dragIdx)return;
+    var item=window.lineItems.splice(dragIdx,1)[0];
+    window.lineItems.splice(dropIdx,0,item);
+    dragIdx=null;
+    render();
+  });
+}
 function renderRow(it,i,m){
   var em=effectiveMargin(it,m);
-  var cp=cprice(it.unit_price,em),ext=cp*it.qty,h='<tr>';
+  var cp=cprice(it.unit_price,em),ext=cp*it.qty,h='<tr data-row="'+i+'">';
   h+='<td><input value="'+escH(it.sku)+'" oninput="lineItems['+i+'].sku=this.value" autocomplete="off"></td>';
   h+='<td><input value="'+escH(it.description)+'" oninput="lineItems['+i+'].description=this.value" autocomplete="off"></td>';
   h+='<td><input type="number" value="'+it.qty+'" min="1" style="width:50px" oninput="lineItems['+i+'].qty=+this.value;recalcAll()" autocomplete="off"></td>';
   h+='<td><input type="number" value="'+it.unit_price.toFixed(2)+'" step="0.01" min="0" oninput="lineItems['+i+'].unit_price=+this.value;recalcAll()" autocomplete="off"></td>';
   var mval=(it.margin!==null&&it.margin!==undefined&&it.margin!=='')?it.margin:'';
-  h+='<td><input type="number" value="'+mval+'" min="0" max="99" step="0.5" placeholder="'+m+'" style="width:52px" title="Line margin override" oninput="lineItems['+i+'].margin=this.value===\'\'?null:+this.value;recalcAll()" autocomplete="off"></td>';
+  h+='<td><input type="number" value="'+mval+'" min="0" max="99" step="0.125" placeholder="'+m+'" style="width:52px" title="Line margin override" oninput="lineItems['+i+'].margin=this.value===\'\'?null:+this.value;recalcAll()" autocomplete="off"></td>';
   h+='<td><input type="date" value="'+escH(it.start_date||'')+'" style="width:105px" oninput="lineItems['+i+'].start_date=this.value"></td>';
   h+='<td><input type="date" value="'+escH(it.end_date||'')+'" style="width:105px" oninput="lineItems['+i+'].end_date=this.value"></td>';
   h+='<td class="muted">'+(ext>0?'$'+fmt(ext):'\u2014')+'</td>';
-  h+='<td style="white-space:nowrap">';
-  h+='<button class="del" style="color:#5B94CB" title="Move up" onclick="moveRow('+i+',-1)">\u25B2</button>';
-  h+='<button class="del" style="color:#5B94CB" title="Move down" onclick="moveRow('+i+',1)">\u25BC</button>';
+  var hasOverride=(it.margin!==null&&it.margin!==undefined&&it.margin!=='');
+  h+='<td style="white-space:nowrap;padding:4px 2px">';
+  h+='<span class="drag-handle" draggable="true" data-idx="'+i+'" title="Drag to reorder" style="cursor:grab;color:#aaa;font-size:16px;padding:2px 4px;user-select:none">&#8942;</span>';
+  if(hasOverride)h+='<button class="del" style="color:#5B94CB;font-size:12px" title="Reset to global margin" onclick="lineItems['+i+'].margin=null;recalcAll()">↺</button>';
   h+='<button class="del" onclick="removeRow('+i+')">\u2715</button>';
   h+='</td></tr>';
   return h;
@@ -317,6 +355,7 @@ function render(){
   document.getElementById('totals').innerHTML='<div class="trow"><span>Subtotal</span><span>$'+fmt(sub)+'</span></div><div class="trow grand"><span>Total (USD)</span><span>$'+fmt(sub)+'</span></div>';
   updateMarginDollar(m,sub,vt);
   if(window.lineItems.length) autoSave();
+  initDragDrop();
 }
 function updateMarginDollar(m,c,v){var el=document.getElementById('marginDollar');if(el)el.textContent=(m>0&&c>v)?'$'+fmt(c-v):'';}
 function recalcAll(){var m=parseFloat(document.getElementById('marginPct').value)||0;document.getElementById('marginHint').textContent=m>0?m+'% margin applied':'';render();}
