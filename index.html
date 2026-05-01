@@ -53,9 +53,10 @@ td input:focus{border-color:#5B94CB;outline:none}td input[type=date]{font-size:1
 <div class="wrap">
   <div class="rep-card">
     <div class="section-label" style="margin-bottom:10px">Rep Settings</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
       <div class="field" style="margin:0"><label>Your name</label><input id="repName" autocomplete="off" placeholder="Matt Clemmons" oninput="saveRepSettings()"></div>
       <div class="field" style="margin:0"><label>Your email</label><input id="repEmail" autocomplete="off" placeholder="matt@tekstream.com" oninput="saveRepSettings()"></div>
+      <div class="field" style="margin:0"><label>TekStream Signer Email</label><input id="signerEmail" autocomplete="off" placeholder="manager@tekstream.com" oninput="saveRepSettings()"></div>
     </div>
   </div>
 </div>
@@ -89,7 +90,7 @@ td input:focus{border-color:#5B94CB;outline:none}td input[type=date]{font-size:1
       </div>
       <div class="field"><label>Personalized note</label><textarea id="notes" autocomplete="off" placeholder="Thank you for the opportunity..."></textarea></div>
       <div class="field"><label>Payment terms</label><input id="terms" autocomplete="off" value="Net 30"></div>
-      <input type="hidden" id="preparedBy"><input type="hidden" id="preparedByCompany" value="TekStream">
+      <input type="hidden" id="preparedBy"><input type="hidden" id="preparedByCompany" value="TekStream"><input type="hidden" id="signerEmailHidden">
       <input type="hidden" id="preparedByEmail">
     </div>
     <div class="card" id="savedCard" style="display:none">
@@ -106,6 +107,7 @@ td input:focus{border-color:#5B94CB;outline:none}td input[type=date]{font-size:1
       <button class="btn dl-btn" onclick="downloadPdf()">Download PDF quote &#8595;</button>
       <button class="btn dl-btn" style="background:#717174" onclick="previewPdf()">Preview PDF &#128269;</button>
       <button class="btn dl-btn" style="background:#5B94CB" onclick="emailQuote()">Email Quote &#9993;</button>
+      <button class="btn dl-btn" style="background:#2d7a4f" id="signBtn" onclick="sendForSignature()">Send for Signature &#9998;</button>
     </div>
     <p style="font-size:11px;color:#717174;margin-top:8px;text-align:center">Email Quote downloads the PDF &#8212; attach it to the Outlook email before sending.</p>
   </div>
@@ -155,16 +157,21 @@ function autoSave() {
 function saveRepSettings(){
   var name=document.getElementById('repName').value;
   var email=document.getElementById('repEmail').value;
+  var signer=document.getElementById('signerEmail').value;
   localStorage.setItem('ts_rep_name',name);
   localStorage.setItem('ts_rep_email',email);
+  localStorage.setItem('ts_signer_email',signer);
   document.getElementById('preparedBy').value=name;
   document.getElementById('preparedByEmail').value=email;
+  document.getElementById('signerEmailHidden').value=signer;
 }
 function loadRepSettings(){
   var name=localStorage.getItem('ts_rep_name')||'';
   var email=localStorage.getItem('ts_rep_email')||'';
+  var signer=localStorage.getItem('ts_signer_email')||'';
   if(name){document.getElementById('repName').value=name;document.getElementById('preparedBy').value=name;}
   if(email){document.getElementById('repEmail').value=email;document.getElementById('preparedByEmail').value=email;}
+  if(signer){document.getElementById('signerEmail').value=signer;document.getElementById('signerEmailHidden').value=signer;}
 }
 
 function getQuoteState(){
@@ -331,6 +338,121 @@ async function extractVAD(input){
   }catch(e){document.getElementById('extractStatus').textContent='Error: '+e.message;}
 }
 window.loadLineItems=function(items){window.lineItems=items.map(function(it){return{sku:String(it.sku||''),description:String(it.description||''),qty:parseFloat(it.qty)||1,unit_price:parseFloat(String(it.unit_price||'0').replace(/[$,]/g,''))||0,start_date:String(it.start_date||''),end_date:String(it.end_date||'')};});render();};
+
+async function sendForSignature(){
+  var customerEmail=document.getElementById('contactEmail').value;
+  var signerEmail=document.getElementById('signerEmailHidden').value;
+  if(!customerEmail){alert('Please enter a customer email before sending for signature.');return;}
+  if(!signerEmail){alert('Please enter a TekStream Signer Email in Rep Settings before sending for signature.');return;}
+
+  var btn=document.getElementById('signBtn');
+  btn.textContent='Sending…';
+  btn.disabled=true;
+
+  try{
+    // Generate PDF as base64
+    var pdfBlob=await generatePdfBlob();
+    var b64=await new Promise(function(res,rej){
+      var reader=new FileReader();
+      reader.onload=function(e){res(e.target.result.split(',')[1]);};
+      reader.onerror=rej;
+      reader.readAsDataURL(pdfBlob);
+    });
+
+    var resp=await fetch('/api/sign',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        pdfBase64:b64,
+        quoteNumber:document.getElementById('quoteNumber').value,
+        customerName:document.getElementById('customerName').value,
+        customerEmail:customerEmail,
+        signerEmail:signerEmail
+      })
+    });
+    var data=await resp.json();
+    if(!resp.ok)throw new Error(data.error||resp.status);
+    btn.textContent='✓ Sent for Signature';
+    btn.style.background='#1a5c38';
+  }catch(e){
+    btn.textContent='Send for Signature ✒';
+    btn.disabled=false;
+    alert('Error sending for signature: '+e.message);
+  }
+}
+
+async function generatePdfBlob(){
+  var pdfGroups=groupByYear(window.lineItems);
+  var jsPDF=window.jspdf.jsPDF;
+  var m=parseFloat(document.getElementById('marginPct').value)||0;
+  var cn=document.getElementById('customerName').value||'Customer';
+  var co=document.getElementById('contactName').value||'';
+  var ce=document.getElementById('contactEmail').value||'';
+  var qn=document.getElementById('quoteNumber').value||'TS-QUOTE';
+  var qd=document.getElementById('quoteDate').value;
+  var ed=document.getElementById('expiryDate').value;
+  var nt=document.getElementById('notes').value;
+  var tm=document.getElementById('terms').value||'Net 30';
+  var pb=document.getElementById('preparedBy').value||'';
+  var pbc=document.getElementById('preparedByCompany').value||'TekStream';
+  var pbe=document.getElementById('preparedByEmail').value||'';
+  var logoSrc=window.logoDataUrl||'';
+  var doc=new jsPDF({unit:'pt',format:'letter'});
+  var W=612,L=48,R=564;
+  doc.setFillColor(0,54,88);doc.rect(0,0,W,68,'F');
+  if(logoSrc&&logoSrc.startsWith('data:')){try{var li=new Image();await new Promise(function(res,rej){li.onload=res;li.onerror=rej;li.src=logoSrc;});doc.addImage(logoSrc,'PNG',L,11,li.naturalWidth*(46/li.naturalHeight),46);}catch(e){doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(255,255,255);doc.text('TekStream',L,36);}}
+  doc.setFillColor(91,148,203);doc.rect(0,68,W,5,'F');
+  doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);
+  doc.text('Quote #  '+qn,R,28,{align:'right'});doc.setFont('helvetica','normal');doc.text('Date:  '+qd,R,42,{align:'right'});doc.text('Expires:  '+ed,R,56,{align:'right'});
+  doc.setFont('helvetica','bold');doc.setFontSize(22);doc.setTextColor(0,54,88);doc.text('Quote',L,108);
+  doc.setFillColor(235,243,251);doc.roundedRect(L,118,210,70,3,3,'F');
+  doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(91,148,203);doc.text('PREPARED FOR',L+10,133);
+  doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(0,54,88);doc.text(cn,L+10,149);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(113,113,116);
+  if(co)doc.text(co,L+10,161);if(ce)doc.text(ce,L+10,173);
+  doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(91,148,203);doc.text('PREPARED BY',R-200,133);
+  doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(0,54,88);doc.text(pbc,R-200,149);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(113,113,116);
+  if(pb)doc.text(pb,R-200,161);if(pbe)doc.text(pbe,R-200,173);
+  var y=210;
+  if(nt){doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(60,60,60);var lines=doc.splitTextToSize(nt,R-L);doc.text(lines,L,y);y+=lines.length*13+14;}
+  var skuW=(R-L)*0.13,dateW=50,qtyW=30,priceW=62,extW=70,descW=(R-L)-skuW-dateW*2-qtyW-priceW-extW-10;
+  var colSku=L+4,colDesc=L+skuW+4,colSt=colDesc+descW+2,colEd=colSt+dateW+2,colQty=colEd+dateW+2,colPr=colQty+qtyW+4,colEx=R-4;
+  function newPageIfNeeded(n){if(y+n>692){doc.addPage();y=48;}}
+  function drawColHeaders(){doc.setFillColor(0,54,88);doc.rect(L,y,R-L,20,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(255,255,255);doc.text('SKU',colSku,y+14);doc.text('Description',colDesc,y+14);doc.text('Start',colSt+dateW,y+14,{align:'right'});doc.text('End',colEd+dateW,y+14,{align:'right'});doc.text('Qty',colQty+qtyW,y+14,{align:'right'});doc.text('Unit Price',colPr+priceW,y+14,{align:'right'});doc.text('Extended',colEx,y+14,{align:'right'});y+=20;}
+  var subtotal=0;
+  function renderPdfRow(it,idx,alt){
+    var cp=cprice(it.unit_price,m),ext=cp*it.qty;subtotal+=ext;
+    var skuL=doc.splitTextToSize(it.sku||'',skuW-4),descL=doc.splitTextToSize(it.description||'',descW-4);
+    var nL=Math.max(skuL.length,descL.length,1),rowH=nL*11+10;
+    newPageIfNeeded(rowH);
+    if(alt){doc.setFillColor(235,243,251);doc.rect(L,y,R-L,rowH,'F');}
+    doc.setFont('helvetica','normal');doc.setTextColor(19,17,18);doc.setFontSize(8.5);
+    doc.text(skuL,colSku,y+9);doc.text(descL,colDesc,y+9);
+    var mid=y+rowH/2+3;
+    if(it.start_date)doc.text(it.start_date,colSt+dateW,mid,{align:'right'});
+    if(it.end_date)doc.text(it.end_date,colEd+dateW,mid,{align:'right'});
+    doc.text(it.qty.toLocaleString(),colQty+qtyW,mid,{align:'right'});
+    doc.text(cp>0?'$'+fmt(cp):'—',colPr+priceW,mid,{align:'right'});
+    doc.text(ext>0?'$'+fmt(ext):'—',colEx,mid,{align:'right'});
+    y+=rowH;
+  }
+  if(!pdfGroups){drawColHeaders();window.lineItems.forEach(function(it,i){renderPdfRow(it,i,i%2===1);});}
+  else{pdfGroups.forEach(function(grp){newPageIfNeeded(36);doc.setFillColor(91,148,203);doc.rect(L,y,R-L,16,'F');doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);doc.text(grp.label,L+6,y+11);y+=16;drawColHeaders();var prev=subtotal;grp.items.forEach(function(it,i){renderPdfRow(it,i,i%2===1);});var gs=subtotal-prev;newPageIfNeeded(20);doc.setFillColor(235,243,251);doc.rect(L,y,R-L,14,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(0,54,88);doc.text(grp.label+' Subtotal',colPr+priceW,y+10,{align:'right'});doc.text('$'+fmt(gs),colEx,y+10,{align:'right'});y+=18;});}
+  newPageIfNeeded(80);
+  y+=6;doc.setDrawColor(91,148,203);doc.setLineWidth(0.5);doc.line(R-190,y,R,y);y+=14;
+  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);
+  doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});
+  y+=28;doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(113,113,116);
+  doc.text('Payment terms: '+tm+(pdfGroups?'  |  Invoiced annually':''),L,y);y+=12;
+  doc.text('This quote is valid through the expiration date above. All prices are in USD.',L,y);y+=12;
+  doc.text('Quote subject to change without notice.',L,y);
+  doc.setFillColor(0,54,88);doc.rect(0,748,W,6,'F');doc.setFillColor(91,148,203);doc.rect(0,754,W,14,'F');
+  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(255,255,255);
+  doc.text('Copyright © TekStream Solutions, LLC 2026 | tekstream.com | Confidential',W/2,763,{align:'center'});
+  return doc.output('blob');
+}
+
 async function emailQuote(){
   await downloadPdf();
   var cn=document.getElementById('customerName').value||'Customer';
