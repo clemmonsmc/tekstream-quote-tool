@@ -136,6 +136,8 @@ window.logoDataUrl = null;
 function escH(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
 function cprice(vad,m){return(!vad||vad<=0||m>=100)?0:vad/(1-m/100);}
 function fmt(n){return n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function effectiveMargin(it,globalM){return(it.margin!==null&&it.margin!==undefined&&it.margin!=='')? parseFloat(it.margin):globalM;}
+function itemCprice(it,globalM){return cprice(it.unit_price,effectiveMargin(it,globalM));}
 
 // ── Auto-save ─────────────────────────────────────────────────────────────
 var _autoSaveTimer = null;
@@ -253,7 +255,7 @@ function renderSavedQuotes(){
     list.appendChild(row);
   });
 }
-function addRow(){window.lineItems.push({sku:'',description:'',qty:1,unit_price:0,start_date:'',end_date:''});render();}
+function addRow(){window.lineItems.push({sku:'',description:'',qty:1,unit_price:0,start_date:'',end_date:'',margin:null});render();}
 function removeRow(i){window.lineItems.splice(i,1);render();}
 
 function groupByYear(items){
@@ -265,16 +267,29 @@ function groupByYear(items){
   return years.map(function(yr,i){return{label:yr==='__none__'?'Other':'Payment '+(i+1)+' ('+yr+')',items:groups[yr]};});
 }
 
+function moveRow(i,dir){
+  var j=i+dir;
+  if(j<0||j>=window.lineItems.length)return;
+  var tmp=window.lineItems[i];window.lineItems[i]=window.lineItems[j];window.lineItems[j]=tmp;
+  render();
+}
 function renderRow(it,i,m){
-  var cp=cprice(it.unit_price,m),ext=cp*it.qty,h='<tr>';
+  var em=effectiveMargin(it,m);
+  var cp=cprice(it.unit_price,em),ext=cp*it.qty,h='<tr>';
   h+='<td><input value="'+escH(it.sku)+'" oninput="lineItems['+i+'].sku=this.value" autocomplete="off"></td>';
   h+='<td><input value="'+escH(it.description)+'" oninput="lineItems['+i+'].description=this.value" autocomplete="off"></td>';
   h+='<td><input type="number" value="'+it.qty+'" min="1" style="width:50px" oninput="lineItems['+i+'].qty=+this.value;recalcAll()" autocomplete="off"></td>';
   h+='<td><input type="number" value="'+it.unit_price.toFixed(2)+'" step="0.01" min="0" oninput="lineItems['+i+'].unit_price=+this.value;recalcAll()" autocomplete="off"></td>';
+  var mval=(it.margin!==null&&it.margin!==undefined&&it.margin!=='')?it.margin:'';
+  h+='<td><input type="number" value="'+mval+'" min="0" max="99" step="0.5" placeholder="'+m+'" style="width:52px" title="Line margin override" oninput="lineItems['+i+'].margin=this.value===\'\'?null:+this.value;recalcAll()" autocomplete="off"></td>';
   h+='<td><input type="date" value="'+escH(it.start_date||'')+'" style="width:105px" oninput="lineItems['+i+'].start_date=this.value"></td>';
   h+='<td><input type="date" value="'+escH(it.end_date||'')+'" style="width:105px" oninput="lineItems['+i+'].end_date=this.value"></td>';
   h+='<td class="muted">'+(ext>0?'$'+fmt(ext):'\u2014')+'</td>';
-  h+='<td><button class="del" onclick="removeRow('+i+')">\u2715</button></td></tr>';
+  h+='<td style="white-space:nowrap">';
+  h+='<button class="del" style="color:#5B94CB" title="Move up" onclick="moveRow('+i+',-1)">\u25B2</button>';
+  h+='<button class="del" style="color:#5B94CB" title="Move down" onclick="moveRow('+i+',1)">\u25BC</button>';
+  h+='<button class="del" onclick="removeRow('+i+')">\u2715</button>';
+  h+='</td></tr>';
   return h;
 }
 
@@ -282,7 +297,7 @@ function render(){
   var m=parseFloat(document.getElementById('marginPct').value)||0;
   var area=document.getElementById('liArea');
   if(!window.lineItems.length){area.innerHTML='<div class="empty">Add line items manually or upload a VAD quote.</div>';document.getElementById('totals').innerHTML='';updateMarginDollar(m,0,0);return;}
-  var tbl='<table><colgroup><col style="width:11%"><col style="width:28%"><col style="width:6%"><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:22%"><col style="width:5%"></colgroup><thead><tr><th>SKU</th><th>Description</th><th>Qty</th><th>VAD Price</th><th>Start</th><th>End</th><th>Customer</th><th></th></tr></thead><tbody>';
+  var tbl='<table><colgroup><col style="width:10%"><col style="width:24%"><col style="width:5%"><col style="width:9%"><col style="width:6%"><col style="width:8%"><col style="width:8%"><col style="width:18%"><col style="width:7%"></colgroup><thead><tr><th>SKU</th><th>Description</th><th>Qty</th><th>VAD Price</th><th>Margin%</th><th>Start</th><th>End</th><th>Customer</th><th></th></tr></thead><tbody>';
   var h='',groups=groupByYear(window.lineItems);
   if(!groups){
     h+=tbl;window.lineItems.forEach(function(it,i){h+=renderRow(it,i,m);});h+='</tbody></table>';
@@ -291,14 +306,14 @@ function render(){
       h+='<div style="background:#5B94CB;color:#fff;font-weight:700;font-size:12px;padding:7px 12px;letter-spacing:.06em;border-radius:6px 6px 0 0;margin-top:8px">'+grp.label+'</div>';
       h+=tbl;
       var gt=0;
-      grp.items.forEach(function(it){var i=window.lineItems.indexOf(it);gt+=cprice(it.unit_price,m)*it.qty;h+=renderRow(it,i,m);});
+      grp.items.forEach(function(it){var i=window.lineItems.indexOf(it);gt+=itemCprice(it,m)*it.qty;h+=renderRow(it,i,m);});
       h+='<tr style="background:#EBF3FB"><td colspan="6" style="text-align:right;font-size:12px;font-weight:600;padding:6px 8px;color:#003658">'+grp.label+' Subtotal</td><td style="font-size:12px;font-weight:700;color:#003658;padding:6px 4px">$'+fmt(gt)+'</td><td></td></tr>';
       h+='</tbody></table>';
     });
   }
   area.innerHTML=h;
   var vt=window.lineItems.reduce(function(s,it){return s+it.unit_price*it.qty;},0);
-  var sub=window.lineItems.reduce(function(s,it){return s+cprice(it.unit_price,m)*it.qty;},0);
+  var sub=window.lineItems.reduce(function(s,it){return s+itemCprice(it,m)*it.qty;},0);
   document.getElementById('totals').innerHTML='<div class="trow"><span>Subtotal</span><span>$'+fmt(sub)+'</span></div><div class="trow grand"><span>Total (USD)</span><span>$'+fmt(sub)+'</span></div>';
   updateMarginDollar(m,sub,vt);
   if(window.lineItems.length) autoSave();
@@ -337,7 +352,7 @@ async function extractVAD(input){
     document.getElementById('extractStatus').textContent='\u2713 Extracted '+(parsed.lineItems&&parsed.lineItems.length||0)+' line items'+(parsed.vad?' ('+parsed.vad+')':'');
   }catch(e){document.getElementById('extractStatus').textContent='Error: '+e.message;}
 }
-window.loadLineItems=function(items){window.lineItems=items.map(function(it){return{sku:String(it.sku||''),description:String(it.description||''),qty:parseFloat(it.qty)||1,unit_price:parseFloat(String(it.unit_price||'0').replace(/[$,]/g,''))||0,start_date:String(it.start_date||''),end_date:String(it.end_date||'')};});render();};
+window.loadLineItems=function(items){window.lineItems=items.map(function(it){return{sku:String(it.sku||''),description:String(it.description||''),qty:parseFloat(it.qty)||1,unit_price:parseFloat(String(it.unit_price||'0').replace(/[$,]/g,''))||0,start_date:String(it.start_date||''),end_date:String(it.end_date||''),margin:null};});render();};
 
 async function sendForSignature(){
   var customerEmail=document.getElementById('contactEmail').value;
@@ -422,7 +437,7 @@ async function generatePdfBlob(){
   function drawColHeaders(){doc.setFillColor(0,54,88);doc.rect(L,y,R-L,20,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(255,255,255);doc.text('SKU',colSku,y+14);doc.text('Description',colDesc,y+14);doc.text('Start',colSt+dateW,y+14,{align:'right'});doc.text('End',colEd+dateW,y+14,{align:'right'});doc.text('Qty',colQty+qtyW,y+14,{align:'right'});doc.text('Unit Price',colPr+priceW,y+14,{align:'right'});doc.text('Extended',colEx,y+14,{align:'right'});y+=20;}
   var subtotal=0;
   function renderPdfRow(it,idx,alt){
-    var cp=cprice(it.unit_price,m),ext=cp*it.qty;subtotal+=ext;
+    var cp=itemCprice(it,m),ext=cp*it.qty;subtotal+=ext;
     var skuL=doc.splitTextToSize(it.sku||'',skuW-4),descL=doc.splitTextToSize(it.description||'',descW-4);
     var nL=Math.max(skuL.length,descL.length,1),rowH=nL*11+10;
     newPageIfNeeded(rowH);
@@ -508,7 +523,7 @@ async function previewPdf(){
   function newPageIfNeeded(n){if(y+n>692){doc.addPage();y=48;}}
   function drawColHeaders(){doc.setFillColor(0,54,88);doc.rect(L,y,R-L,20,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(255,255,255);doc.text('SKU',colSku,y+14);doc.text('Description',colDesc,y+14);doc.text('Start',colSt+dateW,y+14,{align:'right'});doc.text('End',colEd+dateW,y+14,{align:'right'});doc.text('Qty',colQty+qtyW,y+14,{align:'right'});doc.text('Unit Price',colPr+priceW,y+14,{align:'right'});doc.text('Extended',colEx,y+14,{align:'right'});y+=20;}
   var subtotal=0;
-  function renderPdfRow(it,idx,alt){var cp=cprice(it.unit_price,m),ext=cp*it.qty;subtotal+=ext;var skuL=doc.splitTextToSize(it.sku||'',skuW-4),descL=doc.splitTextToSize(it.description||'',descW-4);var nL=Math.max(skuL.length,descL.length,1),rowH=nL*11+10;newPageIfNeeded(rowH);if(alt){doc.setFillColor(235,243,251);doc.rect(L,y,R-L,rowH,'F');}doc.setFont('helvetica','normal');doc.setTextColor(19,17,18);doc.setFontSize(8.5);doc.text(skuL,colSku,y+9);doc.text(descL,colDesc,y+9);var mid=y+rowH/2+3;if(it.start_date)doc.text(it.start_date,colSt+dateW,mid,{align:'right'});if(it.end_date)doc.text(it.end_date,colEd+dateW,mid,{align:'right'});doc.text(it.qty.toLocaleString(),colQty+qtyW,mid,{align:'right'});doc.text(cp>0?'$'+fmt(cp):'\u2014',colPr+priceW,mid,{align:'right'});doc.text(ext>0?'$'+fmt(ext):'\u2014',colEx,mid,{align:'right'});y+=rowH;}
+  function renderPdfRow(it,idx,alt){var cp=itemCprice(it,m),ext=cp*it.qty;subtotal+=ext;var skuL=doc.splitTextToSize(it.sku||'',skuW-4),descL=doc.splitTextToSize(it.description||'',descW-4);var nL=Math.max(skuL.length,descL.length,1),rowH=nL*11+10;newPageIfNeeded(rowH);if(alt){doc.setFillColor(235,243,251);doc.rect(L,y,R-L,rowH,'F');}doc.setFont('helvetica','normal');doc.setTextColor(19,17,18);doc.setFontSize(8.5);doc.text(skuL,colSku,y+9);doc.text(descL,colDesc,y+9);var mid=y+rowH/2+3;if(it.start_date)doc.text(it.start_date,colSt+dateW,mid,{align:'right'});if(it.end_date)doc.text(it.end_date,colEd+dateW,mid,{align:'right'});doc.text(it.qty.toLocaleString(),colQty+qtyW,mid,{align:'right'});doc.text(cp>0?'$'+fmt(cp):'\u2014',colPr+priceW,mid,{align:'right'});doc.text(ext>0?'$'+fmt(ext):'\u2014',colEx,mid,{align:'right'});y+=rowH;}
   if(!pdfGroups){drawColHeaders();window.lineItems.forEach(function(it,i){renderPdfRow(it,i,i%2===1);});}
   else{pdfGroups.forEach(function(grp){newPageIfNeeded(36);doc.setFillColor(91,148,203);doc.rect(L,y,R-L,16,'F');doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);doc.text(grp.label,L+6,y+11);y+=16;drawColHeaders();var prev=subtotal;grp.items.forEach(function(it,i){renderPdfRow(it,i,i%2===1);});var gs=subtotal-prev;newPageIfNeeded(20);doc.setFillColor(235,243,251);doc.rect(L,y,R-L,14,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(0,54,88);doc.text(grp.label+' Subtotal',colPr+priceW,y+10,{align:'right'});doc.text('$'+fmt(gs),colEx,y+10,{align:'right'});y+=18;});}
   newPageIfNeeded(80);
@@ -566,7 +581,7 @@ async function previewPdf(){
   function drawColHeaders(){doc.setFillColor(0,54,88);doc.rect(L,y,R-L,20,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(255,255,255);doc.text('SKU',colSku,y+14);doc.text('Description',colDesc,y+14);doc.text('Start',colSt+dateW,y+14,{align:'right'});doc.text('End',colEd+dateW,y+14,{align:'right'});doc.text('Qty',colQty+qtyW,y+14,{align:'right'});doc.text('Unit Price',colPr+priceW,y+14,{align:'right'});doc.text('Extended',colEx,y+14,{align:'right'});y+=20;}
   var subtotal=0;
   function renderPdfRow(it,idx,alt){
-    var cp=cprice(it.unit_price,m),ext=cp*it.qty;subtotal+=ext;
+    var cp=itemCprice(it,m),ext=cp*it.qty;subtotal+=ext;
     var skuL=doc.splitTextToSize(it.sku||'',skuW-4),descL=doc.splitTextToSize(it.description||'',descW-4);
     var nL=Math.max(skuL.length,descL.length,1),rowH=nL*11+10;
     newPageIfNeeded(rowH);
@@ -639,7 +654,7 @@ async function downloadPdf(){
   function drawColHeaders(){doc.setFillColor(0,54,88);doc.rect(L,y,R-L,20,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(255,255,255);doc.text('SKU',colSku,y+14);doc.text('Description',colDesc,y+14);doc.text('Start',colSt+dateW,y+14,{align:'right'});doc.text('End',colEd+dateW,y+14,{align:'right'});doc.text('Qty',colQty+qtyW,y+14,{align:'right'});doc.text('Unit Price',colPr+priceW,y+14,{align:'right'});doc.text('Extended',colEx,y+14,{align:'right'});y+=20;}
   var subtotal=0;
   function renderPdfRow(it,idx,alt){
-    var cp=cprice(it.unit_price,m),ext=cp*it.qty;subtotal+=ext;
+    var cp=itemCprice(it,m),ext=cp*it.qty;subtotal+=ext;
     var skuL=doc.splitTextToSize(it.sku||'',skuW-4),descL=doc.splitTextToSize(it.description||'',descW-4);
     var nL=Math.max(skuL.length,descL.length,1),rowH=nL*11+10;
     newPageIfNeeded(rowH);
@@ -683,7 +698,7 @@ async function downloadPdf(){
 }
 async function previewPdf(){
   // Re-run PDF generation but open in new tab instead of downloading
-  var pdfGroups=groupByYear(window.lineItems);var jsPDF=window.jspdf.jsPDF;var m=parseFloat(document.getElementById('marginPct').value)||0;var cn=document.getElementById('customerName').value||'Customer';var co=document.getElementById('contactName').value||'';var ce=document.getElementById('contactEmail').value||'';var qn=document.getElementById('quoteNumber').value||'TS-QUOTE';var qd=document.getElementById('quoteDate').value;var ed=document.getElementById('expiryDate').value;var nt=document.getElementById('notes').value;var tm=document.getElementById('terms').value||'Net 30';var pb=document.getElementById('preparedBy').value||'';var pbc=document.getElementById('preparedByCompany').value||'TekStream';var pbe=document.getElementById('preparedByEmail').value||'';var logoSrc=window.logoDataUrl||'';var doc=new jsPDF({unit:'pt',format:'letter'});var W=612,L=48,R=564;doc.setFillColor(0,54,88);doc.rect(0,0,W,68,'F');if(logoSrc&&logoSrc.startsWith('data:')){try{var li=new Image();await new Promise(function(res,rej){li.onload=res;li.onerror=rej;li.src=logoSrc;});doc.addImage(logoSrc,'PNG',L,11,li.naturalWidth*(46/li.naturalHeight),46);}catch(e){doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(255,255,255);doc.text('TekStream',L,36);}}doc.setFillColor(91,148,203);doc.rect(0,68,W,5,'F');doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);doc.text('Quote #  '+qn,R,28,{align:'right'});doc.setFont('helvetica','normal');doc.text('Date:  '+qd,R,42,{align:'right'});doc.text('Expires:  '+ed,R,56,{align:'right'});doc.setFont('helvetica','bold');doc.setFontSize(22);doc.setTextColor(0,54,88);doc.text('Quote',L,108);doc.setFillColor(235,243,251);doc.roundedRect(L,118,210,70,3,3,'F');doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(91,148,203);doc.text('PREPARED FOR',L+10,133);doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(0,54,88);doc.text(cn,L+10,149);doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(113,113,116);if(co)doc.text(co,L+10,161);if(ce)doc.text(ce,L+10,173);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(91,148,203);doc.text('PREPARED BY',R-200,133);doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(0,54,88);doc.text(pbc,R-200,149);doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(113,113,116);if(pb)doc.text(pb,R-200,161);if(pbe)doc.text(pbe,R-200,173);var y=210;if(nt){doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(60,60,60);var lines=doc.splitTextToSize(nt,R-L);doc.text(lines,L,y);y+=lines.length*13+14;}var skuW=(R-L)*0.13,dateW=50,qtyW=30,priceW=62,extW=70,descW=(R-L)-skuW-dateW*2-qtyW-priceW-extW-10,colSku=L+4,colDesc=L+skuW+4,colSt=colDesc+descW+2,colEd=colSt+dateW+2,colQty=colEd+dateW+2,colPr=colQty+qtyW+4,colEx=R-4;function newPageIfNeeded(n){if(y+n>692){doc.addPage();y=48;}}function drawColHeaders(){doc.setFillColor(0,54,88);doc.rect(L,y,R-L,20,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(255,255,255);doc.text('SKU',colSku,y+14);doc.text('Description',colDesc,y+14);doc.text('Start',colSt+dateW,y+14,{align:'right'});doc.text('End',colEd+dateW,y+14,{align:'right'});doc.text('Qty',colQty+qtyW,y+14,{align:'right'});doc.text('Unit Price',colPr+priceW,y+14,{align:'right'});doc.text('Extended',colEx,y+14,{align:'right'});y+=20;}var subtotal=0;function renderPdfRow(it,idx,alt){var cp=cprice(it.unit_price,m),ext=cp*it.qty;subtotal+=ext;var skuL=doc.splitTextToSize(it.sku||'',skuW-4),descL=doc.splitTextToSize(it.description||'',descW-4),nL=Math.max(skuL.length,descL.length,1),rowH=nL*11+10;newPageIfNeeded(rowH);if(alt){doc.setFillColor(235,243,251);doc.rect(L,y,R-L,rowH,'F');}doc.setFont('helvetica','normal');doc.setTextColor(19,17,18);doc.setFontSize(8.5);doc.text(skuL,colSku,y+9);doc.text(descL,colDesc,y+9);var mid=y+rowH/2+3;if(it.start_date)doc.text(it.start_date,colSt+dateW,mid,{align:'right'});if(it.end_date)doc.text(it.end_date,colEd+dateW,mid,{align:'right'});doc.text(it.qty.toLocaleString(),colQty+qtyW,mid,{align:'right'});doc.text(cp>0?'$'+fmt(cp):'—',colPr+priceW,mid,{align:'right'});doc.text(ext>0?'$'+fmt(ext):'—',colEx,mid,{align:'right'});y+=rowH;}if(!pdfGroups){drawColHeaders();window.lineItems.forEach(function(it,i){renderPdfRow(it,i,i%2===1);});}else{pdfGroups.forEach(function(grp){newPageIfNeeded(36);doc.setFillColor(91,148,203);doc.rect(L,y,R-L,16,'F');doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);doc.text(grp.label,L+6,y+11);y+=16;drawColHeaders();var prev=subtotal;grp.items.forEach(function(it,i){renderPdfRow(it,i,i%2===1);});var gs=subtotal-prev;newPageIfNeeded(20);doc.setFillColor(235,243,251);doc.rect(L,y,R-L,14,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(0,54,88);doc.text(grp.label+' Subtotal',colPr+priceW,y+10,{align:'right'});doc.text('$'+fmt(gs),colEx,y+10,{align:'right'});y+=18;});}newPageIfNeeded(80);y+=6;doc.setDrawColor(91,148,203);doc.setLineWidth(0.5);doc.line(R-190,y,R,y);y+=14;doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});y+=28;doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(113,113,116);doc.text('Payment terms: '+tm+(pdfGroups?'  |  Invoiced annually':''),L,y);y+=12;doc.text('This quote is valid through the expiration date above. All prices are in USD.',L,y);y+=12;doc.text('Quote subject to change without notice.',L,y);doc.setFillColor(0,54,88);doc.rect(0,748,W,6,'F');doc.setFillColor(91,148,203);doc.rect(0,754,W,14,'F');doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(255,255,255);doc.text('Copyright © TekStream Solutions, LLC 2026 | tekstream.com | Confidential',W/2,763,{align:'center'});
+  var pdfGroups=groupByYear(window.lineItems);var jsPDF=window.jspdf.jsPDF;var m=parseFloat(document.getElementById('marginPct').value)||0;var cn=document.getElementById('customerName').value||'Customer';var co=document.getElementById('contactName').value||'';var ce=document.getElementById('contactEmail').value||'';var qn=document.getElementById('quoteNumber').value||'TS-QUOTE';var qd=document.getElementById('quoteDate').value;var ed=document.getElementById('expiryDate').value;var nt=document.getElementById('notes').value;var tm=document.getElementById('terms').value||'Net 30';var pb=document.getElementById('preparedBy').value||'';var pbc=document.getElementById('preparedByCompany').value||'TekStream';var pbe=document.getElementById('preparedByEmail').value||'';var logoSrc=window.logoDataUrl||'';var doc=new jsPDF({unit:'pt',format:'letter'});var W=612,L=48,R=564;doc.setFillColor(0,54,88);doc.rect(0,0,W,68,'F');if(logoSrc&&logoSrc.startsWith('data:')){try{var li=new Image();await new Promise(function(res,rej){li.onload=res;li.onerror=rej;li.src=logoSrc;});doc.addImage(logoSrc,'PNG',L,11,li.naturalWidth*(46/li.naturalHeight),46);}catch(e){doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(255,255,255);doc.text('TekStream',L,36);}}doc.setFillColor(91,148,203);doc.rect(0,68,W,5,'F');doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);doc.text('Quote #  '+qn,R,28,{align:'right'});doc.setFont('helvetica','normal');doc.text('Date:  '+qd,R,42,{align:'right'});doc.text('Expires:  '+ed,R,56,{align:'right'});doc.setFont('helvetica','bold');doc.setFontSize(22);doc.setTextColor(0,54,88);doc.text('Quote',L,108);doc.setFillColor(235,243,251);doc.roundedRect(L,118,210,70,3,3,'F');doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(91,148,203);doc.text('PREPARED FOR',L+10,133);doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(0,54,88);doc.text(cn,L+10,149);doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(113,113,116);if(co)doc.text(co,L+10,161);if(ce)doc.text(ce,L+10,173);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(91,148,203);doc.text('PREPARED BY',R-200,133);doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(0,54,88);doc.text(pbc,R-200,149);doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(113,113,116);if(pb)doc.text(pb,R-200,161);if(pbe)doc.text(pbe,R-200,173);var y=210;if(nt){doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(60,60,60);var lines=doc.splitTextToSize(nt,R-L);doc.text(lines,L,y);y+=lines.length*13+14;}var skuW=(R-L)*0.13,dateW=50,qtyW=30,priceW=62,extW=70,descW=(R-L)-skuW-dateW*2-qtyW-priceW-extW-10,colSku=L+4,colDesc=L+skuW+4,colSt=colDesc+descW+2,colEd=colSt+dateW+2,colQty=colEd+dateW+2,colPr=colQty+qtyW+4,colEx=R-4;function newPageIfNeeded(n){if(y+n>692){doc.addPage();y=48;}}function drawColHeaders(){doc.setFillColor(0,54,88);doc.rect(L,y,R-L,20,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(255,255,255);doc.text('SKU',colSku,y+14);doc.text('Description',colDesc,y+14);doc.text('Start',colSt+dateW,y+14,{align:'right'});doc.text('End',colEd+dateW,y+14,{align:'right'});doc.text('Qty',colQty+qtyW,y+14,{align:'right'});doc.text('Unit Price',colPr+priceW,y+14,{align:'right'});doc.text('Extended',colEx,y+14,{align:'right'});y+=20;}var subtotal=0;function renderPdfRow(it,idx,alt){var cp=itemCprice(it,m),ext=cp*it.qty;subtotal+=ext;var skuL=doc.splitTextToSize(it.sku||'',skuW-4),descL=doc.splitTextToSize(it.description||'',descW-4),nL=Math.max(skuL.length,descL.length,1),rowH=nL*11+10;newPageIfNeeded(rowH);if(alt){doc.setFillColor(235,243,251);doc.rect(L,y,R-L,rowH,'F');}doc.setFont('helvetica','normal');doc.setTextColor(19,17,18);doc.setFontSize(8.5);doc.text(skuL,colSku,y+9);doc.text(descL,colDesc,y+9);var mid=y+rowH/2+3;if(it.start_date)doc.text(it.start_date,colSt+dateW,mid,{align:'right'});if(it.end_date)doc.text(it.end_date,colEd+dateW,mid,{align:'right'});doc.text(it.qty.toLocaleString(),colQty+qtyW,mid,{align:'right'});doc.text(cp>0?'$'+fmt(cp):'—',colPr+priceW,mid,{align:'right'});doc.text(ext>0?'$'+fmt(ext):'—',colEx,mid,{align:'right'});y+=rowH;}if(!pdfGroups){drawColHeaders();window.lineItems.forEach(function(it,i){renderPdfRow(it,i,i%2===1);});}else{pdfGroups.forEach(function(grp){newPageIfNeeded(36);doc.setFillColor(91,148,203);doc.rect(L,y,R-L,16,'F');doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);doc.text(grp.label,L+6,y+11);y+=16;drawColHeaders();var prev=subtotal;grp.items.forEach(function(it,i){renderPdfRow(it,i,i%2===1);});var gs=subtotal-prev;newPageIfNeeded(20);doc.setFillColor(235,243,251);doc.rect(L,y,R-L,14,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(0,54,88);doc.text(grp.label+' Subtotal',colPr+priceW,y+10,{align:'right'});doc.text('$'+fmt(gs),colEx,y+10,{align:'right'});y+=18;});}newPageIfNeeded(80);y+=6;doc.setDrawColor(91,148,203);doc.setLineWidth(0.5);doc.line(R-190,y,R,y);y+=14;doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});y+=28;doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(113,113,116);doc.text('Payment terms: '+tm+(pdfGroups?'  |  Invoiced annually':''),L,y);y+=12;doc.text('This quote is valid through the expiration date above. All prices are in USD.',L,y);y+=12;doc.text('Quote subject to change without notice.',L,y);doc.setFillColor(0,54,88);doc.rect(0,748,W,6,'F');doc.setFillColor(91,148,203);doc.rect(0,754,W,14,'F');doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(255,255,255);doc.text('Copyright © TekStream Solutions, LLC 2026 | tekstream.com | Confidential',W/2,763,{align:'center'});
   // Open in new tab instead of downloading
   window.open(doc.output('bloburl'), '_blank');
 }
