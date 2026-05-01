@@ -44,7 +44,7 @@ td input:focus{border-color:#5B94CB;outline:none}td input[type=date]{font-size:1
 .drawer-hdr h2{font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;flex:1;margin:0}
 .drawer-close{background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0 4px}
 .drawer-body{flex:1;overflow-y:auto;padding:16px}
-.quote-details-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px 16px;align-items:end}
+.quote-details-grid{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr 120px 120px 110px;gap:10px 14px;align-items:start}
 .quote-details-grid .field{margin:0}
 .saved-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0f2f5;cursor:pointer}
 .saved-item:last-child{border-bottom:none}
@@ -87,33 +87,33 @@ tr.drag-over td{border-top:2px solid #5B94CB}
   <div class="left-col">
     <div class="card">
       <div class="section-label" style="margin-bottom:10px">Quote Details</div>
-      <div class="quote-details-grid">
-      <div class="field"><label>Customer / company</label><input id="customerName" autocomplete="off" placeholder="ACME Corp"></div>
-      <div class="field"><label>Contact name</label><input id="contactName" autocomplete="off"></div>
-      <div class="field"><label>Contact email</label><input id="contactEmail" autocomplete="off"></div>
-      <div class="field"><label>Quote number</label><input id="quoteNumber" autocomplete="off"></div>
-      <div class="field-row">
-        <div class="field"><label>Quote date</label><input id="quoteDate" type="date"></div>
-        <div class="field"><label>Expiration date</label><input id="expiryDate" type="date" oninput="this.style.borderColor=this.value?'':\'#e53e3e\'"></div>
-      </div>
-      <div class="field">
-        <label>Margin %</label>
-        <input id="marginPct" type="number" value="15" min="0" max="99" step="0.125" autocomplete="off" oninput="recalcAll()">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
-          <span id="marginHint" style="font-size:11px;color:#717174">15% margin applied</span>
-          <span id="marginDollar" style="font-size:11px;font-weight:600;color:#003658"></span>
+      <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr 120px 120px 110px;gap:10px 14px;align-items:start;margin-bottom:10px">
+        <div class="field" style="margin:0"><label>Customer / company</label><input id="customerName" autocomplete="off" placeholder="ACME Corp"></div>
+        <div class="field" style="margin:0"><label>Contact name</label><input id="contactName" autocomplete="off"></div>
+        <div class="field" style="margin:0"><label>Contact email</label><input id="contactEmail" autocomplete="off"></div>
+        <div class="field" style="margin:0"><label>Quote number</label><input id="quoteNumber" autocomplete="off"></div>
+        <div class="field" style="margin:0"><label>Quote date</label><input id="quoteDate" type="date"></div>
+        <div class="field" style="margin:0"><label>Expiration date</label><input id="expiryDate" type="date" oninput="this.style.borderColor=this.value?'':\'#e53e3e\'"></div>
+        <div class="field" style="margin:0">
+          <label>Margin %</label>
+          <input id="marginPct" type="number" value="15" min="0" max="99" step="0.125" autocomplete="off" oninput="recalcAll()">
+          <div style="display:flex;justify-content:space-between;margin-top:2px">
+            <span id="marginHint" style="font-size:10px;color:#717174">15% applied</span>
+            <span id="marginDollar" style="font-size:10px;font-weight:600;color:#003658"></span>
+          </div>
         </div>
       </div>
-      <div class="field">
-        <label>VAD Quote (PDF or Excel)</label>
-        <input type="file" id="vadPdf" accept=".pdf,.xlsx,.xls" style="display:none" onchange="extractVAD(this)">
-        <div class="upload-row">
-          <button class="btn" onclick="document.getElementById('vadPdf').click()">Upload VAD Quote</button>
-          <span id="extractStatus" class="upload-status">No file selected</span>
+      <div style="display:grid;grid-template-columns:auto 1fr 160px;gap:10px 14px;align-items:start">
+        <div class="field" style="margin:0">
+          <label>VAD Quote (PDF or Excel)</label>
+          <input type="file" id="vadPdf" accept=".pdf,.xlsx,.xls" style="display:none" onchange="extractVAD(this)">
+          <div class="upload-row">
+            <button class="btn" onclick="document.getElementById('vadPdf').click()">Upload VAD Quote</button>
+            <span id="extractStatus" class="upload-status">No file selected</span>
+          </div>
         </div>
-      </div>
-      <div class="field"><label>Personalized note</label><textarea id="notes" autocomplete="off" placeholder="Thank you for the opportunity..."></textarea></div>
-      <div class="field"><label>Payment terms</label><input id="terms" autocomplete="off" value="Net 30"></div>
+        <div class="field" style="margin:0"><label>Personalized note</label><textarea id="notes" autocomplete="off" placeholder="Thank you for the opportunity..." style="min-height:52px"></textarea></div>
+        <div class="field" style="margin:0"><label>Payment terms</label><input id="terms" autocomplete="off" value="Net 30"></div>
       </div>
       <input type="hidden" id="preparedBy"><input type="hidden" id="preparedByCompany" value="TekStream"><input type="hidden" id="signerEmailHidden">
       <input type="hidden" id="preparedByEmail">
