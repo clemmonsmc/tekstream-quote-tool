@@ -345,7 +345,7 @@ function render(){
       h+=tbl;
       var gt=0;
       grp.items.forEach(function(it){var i=window.lineItems.indexOf(it);gt+=itemCprice(it,m)*it.qty;h+=renderRow(it,i,m);});
-      h+='<tr style="background:#EBF3FB"><td colspan="6" style="text-align:right;font-size:12px;font-weight:600;padding:6px 8px;color:#003658">Subtotal</td><td style="font-size:12px;font-weight:700;color:#003658;padding:6px 4px">$'+fmt(gt)+'</td><td></td></tr>';
+      h+='<tr style="background:#EBF3FB"><td colspan="7"></td><td style="font-size:12px;font-weight:700;color:#003658;padding:6px 4px;text-align:right"><span style="font-weight:600;margin-right:8px">Subtotal</span>$'+fmt(gt)+'</td><td></td></tr>';
       h+='</tbody></table>';
     });
   }
