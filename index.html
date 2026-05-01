@@ -318,7 +318,7 @@ function renderRow(it,i,m){
   h+='<td><input type="number" value="'+it.qty+'" min="1" style="width:50px" oninput="lineItems['+i+'].qty=+this.value;recalcAll()" autocomplete="off"></td>';
   h+='<td><input type="number" value="'+it.unit_price.toFixed(2)+'" step="0.01" min="0" oninput="lineItems['+i+'].unit_price=+this.value;recalcAll()" autocomplete="off"></td>';
   var mval=(it.margin!==null&&it.margin!==undefined&&it.margin!=='')?it.margin:'';
-  h+='<td><input type="number" value="'+mval+'" min="0" max="99" step="0.125" placeholder="'+m+'" style="width:52px" title="Line margin override" oninput="lineItems['+i+'].margin=this.value===\'\'?null:+this.value;recalcAll()" autocomplete="off"></td>';
+  h+='<td><input type="number" value="'+mval+'" min="0" max="99" step="0.125" placeholder="'+m+'" style="width:52px" title="Line margin override" onfocus="if(this.value===\'\'){this.value='+m+';lineItems['+i+'].margin='+m+';}" oninput="lineItems['+i+'].margin=this.value===\'\'?null:+this.value;recalcAll()" autocomplete="off"></td>';
   h+='<td><input type="date" value="'+escH(it.start_date||'')+'" style="width:105px" oninput="lineItems['+i+'].start_date=this.value"></td>';
   h+='<td><input type="date" value="'+escH(it.end_date||'')+'" style="width:105px" oninput="lineItems['+i+'].end_date=this.value"></td>';
   h+='<td class="muted">'+(ext>0?'$'+fmt(ext):'\u2014')+'</td>';
@@ -345,7 +345,7 @@ function render(){
       h+=tbl;
       var gt=0;
       grp.items.forEach(function(it){var i=window.lineItems.indexOf(it);gt+=itemCprice(it,m)*it.qty;h+=renderRow(it,i,m);});
-      h+='<tr style="background:#EBF3FB"><td colspan="6" style="text-align:right;font-size:12px;font-weight:600;padding:6px 8px;color:#003658">'+grp.label+' Subtotal</td><td style="font-size:12px;font-weight:700;color:#003658;padding:6px 4px">$'+fmt(gt)+'</td><td></td></tr>';
+      h+='<tr style="background:#EBF3FB"><td colspan="6" style="text-align:right;font-size:12px;font-weight:600;padding:6px 8px;color:#003658">Subtotal</td><td style="font-size:12px;font-weight:700;color:#003658;padding:6px 4px">$'+fmt(gt)+'</td><td></td></tr>';
       h+='</tbody></table>';
     });
   }
