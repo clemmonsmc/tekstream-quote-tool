@@ -15,8 +15,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .btn-sm{padding:6px 12px;font-size:12px}
 .wrap{max-width:1400px;margin:0 auto;padding:20px 24px 0}
 .rep-card{background:#fff;border-radius:10px;padding:16px 20px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:12px}
-.layout{display:grid;grid-template-columns:320px 1fr;gap:20px;padding:12px 24px 28px;max-width:1400px;margin:0 auto}
-.left-col{display:flex;flex-direction:column;gap:16px}
+.layout{padding:12px 24px 28px;max-width:1400px;margin:0 auto}
+.left-col{margin-bottom:12px}
 .card{background:#fff;border-radius:10px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .section-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5B94CB;margin-bottom:12px}
 .field{margin-bottom:14px}.field label{display:block;font-size:12px;color:#717174;margin-bottom:4px}
@@ -36,6 +36,16 @@ td input:focus{border-color:#5B94CB;outline:none}td input[type=date]{font-size:1
 .trow.grand{font-size:16px;font-weight:700;color:#003658}
 .empty{color:#717174;text-align:center;padding:40px;font-size:13px}
 .btn-row{display:flex;gap:10px;margin-top:16px}.dl-btn{flex:1;padding:13px;font-size:15px;border-radius:8px}
+.drawer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:100}
+.drawer-overlay.open{display:block}
+.drawer{position:fixed;left:0;top:0;bottom:0;width:340px;background:#fff;box-shadow:4px 0 24px rgba(0,0,0,.18);z-index:101;transform:translateX(-100%);transition:transform .25s ease;display:flex;flex-direction:column}
+.drawer.open{transform:translateX(0)}
+.drawer-hdr{background:#003658;color:#fff;padding:16px 20px;display:flex;align-items:center;gap:12px}
+.drawer-hdr h2{font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;flex:1;margin:0}
+.drawer-close{background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0 4px}
+.drawer-body{flex:1;overflow-y:auto;padding:16px}
+.quote-details-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px 16px;align-items:end}
+.quote-details-grid .field{margin:0}
 .saved-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0f2f5;cursor:pointer}
 .saved-item:last-child{border-bottom:none}
 .saved-item:hover .saved-label{color:#5B94CB}
@@ -47,9 +57,20 @@ tr.drag-over td{border-top:2px solid #5B94CB}
 </style>
 </head>
 <body>
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="savedDrawer">
+  <div class="drawer-hdr">
+    <h2>Saved Quotes</h2>
+    <button class="drawer-close" onclick="closeDrawer()">&times;</button>
+  </div>
+  <div class="drawer-body">
+    <div id="savedList"></div>
+  </div>
+</div>
 <div class="hdr">
   <img class="hdr-logo" id="hdrLogo" alt="TekStream">
   <span class="hdr-tag">VAD Quote Generator</span>
+  <button class="btn" style="border:1.5px solid rgba(255,255,255,.4);background:transparent" onclick="openDrawer()">Saved Quotes</button>
   <button class="btn" style="border:1.5px solid rgba(255,255,255,.4);background:transparent" onclick="newQuote()">New Quote</button>
 </div>
 <div class="wrap">
@@ -65,7 +86,8 @@ tr.drag-over td{border-top:2px solid #5B94CB}
 <div class="layout">
   <div class="left-col">
     <div class="card">
-      <div class="section-label">Quote Details</div>
+      <div class="section-label" style="margin-bottom:10px">Quote Details</div>
+      <div class="quote-details-grid">
       <div class="field"><label>Customer / company</label><input id="customerName" autocomplete="off" placeholder="ACME Corp"></div>
       <div class="field"><label>Contact name</label><input id="contactName" autocomplete="off"></div>
       <div class="field"><label>Contact email</label><input id="contactEmail" autocomplete="off"></div>
@@ -76,7 +98,7 @@ tr.drag-over td{border-top:2px solid #5B94CB}
       </div>
       <div class="field">
         <label>Margin %</label>
-        <input id="marginPct" type="number" value="15" min="0" max="99" step="0.5" autocomplete="off" oninput="recalcAll()">
+        <input id="marginPct" type="number" value="15" min="0" max="99" step="0.125" autocomplete="off" oninput="recalcAll()">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
           <span id="marginHint" style="font-size:11px;color:#717174">15% margin applied</span>
           <span id="marginDollar" style="font-size:11px;font-weight:600;color:#003658"></span>
@@ -92,14 +114,14 @@ tr.drag-over td{border-top:2px solid #5B94CB}
       </div>
       <div class="field"><label>Personalized note</label><textarea id="notes" autocomplete="off" placeholder="Thank you for the opportunity..."></textarea></div>
       <div class="field"><label>Payment terms</label><input id="terms" autocomplete="off" value="Net 30"></div>
+      </div>
       <input type="hidden" id="preparedBy"><input type="hidden" id="preparedByCompany" value="TekStream"><input type="hidden" id="signerEmailHidden">
       <input type="hidden" id="preparedByEmail">
     </div>
-    <div class="card" id="savedCard" style="display:none">
-      <div class="section-label">Saved Quotes</div>
-      <div id="savedList"></div>
-    </div>
+
   </div>
+</div>
+<div style="padding:0 24px 28px;max-width:1400px;margin:0 auto">
   <div class="card">
     <div class="section-label" style="margin-bottom:14px">Line Items</div>
     <div id="liArea"><div class="empty">Add line items manually or upload a VAD quote.</div></div>
@@ -158,6 +180,15 @@ function autoSave() {
 }
 
 
+function openDrawer(){
+  document.getElementById('savedDrawer').classList.add('open');
+  document.getElementById('drawerOverlay').classList.add('open');
+  renderSavedQuotes();
+}
+function closeDrawer(){
+  document.getElementById('savedDrawer').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('open');
+}
 function saveRepSettings(){
   var name=document.getElementById('repName').value;
   var email=document.getElementById('repEmail').value;
@@ -225,10 +256,10 @@ function deleteSavedQuote(key){
 }
 function renderSavedQuotes(){
   var saved=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
-  var card=document.getElementById('savedCard');
+  var card=null;
   var list=document.getElementById('savedList');
-  if(!saved.length){card.style.display='none';return;}
-  card.style.display='block';
+  if(!saved.length){list.innerHTML='<div style="color:#717174;font-size:13px;text-align:center;padding:20px">No saved quotes yet.</div>';return;}
+
   list.innerHTML='';
   saved.forEach(function(q,i){
     var row=document.createElement('div');
@@ -318,10 +349,13 @@ function renderRow(it,i,m){
   h+='<td><input type="number" value="'+it.qty+'" min="1" style="width:50px" oninput="lineItems['+i+'].qty=+this.value;recalcAll()" autocomplete="off"></td>';
   h+='<td><input type="number" value="'+it.unit_price.toFixed(2)+'" step="0.01" min="0" oninput="lineItems['+i+'].unit_price=+this.value;recalcAll()" autocomplete="off"></td>';
   var mval=(it.margin!==null&&it.margin!==undefined&&it.margin!=='')?it.margin:'';
-  h+='<td><input type="number" value="'+mval+'" min="0" max="99" step="0.125" placeholder="'+m+'" style="width:52px" title="Line margin override" onfocus="if(this.value===\'\'){this.value='+m+';lineItems['+i+'].margin='+m+';}" oninput="lineItems['+i+'].margin=this.value===\'\'?null:+this.value;recalcAll()" autocomplete="off"></td>';
+  h+='<td><input type="number" value="'+mval+'" min="0" max="99" step="0.125" placeholder="'+m+'" style="width:52px" title="Line margin override" oninput="lineItems['+i+'].margin=this.value===\'\'?null:+this.value;recalcAll()" autocomplete="off"></td>';
+  var marginDollarLine=(cp-it.unit_price)*it.qty;
+  h+='<td class="muted" style="text-align:right;padding-right:4px;font-size:11px;color:#2d7a4f">'+(marginDollarLine>0?'$'+fmt(marginDollarLine):'')+'</td>';
   h+='<td><input type="date" value="'+escH(it.start_date||'')+'" style="width:105px" oninput="lineItems['+i+'].start_date=this.value"></td>';
   h+='<td><input type="date" value="'+escH(it.end_date||'')+'" style="width:105px" oninput="lineItems['+i+'].end_date=this.value"></td>';
-  h+='<td class="muted">'+(ext>0?'$'+fmt(ext):'\u2014')+'</td>';
+  var custVal=(ext>0?ext.toFixed(2):'');
+  h+='<td><input type="number" value="'+custVal+'" min="0" step="0.01" style="width:90px;color:#003658;font-weight:600" placeholder="—" title="Customer price (editable)" oninput="(function(v,idx){if(!v||isNaN(+v))return;var vad=lineItems[idx].unit_price;if(!vad)return;var m=(1-vad/(+v/lineItems[idx].qty))*100;lineItems[idx].margin=Math.round(m*1000)/1000;recalcAll();})(this.value,'+i+')" autocomplete="off"></td>';
   var hasOverride=(it.margin!==null&&it.margin!==undefined&&it.margin!=='');
   h+='<td style="white-space:nowrap;padding:4px 2px">';
   h+='<span class="drag-handle" draggable="true" data-idx="'+i+'" title="Drag to reorder" style="cursor:grab;color:#aaa;font-size:16px;padding:2px 4px;user-select:none">&#8942;</span>';
@@ -335,7 +369,7 @@ function render(){
   var m=parseFloat(document.getElementById('marginPct').value)||0;
   var area=document.getElementById('liArea');
   if(!window.lineItems.length){area.innerHTML='<div class="empty">Add line items manually or upload a VAD quote.</div>';document.getElementById('totals').innerHTML='';updateMarginDollar(m,0,0);return;}
-  var tbl='<table><colgroup><col style="width:10%"><col style="width:24%"><col style="width:5%"><col style="width:9%"><col style="width:6%"><col style="width:8%"><col style="width:8%"><col style="width:18%"><col style="width:7%"></colgroup><thead><tr><th>SKU</th><th>Description</th><th>Qty</th><th>VAD Price</th><th>Margin%</th><th>Start</th><th>End</th><th>Customer</th><th></th></tr></thead><tbody>';
+  var tbl='<table><colgroup><col style="width:10%"><col style="width:24%"><col style="width:5%"><col style="width:9%"><col style="width:6%"><col style="width:8%"><col style="width:8%"><col style="width:18%"><col style="width:7%"></colgroup><thead><tr><th>SKU</th><th>Description</th><th>Qty</th><th>VAD Price</th><th>Margin%</th><th>Margin$</th><th>Start</th><th>End</th><th>Customer</th><th></th></tr></thead><tbody>';
   var h='',groups=groupByYear(window.lineItems);
   if(!groups){
     h+=tbl;window.lineItems.forEach(function(it,i){h+=renderRow(it,i,m);});h+='</tbody></table>';
