@@ -30,6 +30,8 @@ td{padding:5px 3px;border-bottom:1px solid #f0f2f5;vertical-align:middle}
 tr:nth-child(even) td{background:#EBF3FB}
 td input{border:1.5px solid #e2e8f0;border-radius:4px;padding:4px 5px;font-size:12px;width:100%;background:#fff}
 td input:focus{border-color:#5B94CB;outline:none}td input[type=date]{font-size:11px}
+td input.cust-price::-webkit-inner-spin-button,td input.cust-price::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+td input.cust-price{-moz-appearance:textfield}
 .del{background:none;border:none;color:#c00;cursor:pointer;font-size:14px;padding:2px 6px}
 .muted{color:#717174;font-size:12px}
 .trow{display:flex;justify-content:flex-end;gap:40px;padding:3px 0;font-size:13px}
@@ -356,13 +358,22 @@ function renderRow(it,i,m){
   h+='<td><input type="date" value="'+escH(it.start_date||'')+'" style="width:105px" oninput="lineItems['+i+'].start_date=this.value"></td>';
   h+='<td><input type="date" value="'+escH(it.end_date||'')+'" style="width:105px" oninput="lineItems['+i+'].end_date=this.value"></td>';
   var custVal=(ext>0?ext.toFixed(2):'');
-  h+='<td><input type="number" value="'+custVal+'" min="0" step="0.01" style="width:90px;color:#003658;font-weight:600" placeholder="—" title="Customer price (editable)" oninput="(function(v,idx){if(!v||isNaN(+v))return;var vad=lineItems[idx].unit_price;if(!vad)return;var m=(1-vad/(+v/lineItems[idx].qty))*100;lineItems[idx].margin=Math.round(m*1000)/1000;recalcAll();})(this.value,'+i+')" autocomplete="off"></td>';
+  h+='<td><input type="number" value="'+custVal+'" min="0" step="0.01" class="cust-price" style="width:90px;color:#003658;font-weight:600" placeholder="—" title="Customer price (editable)" oninput="(function(v,idx){if(!v||isNaN(+v))return;var vad=lineItems[idx].unit_price;if(!vad)return;var m=(1-vad/(+v/lineItems[idx].qty))*100;lineItems[idx].margin=Math.round(m*1000)/1000;updateTotalsOnly();})(this.value,'+i+')" autocomplete="off"></td>';
   var hasOverride=(it.margin!==null&&it.margin!==undefined&&it.margin!=='');
   h+='<td style="white-space:nowrap;padding:4px 2px">';
   if(hasOverride)h+='<button class="del" style="color:#5B94CB;font-size:12px" title="Reset to global margin" onclick="lineItems['+i+'].margin=null;recalcAll()">↺</button>';
   h+='<button class="del" onclick="removeRow('+i+')">\u2715</button>';
   h+='</td></tr>';
   return h;
+}
+
+function updateTotalsOnly(){
+  var m=parseFloat(document.getElementById('marginPct').value)||0;
+  var vt=window.lineItems.reduce(function(s,it){return s+it.unit_price*it.qty;},0);
+  var sub=window.lineItems.reduce(function(s,it){return s+itemCprice(it,m)*it.qty;},0);
+  document.getElementById('totals').innerHTML='<div class="trow"><span>Subtotal</span><span>$'+fmt(sub)+'</span></div><div class="trow grand"><span>Total (USD)</span><span>$'+fmt(sub)+'</span></div>';
+  updateMarginDollar(m,sub,vt);
+  if(window.lineItems.length) autoSave();
 }
 
 function render(){
