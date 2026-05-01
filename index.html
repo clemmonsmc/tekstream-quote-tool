@@ -344,6 +344,7 @@ function initDragDrop(){
 function renderRow(it,i,m){
   var em=effectiveMargin(it,m);
   var cp=cprice(it.unit_price,em),ext=cp*it.qty,h='<tr data-row="'+i+'">';
+  h+='<td style="text-align:center;padding:2px"><span class="drag-handle" draggable="true" data-idx="'+i+'" title="Drag to reorder" style="cursor:grab;color:#ccc;font-size:14px;user-select:none">&#8942;</span></td>';
   h+='<td><input value="'+escH(it.sku)+'" oninput="lineItems['+i+'].sku=this.value" autocomplete="off"></td>';
   h+='<td><input value="'+escH(it.description)+'" oninput="lineItems['+i+'].description=this.value" autocomplete="off"></td>';
   h+='<td><input type="number" value="'+it.qty+'" min="1" style="width:50px" oninput="lineItems['+i+'].qty=+this.value;recalcAll()" autocomplete="off"></td>';
@@ -358,7 +359,6 @@ function renderRow(it,i,m){
   h+='<td><input type="number" value="'+custVal+'" min="0" step="0.01" style="width:90px;color:#003658;font-weight:600" placeholder="—" title="Customer price (editable)" oninput="(function(v,idx){if(!v||isNaN(+v))return;var vad=lineItems[idx].unit_price;if(!vad)return;var m=(1-vad/(+v/lineItems[idx].qty))*100;lineItems[idx].margin=Math.round(m*1000)/1000;recalcAll();})(this.value,'+i+')" autocomplete="off"></td>';
   var hasOverride=(it.margin!==null&&it.margin!==undefined&&it.margin!=='');
   h+='<td style="white-space:nowrap;padding:4px 2px">';
-  h+='<span class="drag-handle" draggable="true" data-idx="'+i+'" title="Drag to reorder" style="cursor:grab;color:#aaa;font-size:16px;padding:2px 4px;user-select:none">&#8942;</span>';
   if(hasOverride)h+='<button class="del" style="color:#5B94CB;font-size:12px" title="Reset to global margin" onclick="lineItems['+i+'].margin=null;recalcAll()">↺</button>';
   h+='<button class="del" onclick="removeRow('+i+')">\u2715</button>';
   h+='</td></tr>';
@@ -369,7 +369,7 @@ function render(){
   var m=parseFloat(document.getElementById('marginPct').value)||0;
   var area=document.getElementById('liArea');
   if(!window.lineItems.length){area.innerHTML='<div class="empty">Add line items manually or upload a VAD quote.</div>';document.getElementById('totals').innerHTML='';updateMarginDollar(m,0,0);return;}
-  var tbl='<table><colgroup><col style="width:10%"><col style="width:24%"><col style="width:5%"><col style="width:9%"><col style="width:6%"><col style="width:8%"><col style="width:8%"><col style="width:18%"><col style="width:7%"></colgroup><thead><tr><th>SKU</th><th>Description</th><th>Qty</th><th>VAD Price</th><th>Margin%</th><th>Margin$</th><th>Start</th><th>End</th><th>Customer</th><th></th></tr></thead><tbody>';
+  var tbl='<table><colgroup><col style="width:2%"><col style="width:9%"><col style="width:20%"><col style="width:5%"><col style="width:8%"><col style="width:6%"><col style="width:7%"><col style="width:7%"><col style="width:8%"><col style="width:21%"><col style="width:7%"></colgroup><thead><tr><th></th><th>SKU</th><th>Description</th><th>Qty</th><th>VAD Price</th><th>Margin%</th><th>Margin$</th><th>Start</th><th>End</th><th>Customer</th><th></th></tr></thead><tbody>';
   var h='',groups=groupByYear(window.lineItems);
   if(!groups){
     h+=tbl;window.lineItems.forEach(function(it,i){h+=renderRow(it,i,m);});h+='</tbody></table>';
