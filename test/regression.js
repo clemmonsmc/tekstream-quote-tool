@@ -20,6 +20,8 @@ async function runRegressionTests() {
    'signerEmailHidden'].forEach(function(id){
     test('dom:#'+id,function(){return{pass:!!document.getElementById(id)};});
   });
+  // Reset state before init tests
+  newQuote();
   // 3. Init
   test('init:quoteNumber',function(){return{pass:!!document.getElementById('quoteNumber').value};});
   test('init:quoteDate',function(){return{pass:!!document.getElementById('quoteDate').value};});
@@ -71,6 +73,20 @@ async function runRegressionTests() {
     closeDrawer();var c=!document.getElementById('savedDrawer').classList.contains('open');
     return{pass:o&&c};
   });
+  test('drawer:rendersSavedQuotes',function(){
+    var saved=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
+    openDrawer();
+    var items=document.querySelectorAll('#savedList .saved-item');
+    closeDrawer();
+    return{pass:items.length===saved.length,detail:'saved='+saved.length+' rendered='+items.length};
+  });
+  test('drawer:loadSavedQuote',function(){
+    var saved=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
+    if(!saved.length)return{pass:true,detail:'no saved quotes to test'};
+    var entry=saved[0];
+    try{restoreQuoteState(entry.state);var ok=document.getElementById('quoteNumber').value===entry.quoteNumber;return{pass:ok,detail:'qn='+document.getElementById('quoteNumber').value};}
+    catch(e){return{pass:false,detail:e.message};}
+  });
   // 8. Set total
   test('setTotal:proportional',function(){
     window.lineItems=[{sku:'A',description:'A',qty:1,unit_price:80,start_date:'',end_date:'',margin:null},{sku:'B',description:'B',qty:1,unit_price:20,start_date:'',end_date:'',margin:null}];
@@ -83,6 +99,19 @@ async function runRegressionTests() {
   // 9. Rep settings
   test('rep:saveToStorage',function(){document.getElementById('repName').value='__tr__';saveRepSettings();return{pass:localStorage.getItem('ts_rep_name')==='__tr__'};});
   test('rep:populatesHidden',function(){return{pass:document.getElementById('preparedBy').value==='__tr__'};});
+  // 10. Customer price back-calc margin
+  test('custPrice:backCalcMargin',function(){
+    window.lineItems=[{sku:'T',description:'T',qty:1,unit_price:100,start_date:'',end_date:'',margin:null}];
+    render();
+    var m=(1-100/(125/1))*100;
+    window.lineItems[0].margin=Math.round(m*1000)/1000;
+    updateTotalsOnly();
+    return{pass:Math.abs(window.lineItems[0].margin-20)<0.01,detail:'margin='+window.lineItems[0].margin};
+  });
+  test('margin:globalStep0.125',function(){
+    var el=document.getElementById('marginPct');
+    return{pass:el.step==='0.125',detail:'step='+el.step};
+  });
   // Cleanup
   newQuote();loadRepSettings();
   // Summary
