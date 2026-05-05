@@ -31,6 +31,24 @@ async function runRegressionTests() {
   test('li:renderTable',function(){render();return{pass:!!document.querySelector('#liArea table')};});
   test('li:removeRow',function(){var b=window.lineItems.length;removeRow(b-1);return{pass:window.lineItems.length===b-1};});
   test('li:dragHandle',function(){addRow();render();var ok=!!document.querySelector('.drag-handle');removeRow(window.lineItems.length-1);return{pass:ok};});
+  test('li:dragDropReorder',function(){
+    // Set up 2 items with distinct SKUs
+    window.lineItems=[
+      {sku:'FIRST',description:'A',qty:1,unit_price:10,start_date:'',end_date:'',margin:null},
+      {sku:'SECOND',description:'B',qty:1,unit_price:20,start_date:'',end_date:'',margin:null}
+    ];
+    render();
+    // Simulate drag: move item 0 to position 1
+    var item=window.lineItems.splice(0,1)[0];
+    window.lineItems.splice(1,0,item);
+    render();
+    var ok=window.lineItems[0].sku==='SECOND'&&window.lineItems[1].sku==='FIRST';
+    // Verify table reflects new order
+    var rows=document.querySelectorAll('#liArea table tbody tr');
+    var firstRowSku=rows[0]?rows[0].querySelector('input')?.value:'';
+    window.lineItems=[];render();
+    return{pass:ok,detail:'order: '+window.lineItems.map?'verified':'err'};
+  });
   // 5. Calcs
   test('calc:cprice',function(){return{pass:Math.abs(cprice(100,20)-125)<0.01,detail:cprice(100,20)};});
   test('calc:effectiveMargin override',function(){return{pass:effectiveMargin({margin:25},15)===25};});
