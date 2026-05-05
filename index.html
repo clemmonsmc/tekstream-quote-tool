@@ -271,6 +271,8 @@ function renderSavedQuotes(){
   var saved=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
   var card=null;
   var list=document.getElementById('savedList');
+  // Filter out empty saves (no customer name and no line items)
+  saved=saved.filter(function(q){return (q.customerName&&q.customerName.trim())||(q.state&&q.state.lineItems&&q.state.lineItems.length>0);});
   if(!saved.length){list.innerHTML='<div style="color:#717174;font-size:13px;text-align:center;padding:20px">No saved quotes yet.</div>';return;}
 
   list.innerHTML='';

@@ -1,5 +1,10 @@
 async function runRegressionTests() {
   const results = [];
+  // Suppress auto-save during tests to avoid polluting saved quotes
+  var _origAutoSave = window.autoSave;
+  window.autoSave = function(){};
+  var _origAutoSaveTimer = window._autoSaveTimer;
+  clearTimeout(window._autoSaveTimer);
   function test(name, fn) {
     try { const r=fn(); results.push({name,pass:r.pass,detail:r.detail||''}); }
     catch(e){ results.push({name,pass:false,detail:'ERROR: '+e.message}); }
@@ -112,7 +117,8 @@ async function runRegressionTests() {
     var el=document.getElementById('marginPct');
     return{pass:el.step==='0.125',detail:'step='+el.step};
   });
-  // Cleanup
+  // Restore auto-save and cleanup
+  window.autoSave = _origAutoSave;
   newQuote();loadRepSettings();
   // Summary
   var passed=results.filter(function(r){return r.pass;}).length;
