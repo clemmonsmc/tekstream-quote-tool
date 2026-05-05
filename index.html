@@ -165,7 +165,7 @@ window.logoDataUrl = null;
   loadRepSettings();
   renderSavedQuotes();
   // Auto-save on any form field change
-  document.querySelector('.left-col .card').addEventListener('input', function(){ autoSave(); });
+  document.querySelector('.card').addEventListener('input', function(){ autoSave(); });
 })();
 
 function checkExpiry(el){el.style.borderColor=el.value?"":"#e53e3e";}
