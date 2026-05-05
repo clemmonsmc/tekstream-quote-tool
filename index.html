@@ -94,7 +94,7 @@ td input.cust-price{-moz-appearance:textfield}
         <div class="field" style="margin:0"><label>Contact email</label><input id="contactEmail" autocomplete="off"></div>
         <div class="field" style="margin:0"><label>Quote number</label><input id="quoteNumber" autocomplete="off"></div>
         <div class="field" style="margin:0"><label>Quote date</label><input id="quoteDate" type="date"></div>
-        <div class="field" style="margin:0"><label>Expiration date</label><input id="expiryDate" type="date" oninput="this.style.borderColor=this.value?'':\'#e53e3e\'"></div>
+        <div class="field" style="margin:0"><label>Expiration date</label><input id="expiryDate" type="date" oninput="checkExpiry(this)"></div>
         <div class="field" style="margin:0">
           <label>Margin %</label>
           <input id="marginPct" type="number" value="15" min="0" max="99" step="0.125" autocomplete="off" oninput="recalcAll()">
@@ -168,6 +168,7 @@ window.logoDataUrl = null;
   document.querySelector('.left-col .card').addEventListener('input', function(){ autoSave(); });
 })();
 
+function checkExpiry(el){el.style.borderColor=el.value?"":"#e53e3e";}
 function escH(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
 function cprice(vad,m){return(!vad||vad<=0||m>=100)?0:vad/(1-m/100);}
 function fmt(n){return n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
