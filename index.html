@@ -396,14 +396,13 @@ function renderRow(it,i,m){
   h+='<td><input value="'+escH(it.description)+'" oninput="lineItems['+i+'].description=this.value" autocomplete="off"></td>';
   h+='<td><input type="number" value="'+it.qty+'" min="1" style="width:50px" oninput="lineItems['+i+'].qty=+this.value;recalcAll()" autocomplete="off"></td>';
   h+='<td><input type="number" value="'+it.unit_price.toFixed(2)+'" step="0.01" min="0" oninput="lineItems['+i+'].unit_price=+this.value;recalcAll()" autocomplete="off"></td>';
-  var mval=(it.margin!==null&&it.margin!==undefined&&it.margin!=='')?it.margin:'';
-  h+='<td><input type="number" value="'+mval+'" min="0" max="99" step="0.125" placeholder="'+m+'" style="width:52px" title="Line margin override" onkeydown="if((event.key===\'ArrowUp\'||event.key===\'ArrowDown\')&&this.value===\'\'){this.value=+this.placeholder;}" oninput="lineItems['+i+'].margin=this.value===\'\'?null:+this.value;recalcAll()" autocomplete="off"></td>';
-  var marginDollarLine=(cp-it.unit_price)*it.qty;
-  h+='<td class="muted" style="text-align:right;padding-right:4px;font-size:11px;color:#2d7a4f">'+(marginDollarLine>0?'$'+fmt(marginDollarLine):'')+'</td>';
+  h+='<td class="muted" style="text-align:right;padding-right:6px">'+(it.unit_price*it.qty>0?'$'+fmt(it.unit_price*it.qty):'\u2014')+'</td>';
   h+='<td><input type="date" value="'+escH(it.start_date||'')+'" style="width:105px" oninput="lineItems['+i+'].start_date=this.value"></td>';
   h+='<td><input type="date" value="'+escH(it.end_date||'')+'" style="width:105px" oninput="lineItems['+i+'].end_date=this.value"></td>';
   var custVal=(ext>0?ext.toFixed(2):'');
-  h+='<td><input type="number" value="'+custVal+'" min="0" step="0.01" class="cust-price" style="width:90px;color:#003658;font-weight:600" placeholder="—" title="Customer price (editable)" oninput="(function(v,idx){if(!v||isNaN(+v))return;var vad=lineItems[idx].unit_price;if(!vad)return;var m=(1-vad/(+v/lineItems[idx].qty))*100;lineItems[idx].margin=Math.round(m*1000)/1000;updateTotalsOnly();})(this.value,'+i+')" autocomplete="off"></td>';
+  h+='<td><input type="number" value="'+custVal+'" min="0" step="0.01" class="cust-price" style="width:90px;color:#003658;font-weight:600" placeholder="\u2014" title="Customer price (editable)" oninput="(function(v,idx){if(!v||isNaN(+v))return;var vad=lineItems[idx].unit_price;if(!vad)return;var m=(1-vad/(+v/lineItems[idx].qty))*100;lineItems[idx].margin=Math.round(m*1000)/1000;updateTotalsOnly();})(this.value,'+i+')" autocomplete="off"></td>';
+  var mval=(it.margin!==null&&it.margin!==undefined&&it.margin!=='')?it.margin:'';
+  h+='<td><input type="number" value="'+mval+'" min="0" max="99" step="0.125" placeholder="'+m+'" style="width:52px" title="Line margin override" onkeydown="if((event.key===\'ArrowUp\'||event.key===\'ArrowDown\')&&this.value===\'\'){this.value=+this.placeholder;}" oninput="lineItems['+i+'].margin=this.value===\'\'?null:+this.value;recalcAll()" autocomplete="off"></td>';
   var hasOverride=(it.margin!==null&&it.margin!==undefined&&it.margin!=='');
   h+='<td style="white-space:nowrap;padding:4px 2px">';
   if(hasOverride)h+='<button class="del" style="color:#5B94CB;font-size:12px" title="Reset to global margin" onclick="lineItems['+i+'].margin=null;recalcAll()">↺</button>';
@@ -448,7 +447,7 @@ function render(){
   var m=parseFloat(document.getElementById('marginPct').value)||0;
   var area=document.getElementById('liArea');
   if(!window.lineItems.length){area.innerHTML='<div class="empty">Add line items manually or upload a VAD quote.</div>';document.getElementById('totals').innerHTML='';updateMarginDollar(m,0,0);return;}
-  var tbl='<table><colgroup><col style="width:2%"><col style="width:9%"><col style="width:20%"><col style="width:5%"><col style="width:8%"><col style="width:6%"><col style="width:7%"><col style="width:7%"><col style="width:8%"><col style="width:21%"><col style="width:7%"></colgroup><thead><tr><th></th><th>SKU</th><th>Description</th><th>Qty</th><th>VAD Price</th><th>Margin%</th><th>Margin$</th><th>Start</th><th>End</th><th>Customer</th><th></th></tr></thead><tbody>';
+  var tbl='<table><colgroup><col style="width:2%"><col style="width:9%"><col style="width:20%"><col style="width:5%"><col style="width:8%"><col style="width:8%"><col style="width:7%"><col style="width:7%"><col style="width:14%"><col style="width:6%"><col style="width:7%"><col style="width:7%"></colgroup><thead><tr><th></th><th>SKU</th><th>Description</th><th>Qty</th><th>VAD Unit $</th><th>VAD Ext. $</th><th>Start</th><th>End</th><th>Customer $</th><th>Margin%</th><th>Margin$</th><th></th></tr></thead><tbody>';
   var h='',groups=groupByYear(window.lineItems);
   if(!groups){
     h+=tbl;window.lineItems.forEach(function(it,i){h+=renderRow(it,i,m);});h+='</tbody></table>';
