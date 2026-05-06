@@ -524,16 +524,34 @@ function render(){
       h+='<div style="background:#5B94CB;color:#fff;font-size:12px;padding:6px 12px;letter-spacing:.06em;border-radius:6px 6px 0 0;margin-top:8px;display:flex;align-items:center;gap:12px">';
       h+='<span style="font-weight:700">'+grp.label+'</span>';
       h+='<span style="opacity:.7;font-size:11px">|&nbsp;&nbsp;Service Dates:</span>';
-      h+='<input type="date" value="'+escH(grp.start||'')+" style=\"background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;width:115px\" "
-          +"oninput=\"updateGroupDates("+gi+",'start_date',this.value);this.nextElementSibling.nextElementSibling.textContent='\u2013 ';\">"
+      h+="<input type='date' value='"+escH(grp.start||'')+"' style='background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;width:115px' "
+          +"oninput=\"updateGroupDates("+gi+",'start_date',this.value);\">"
           +"<span style='color:#fff;opacity:.8;margin:0 2px'>\u2013</span>"
           +"<input type='date' value='"+escH(grp.end||'')+"' style='background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;width:115px' "
           +"oninput=\"updateGroupDates("+gi+",'end_date',this.value);\">";
       h+='</div>';
       h+=tbl;
-      var gt=0;
-      grp.items.forEach(function(it){var i=window.lineItems.indexOf(it);gt+=itemCprice(it,m)*it.qty;h+=renderRow(it,i,m);});
-      h+='<tr style="background:#EBF3FB"><td colspan="9" style="text-align:right;padding-right:10px;font-size:12px;font-weight:600;color:#003658">Subtotal</td><td style="font-size:12px;font-weight:700;color:#003658;padding:6px 4px;text-align:right">'+fmt(gt)+'</td><td></td></tr>';
+      var gt=0,vadExt=0,marginTotal=0;
+      grp.items.forEach(function(it){
+        var i=window.lineItems.indexOf(it);
+        var cp=itemCprice(it,m);
+        gt+=cp*it.qty;
+        vadExt+=it.unit_price*it.qty;
+        marginTotal+=(cp-it.unit_price)*it.qty;
+        h+=renderRow(it,i,m);
+      });
+      var mColor=marginTotal>0?'#2d7a4f':marginTotal<0?'#c00':'#717174';
+      var mStr=marginTotal!==0?(marginTotal<0?'-':'')+fmt(Math.abs(marginTotal)):'';
+      h+='<tr style="background:#EBF3FB">';
+      h+='<td colspan="3" style="padding-left:8px;font-size:12px;font-weight:700;color:#003658">Subtotals</td>';
+      h+='<td></td>';
+      h+='<td></td>';
+      h+='<td style="font-size:12px;font-weight:600;color:#003658;padding:6px 4px;text-align:right">'+fmt(vadExt)+'</td>';
+      h+='<td></td>';
+      h+='<td style="font-size:12px;font-weight:600;padding:6px 4px;text-align:right;color:'+mColor+'">'+mStr+'</td>';
+      h+='<td></td>';
+      h+='<td style="font-size:12px;font-weight:700;color:#003658;padding:6px 4px;text-align:right">'+fmt(gt)+'</td>';
+      h+='<td></td></tr>';
       h+='</tbody></table>';
     });
   }
