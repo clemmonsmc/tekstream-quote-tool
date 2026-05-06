@@ -60,6 +60,22 @@ async function runRegressionTests() {
     var found=cells.some(function(c){return c.textContent.trim()==='125.00';});
     window.lineItems=[];render();return{pass:found};
   });
+
+  test('li:rightAlignHeaders',function(){
+    addRow();render();
+    var ths=Array.from(document.querySelectorAll('#liArea thead th'));
+    var qtyTh=ths.find(function(t){return t.textContent.trim()==='Qty';});
+    var custExtTh=ths.find(function(t){return t.textContent.trim()==='Customer Ext. $';});
+    window.lineItems=[];render();
+    return{pass:!!qtyTh&&qtyTh.style.textAlign==='right'&&!!custExtTh&&custExtTh.style.textAlign==='right'};
+  });
+  test('li:marginNegativeRed',function(){
+    window.lineItems=[{sku:'T',description:'T',qty:1,unit_price:100,start_date:'',end_date:'',margin:-5}];
+    render();
+    var cells=Array.from(document.querySelectorAll('#liArea tbody td'));
+    var redCell=cells.find(function(c){return c.style&&c.style.color==='rgb(204, 0, 0)';});
+    window.lineItems=[];render();return{pass:!!redCell};
+  });
   test('li:removeRow',function(){addRow();var b=window.lineItems.length;removeRow(b-1);return{pass:window.lineItems.length===b-1};});
   test('li:colHeaders',function(){
     var ths=Array.from(document.querySelectorAll('#liArea thead th')).map(function(t){return t.textContent;});
