@@ -409,7 +409,7 @@ function renderRow(it,i,m){
   h+='<td class="muted" style="text-align:right;padding-right:6px">'+(it.unit_price*it.qty>0?'$'+fmt(it.unit_price*it.qty):'\u2014')+'</td>';
   // Col 9: Margin%
   var mval=(it.margin!==null&&it.margin!==undefined&&it.margin!=='')?it.margin:'';
-  h+='<td><input type="number" value="'+mval+'" min="0" max="99" step="0.125" placeholder="'+m+'" style="width:52px" title="Line margin override" onkeydown="if((event.key===\'ArrowUp\'||event.key===\'ArrowDown\')&&this.value===\'\'){this.value=+this.placeholder;}" oninput="lineItems['+i+'].margin=this.value===\'\' ?null:+this.value;recalcAll()" autocomplete="off"></td>';
+  h+='<td><input type="number" value="'+mval+'" min="0" max="99" step="0.125" placeholder="'+m+'" style="width:52px" title="Line margin override" onkeydown="if((event.key===\'ArrowUp\'||event.key===\'ArrowDown\')&&this.value===\'\'){this.value=+this.placeholder;}" oninput="lineItems['+i+'].margin=this.value===\'\'?null:+this.value;recalcAll()" autocomplete="off"></td>';
   var hasOverride=(it.margin!==null&&it.margin!==undefined&&it.margin!=='');
   h+='<td style="white-space:nowrap;padding:4px 2px">';
   if(hasOverride)h+='<button class="del" style="color:#5B94CB;font-size:12px" title="Reset to global margin" onclick="lineItems['+i+'].margin=null;recalcAll()">↺</button>';
