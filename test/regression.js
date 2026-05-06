@@ -14,7 +14,7 @@ async function runRegressionTests() {
    'sendForSignature','openSignModal','closeSignModal','confirmSendForSignature','openDrawer','closeDrawer','renderSavedQuotes','restoreQuoteState',
    'saveRepSettings','loadRepSettings','autoSave','applySetTotal','updateTotalsOnly',
    'initDragDrop','moveRow','effectiveMargin','itemCprice','newQuote','addRow','recalcAll',
-   'checkExpiry','getQuoteState','generatePdfBlob','fmtDateDisplay','updateGroupDates'].forEach(function(fn){
+   'checkExpiry','getQuoteState','generatePdfBlob','fmtDateDisplay','updateGroupDates','custExtFocus','custExtBlur'].forEach(function(fn){
     test('fn:'+fn,function(){return{pass:typeof window[fn]==='function',detail:typeof window[fn]};});
   });
   // 2. DOM
@@ -36,7 +36,31 @@ async function runRegressionTests() {
   // 4. Line items
   test('li:addRow',function(){var b=window.lineItems.length;addRow();return{pass:window.lineItems.length===b+1};});
   test('li:renderTable',function(){render();return{pass:!!document.querySelector('#liArea table')};});
-  test('li:removeRow',function(){var b=window.lineItems.length;removeRow(b-1);return{pass:window.lineItems.length===b-1};});
+  test('li:noBottomSubtotal',function(){
+    window.lineItems=[{sku:'T',description:'T',qty:1,unit_price:100,start_date:'',end_date:'',margin:null}];
+    render();var ok=!document.getElementById('totals').innerHTML.includes('>Subtotal<');
+    window.lineItems=[];render();return{pass:ok};
+  });
+  test('li:subtotalColspan9',function(){
+    window.lineItems=[{sku:'A',description:'A',qty:2,unit_price:100,start_date:'2026-01-01',end_date:'2026-12-31',margin:20}];
+    render();var row=document.querySelector('#liArea tr[style*="EBF3FB"]');
+    var td=row&&row.querySelector('td');window.lineItems=[];render();
+    return{pass:!!td&&td.getAttribute('colspan')==='9',detail:td?'colspan='+td.getAttribute('colspan'):'no row'};
+  });
+  test('li:rightAlignNumbers',function(){var style=document.querySelector('style').textContent;return{pass:style.includes('input[type=number]{text-align:right')};});
+  test('li:vadExtCommas',function(){
+    window.lineItems=[{sku:'T',description:'T',qty:1,unit_price:1234.56,start_date:'',end_date:'',margin:null}];
+    render();var cells=Array.from(document.querySelectorAll('#liArea tbody td'));
+    var found=cells.some(function(c){return c.textContent.trim()==='1,234.56';});
+    window.lineItems=[];render();return{pass:found};
+  });
+  test('li:custUnitNoPrefix',function(){
+    window.lineItems=[{sku:'T',description:'T',qty:1,unit_price:100,start_date:'',end_date:'',margin:20}];
+    render();var cells=Array.from(document.querySelectorAll('#liArea tbody td'));
+    var found=cells.some(function(c){return c.textContent.trim()==='125.00';});
+    window.lineItems=[];render();return{pass:found};
+  });
+  test('li:removeRow',function(){addRow();var b=window.lineItems.length;removeRow(b-1);return{pass:window.lineItems.length===b-1};});
   test('li:colHeaders',function(){
     var ths=Array.from(document.querySelectorAll('#liArea thead th')).map(function(t){return t.textContent;});
     var ok=ths.includes('VAD Unit $')&&ths.includes('VAD Ext. $')&&ths.includes('Customer $')&&ths.includes('Margin%')&&ths.includes('Margin$');
