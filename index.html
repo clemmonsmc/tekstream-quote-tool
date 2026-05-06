@@ -447,7 +447,7 @@ function renderRow(it,i,m){
   h+='<td class="muted" style="text-align:right;padding-right:6px;color:#003658;font-weight:600">'+custUnitVal+'</td>';
   // Col 12: Customer Ext. $
   var custVal=(ext>0?fmt(ext):'\u2014');
-  h+='<td><input type="text" value="'+custVal+'" class="cust-price" style="text-align:right;width:100%;color:#003658;font-weight:600" placeholder="\u2014" title="Customer Ext. $ (editable)" onfocus="if(this.value==='\u2014')this.value='';else this.value=parseFloat(this.value.replace(/[^0-9.]/g,''))||'';" onblur="(function(el,i){var v=parseFloat(el.value)||0;if(!v){var cp2=cprice(lineItems[i].unit_price,effectiveMargin(lineItems[i],parseFloat(document.getElementById('marginPct').value)||0));el.value=cp2>0?fmt(cp2*lineItems[i].qty):'\u2014';return;}var vad=lineItems[i].unit_price;if(vad){var m=(1-vad/(v/lineItems[i].qty))*100;lineItems[i].margin=Math.round(m*1000)/1000;}el.value=fmt(v);updateTotalsOnly();})(this,'+i+')" autocomplete="off"></td>';
+  h+='<td><input type="text" value="'+custVal+'" class="cust-price" style="text-align:right;width:100%;color:#003658;font-weight:600" placeholder="\u2014" title="Customer Ext. $ (editable)" onfocus="custExtFocus(this)" onblur="custExtBlur(this,'+i+')" autocomplete="off"></td>';
   // Col 13: Actions
   h+='<td style="white-space:nowrap;padding:4px 2px">';
   if(hasOverride)h+='<button class="del" style="color:#5B94CB;font-size:12px" title="Reset to global margin" onclick="lineItems[\'+i+\'].margin=null;recalcAll()">↺</button>';
@@ -487,6 +487,24 @@ function updateTotalsOnly(){
   document.getElementById('totals').innerHTML='<div class="trow grand"><span>Total (USD)</span><span>$'+fmt(sub)+'</span></div>';
   updateMarginDollar(m,sub,vt);
   if(window.lineItems.length) autoSave();
+}
+
+function custExtFocus(el){
+  if(el.value==='—')el.value='';
+  else el.value=parseFloat(el.value.replace(/[^0-9.]/g,''))||'';
+}
+function custExtBlur(el,i){
+  var v=parseFloat(el.value)||0;
+  var m=parseFloat(document.getElementById('marginPct').value)||0;
+  if(!v){
+    var cp2=cprice(lineItems[i].unit_price,effectiveMargin(lineItems[i],m));
+    el.value=cp2>0?fmt(cp2*lineItems[i].qty):'—';
+    return;
+  }
+  var vad=lineItems[i].unit_price;
+  if(vad){var mg=(1-vad/(v/lineItems[i].qty))*100;lineItems[i].margin=Math.round(mg*1000)/1000;}
+  el.value=fmt(v);
+  updateTotalsOnly();
 }
 
 function render(){
