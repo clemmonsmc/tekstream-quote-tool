@@ -29,7 +29,7 @@ th{background:#003658;color:#fff;padding:9px 8px;text-align:left;font-weight:600
 td{padding:5px 3px;border-bottom:1px solid #f0f2f5;vertical-align:middle}
 tr:nth-child(even) td{background:#EBF3FB}
 td input{border:1.5px solid #e2e8f0;border-radius:4px;padding:4px 5px;font-size:12px;width:100%;background:#fff}
-td input:focus{border-color:#5B94CB;outline:none}td input[type=date]{font-size:11px}
+td input:focus{border-color:#5B94CB;outline:none}td input[type=date]{font-size:11px}td input[type=number]{text-align:right}
 td input.cust-price::-webkit-inner-spin-button,td input.cust-price::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 td input.cust-price{-moz-appearance:textfield}
 .del{background:none;border:none;color:#c00;cursor:pointer;font-size:14px;padding:2px 6px}
@@ -430,24 +430,24 @@ function renderRow(it,i,m){
   // Col 3: Description
   h+='<td><input value="'+escH(it.description)+'" oninput="lineItems['+i+'].description=this.value" autocomplete="off"></td>';
   // Col 6: Qty
-  h+='<td><input type="number" value="'+it.qty+'" min="1" style="width:50px" oninput="lineItems['+i+'].qty=+this.value;recalcAll()" autocomplete="off"></td>';
+  h+='<td><input type="number" value="'+it.qty+'" min="1" style="width:65px" oninput="lineItems['+i+'].qty=+this.value;recalcAll()" autocomplete="off"></td>';
   // Col 7: VAD Unit $
   h+='<td><input type="number" value="'+it.unit_price.toFixed(2)+'" step="0.01" min="0" oninput="lineItems['+i+'].unit_price=+this.value;recalcAll()" autocomplete="off"></td>';
   // Col 8: VAD Ext. $
-  h+='<td class="muted" style="text-align:right;padding-right:6px">'+(it.unit_price*it.qty>0?'$'+fmt(it.unit_price*it.qty):'\u2014')+'</td>';
+  h+='<td class="muted" style="text-align:right;padding-right:6px">'+(it.unit_price*it.qty>0?fmt(it.unit_price*it.qty):'\u2014')+'</td>';
   // Col 9: Margin%
   var mval=(it.margin!==null&&it.margin!==undefined&&it.margin!=='')?it.margin:'';
   h+='<td><input type="number" value="'+mval+'" min="0" max="99" step="0.125" placeholder="'+m+'" style="width:52px" title="Line margin override" onkeydown="if((event.key===\'ArrowUp\'||event.key===\'ArrowDown\')&&this.value===\'\'){this.value=+this.placeholder;}" oninput="lineItems['+i+'].margin=this.value===\'\'?null:+this.value;recalcAll()" autocomplete="off"></td>';
   var hasOverride=(it.margin!==null&&it.margin!==undefined&&it.margin!=='');
   // Col 10: Margin$
   var marginDollarLine=(cp-it.unit_price)*it.qty;
-  h+='<td class="muted" style="text-align:right;padding-right:4px;font-size:11px;color:#2d7a4f">'+(marginDollarLine>0?'$'+fmt(marginDollarLine):'')+'</td>';
+  h+='<td class="muted" style="text-align:right;padding-right:4px;font-size:11px;color:#2d7a4f">'+(marginDollarLine>0?fmt(marginDollarLine):'')+'</td>';
   // Col 11: Customer Unit $
-  var custUnitVal=cp>0?'$'+fmt(cp):'\u2014';
+  var custUnitVal=cp>0?fmt(cp):'\u2014';
   h+='<td class="muted" style="text-align:right;padding-right:6px;color:#003658;font-weight:600">'+custUnitVal+'</td>';
   // Col 12: Customer Ext. $
-  var custVal=(ext>0?ext.toFixed(2):'');
-  h+='<td><input type="number" value="'+custVal+'" min="0" step="0.01" class="cust-price" style="width:90px;color:#003658;font-weight:600" placeholder="\u2014" title="Customer Ext. $ (editable)" oninput="(function(v,idx){if(!v||isNaN(+v))return;var vad=lineItems[idx].unit_price;if(!vad)return;var m=(1-vad/(+v/lineItems[idx].qty))*100;lineItems[idx].margin=Math.round(m*1000)/1000;updateTotalsOnly();})(this.value,\'+i+\')\'" autocomplete="off"></td>';
+  var custVal=(ext>0?fmt(ext):'\u2014');
+  h+='<td><input type="text" value="'+custVal+'" class="cust-price" style="text-align:right;width:100%;color:#003658;font-weight:600" placeholder="\u2014" title="Customer Ext. $ (editable)" onfocus="if(this.value==='\u2014')this.value='';else this.value=parseFloat(this.value.replace(/[^0-9.]/g,''))||'';" onblur="(function(el,i){var v=parseFloat(el.value)||0;if(!v){var cp2=cprice(lineItems[i].unit_price,effectiveMargin(lineItems[i],parseFloat(document.getElementById('marginPct').value)||0));el.value=cp2>0?fmt(cp2*lineItems[i].qty):'\u2014';return;}var vad=lineItems[i].unit_price;if(vad){var m=(1-vad/(v/lineItems[i].qty))*100;lineItems[i].margin=Math.round(m*1000)/1000;}el.value=fmt(v);updateTotalsOnly();})(this,'+i+')" autocomplete="off"></td>';
   // Col 13: Actions
   h+='<td style="white-space:nowrap;padding:4px 2px">';
   if(hasOverride)h+='<button class="del" style="color:#5B94CB;font-size:12px" title="Reset to global margin" onclick="lineItems[\'+i+\'].margin=null;recalcAll()">↺</button>';
@@ -484,7 +484,7 @@ function updateTotalsOnly(){
   var m=parseFloat(document.getElementById('marginPct').value)||0;
   var vt=window.lineItems.reduce(function(s,it){return s+it.unit_price*it.qty;},0);
   var sub=window.lineItems.reduce(function(s,it){return s+itemCprice(it,m)*it.qty;},0);
-  document.getElementById('totals').innerHTML='<div class="trow"><span>Subtotal</span><span>$'+fmt(sub)+'</span></div><div class="trow grand"><span>Total (USD)</span><span>$'+fmt(sub)+'</span></div>';
+  document.getElementById('totals').innerHTML='<div class="trow grand"><span>Total (USD)</span><span>$'+fmt(sub)+'</span></div>';
   updateMarginDollar(m,sub,vt);
   if(window.lineItems.length) autoSave();
 }
@@ -493,7 +493,7 @@ function render(){
   var m=parseFloat(document.getElementById('marginPct').value)||0;
   var area=document.getElementById('liArea');
   if(!window.lineItems.length){area.innerHTML='<div class="empty">Add line items manually or upload a VAD quote.</div>';document.getElementById('totals').innerHTML='';updateMarginDollar(m,0,0);return;}
-  var tbl='<table><colgroup><col style="width:2%"><col style="width:10%"><col style="width:24%"><col style="width:6%"><col style="width:9%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:11%"><col style="width:11%"><col style="width:7%"></colgroup><thead><tr><th></th><th>SKU</th><th>Description</th><th>Qty</th><th>VAD Unit $</th><th>VAD Ext. $</th><th>Margin%</th><th>Margin$</th><th>Customer Unit $</th><th>Customer Ext. $</th><th></th></tr></thead><tbody>';
+  var tbl='<table><colgroup><col style="width:2%"><col style="width:10%"><col style="width:21%"><col style="width:8%"><col style="width:9%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:11%"><col style="width:11%"><col style="width:7%"></colgroup><thead><tr><th></th><th>SKU</th><th>Description</th><th>Qty</th><th>VAD Unit $</th><th>VAD Ext. $</th><th>Margin%</th><th>Margin$</th><th>Customer Unit $</th><th>Customer Ext. $</th><th></th></tr></thead><tbody>';
   var h='',groups=groupByYear(window.lineItems);
   if(!groups){
     h+=tbl;window.lineItems.forEach(function(it,i){h+=renderRow(it,i,m);});h+='</tbody></table>';
@@ -512,14 +512,14 @@ function render(){
       h+=tbl;
       var gt=0;
       grp.items.forEach(function(it){var i=window.lineItems.indexOf(it);gt+=itemCprice(it,m)*it.qty;h+=renderRow(it,i,m);});
-      h+='<tr style="background:#EBF3FB"><td colspan="5"></td><td style="font-size:12px;font-weight:700;color:#003658;padding:6px 4px;text-align:right"><span style="font-weight:600;margin-right:8px">Subtotal</span>$'+fmt(gt)+'</td><td></td></tr>';
+      h+='<tr style="background:#EBF3FB"><td colspan="9" style="text-align:right;padding-right:10px;font-size:12px;font-weight:600;color:#003658">Subtotal</td><td style="font-size:12px;font-weight:700;color:#003658;padding:6px 4px;text-align:right">'+fmt(gt)+'</td><td></td></tr>';
       h+='</tbody></table>';
     });
   }
   area.innerHTML=h;
   var vt=window.lineItems.reduce(function(s,it){return s+it.unit_price*it.qty;},0);
   var sub=window.lineItems.reduce(function(s,it){return s+itemCprice(it,m)*it.qty;},0);
-  document.getElementById('totals').innerHTML='<div class="trow"><span>Subtotal</span><span>$'+fmt(sub)+'</span></div><div class="trow grand"><span>Total (USD)</span><span>$'+fmt(sub)+'</span></div>';
+  document.getElementById('totals').innerHTML='<div class="trow grand"><span>Total (USD)</span><span>$'+fmt(sub)+'</span></div>';
   updateMarginDollar(m,sub,vt);
   if(window.lineItems.length) autoSave();
   initDragDrop();
