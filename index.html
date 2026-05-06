@@ -54,6 +54,19 @@ td input.cust-price{-moz-appearance:textfield}
 .saved-label{flex:1;font-size:13px;color:#13110F}
 .saved-meta{font-size:11px;color:#717174;white-space:nowrap}
 .saved-del{background:none;border:none;color:#c00;cursor:pointer;font-size:16px;padding:2px 6px;flex-shrink:0}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:#fff;border-radius:12px;padding:28px 32px;max-width:420px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.22)}
+.modal h3{font-size:16px;font-weight:700;color:#003658;margin-bottom:6px}
+.modal p{font-size:13px;color:#717174;margin-bottom:20px}
+.modal-row{display:flex;flex-direction:column;gap:4px;margin-bottom:16px;padding:12px 14px;background:#EBF3FB;border-radius:8px}
+.modal-row label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5B94CB}
+.modal-row span{font-size:14px;color:#13110F;font-weight:500}
+.modal-row span.sub{font-size:12px;color:#717174;font-weight:400}
+.modal-btns{display:flex;gap:10px;margin-top:24px}
+.modal-btns button{flex:1;padding:11px;border-radius:7px;font-size:14px;font-weight:600;cursor:pointer;border:none}
+.modal-cancel{background:#f0f2f5;color:#717174}.modal-cancel:hover{background:#e2e8f0}
+.modal-confirm{background:#2d7a4f;color:#fff}.modal-confirm:hover{background:#245f3d}
 .drag-handle:active{cursor:grabbing}
 </style>
 </head>
@@ -66,6 +79,25 @@ td input.cust-price{-moz-appearance:textfield}
   </div>
   <div class="drawer-body">
     <div id="savedList"></div>
+  </div>
+</div>
+<div class="modal-overlay" id="signModal">
+  <div class="modal">
+    <h3>Confirm Signature Request</h3>
+    <p>The following recipients will receive a signature request email from Dropbox Sign.</p>
+    <div class="modal-row">
+      <label>Signer 1 &mdash; Customer</label>
+      <span id="modalCustomerName"></span>
+      <span class="sub" id="modalCustomerEmail"></span>
+    </div>
+    <div class="modal-row">
+      <label>Signer 2 &mdash; TekStream</label>
+      <span id="modalSignerEmail"></span>
+    </div>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeSignModal()">Cancel</button>
+      <button class="modal-confirm" id="modalConfirmBtn" onclick="confirmSendForSignature()">Send for Signature</button>
+    </div>
   </div>
 </div>
 <div class="hdr">
@@ -474,18 +506,31 @@ async function extractVAD(input){
 }
 window.loadLineItems=function(items){window.lineItems=items.map(function(it){return{sku:String(it.sku||''),description:String(it.description||''),qty:parseFloat(it.qty)||1,unit_price:parseFloat(String(it.unit_price||'0').replace(/[$,]/g,''))||0,start_date:String(it.start_date||''),end_date:String(it.end_date||''),margin:null};});render();};
 
-async function sendForSignature(){
+function openSignModal(){
   var customerEmail=document.getElementById('contactEmail').value;
   var signerEmail=document.getElementById('signerEmailHidden').value;
   if(!customerEmail){alert('Please enter a customer email before sending for signature.');return;}
   if(!signerEmail){alert('Please enter a TekStream Signer Email in Rep Settings before sending for signature.');return;}
-
+  // Populate modal
+  document.getElementById('modalCustomerName').textContent=document.getElementById('customerName').value||'Customer';
+  document.getElementById('modalCustomerEmail').textContent=customerEmail;
+  document.getElementById('modalSignerEmail').textContent=signerEmail;
+  document.getElementById('signModal').classList.add('open');
+}
+function closeSignModal(){
+  document.getElementById('signModal').classList.remove('open');
+}
+async function sendForSignature(){
+  openSignModal();
+}
+async function confirmSendForSignature(){
+  closeSignModal();
+  var customerEmail=document.getElementById('contactEmail').value;
+  var signerEmail=document.getElementById('signerEmailHidden').value;
   var btn=document.getElementById('signBtn');
   btn.textContent='Sending…';
   btn.disabled=true;
-
   try{
-    // Generate PDF as base64
     var pdfBlob=await generatePdfBlob();
     var b64=await new Promise(function(res,rej){
       var reader=new FileReader();
@@ -493,7 +538,6 @@ async function sendForSignature(){
       reader.onerror=rej;
       reader.readAsDataURL(pdfBlob);
     });
-
     var resp=await fetch('/api/sign',{
       method:'POST',
       headers:{'Content-Type':'application/json'},

@@ -11,7 +11,7 @@ async function runRegressionTests() {
   }
   // 1. Functions
   ['render','renderRow','groupByYear','downloadPdf','previewPdf','emailQuote','extractVAD',
-   'sendForSignature','openDrawer','closeDrawer','renderSavedQuotes','restoreQuoteState',
+   'sendForSignature','openSignModal','closeSignModal','confirmSendForSignature','openDrawer','closeDrawer','renderSavedQuotes','restoreQuoteState',
    'saveRepSettings','loadRepSettings','autoSave','applySetTotal','updateTotalsOnly',
    'initDragDrop','moveRow','effectiveMargin','itemCprice','newQuote','addRow','recalcAll',
    'checkExpiry','getQuoteState','generatePdfBlob'].forEach(function(fn){
@@ -116,6 +116,22 @@ async function runRegressionTests() {
   test('margin:globalStep0.125',function(){
     var el=document.getElementById('marginPct');
     return{pass:el.step==='0.125',detail:'step='+el.step};
+  });
+  // 11. Signature confirmation modal
+  test('signModal:openClose',function(){
+    document.getElementById('contactEmail').value='test@test.com';
+    document.getElementById('signerEmailHidden').value='signer@tekstream.com';
+    document.getElementById('customerName').value='Test Co';
+    openSignModal();
+    var open=document.getElementById('signModal').classList.contains('open');
+    var name=document.getElementById('modalCustomerName').textContent;
+    var email=document.getElementById('modalCustomerEmail').textContent;
+    closeSignModal();
+    var closed=!document.getElementById('signModal').classList.contains('open');
+    return{pass:open&&closed&&name==='Test Co'&&email==='test@test.com',detail:'name='+name+' email='+email};
+  });
+  test('signModal:dom',function(){
+    return{pass:!!document.getElementById('signModal')&&!!document.getElementById('modalCustomerName')&&!!document.getElementById('modalCustomerEmail')&&!!document.getElementById('modalSignerEmail')};
   });
   // Restore auto-save and cleanup
   window.autoSave = _origAutoSave;
