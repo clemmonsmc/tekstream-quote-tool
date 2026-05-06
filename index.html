@@ -441,7 +441,10 @@ function renderRow(it,i,m){
   var hasOverride=(it.margin!==null&&it.margin!==undefined&&it.margin!=='');
   // Col 10: Margin$
   var marginDollarLine=(cp-it.unit_price)*it.qty;
-  h+='<td class="muted" style="text-align:right;padding-right:4px;font-size:11px;color:#2d7a4f">'+(marginDollarLine>0?fmt(marginDollarLine):'')+'</td>';
+  var marginColor=marginDollarLine>0?'#2d7a4f':marginDollarLine<0?'#c00':'#717174';
+  var marginDollarStr=marginDollarLine!==0?fmt(Math.abs(marginDollarLine)):'';
+  if(marginDollarLine<0)marginDollarStr='-'+marginDollarStr;
+  h+='<td class="muted" style="text-align:right;padding-right:4px;font-size:11px;color:'+marginColor+'">'+marginDollarStr+'</td>';
   // Col 11: Customer Unit $
   var custUnitVal=cp>0?fmt(cp):'\u2014';
   h+='<td class="muted" style="text-align:right;padding-right:6px;color:#003658;font-weight:600">'+custUnitVal+'</td>';
@@ -511,7 +514,7 @@ function render(){
   var m=parseFloat(document.getElementById('marginPct').value)||0;
   var area=document.getElementById('liArea');
   if(!window.lineItems.length){area.innerHTML='<div class="empty">Add line items manually or upload a VAD quote.</div>';document.getElementById('totals').innerHTML='';updateMarginDollar(m,0,0);return;}
-  var tbl='<table><colgroup><col style="width:2%"><col style="width:10%"><col style="width:21%"><col style="width:8%"><col style="width:9%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:11%"><col style="width:11%"><col style="width:7%"></colgroup><thead><tr><th></th><th>SKU</th><th>Description</th><th>Qty</th><th>VAD Unit $</th><th>VAD Ext. $</th><th>Margin%</th><th>Margin$</th><th>Customer Unit $</th><th>Customer Ext. $</th><th></th></tr></thead><tbody>';
+  var tbl='<table><colgroup><col style="width:2%"><col style="width:10%"><col style="width:21%"><col style="width:8%"><col style="width:9%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:11%"><col style="width:11%"><col style="width:7%"></colgroup><thead><tr><th></th><th>SKU</th><th>Description</th><th style="text-align:right">Qty</th><th style="text-align:right">VAD Unit $</th><th style="text-align:right">VAD Ext. $</th><th>Margin%</th><th style="text-align:right">Margin$</th><th style="text-align:right">Customer Unit $</th><th style="text-align:right">Customer Ext. $</th><th></th></tr></thead><tbody>';
   var h='',groups=groupByYear(window.lineItems);
   if(!groups){
     h+=tbl;window.lineItems.forEach(function(it,i){h+=renderRow(it,i,m);});h+='</tbody></table>';
