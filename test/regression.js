@@ -61,6 +61,21 @@ async function runRegressionTests() {
     window.lineItems=[];render();return{pass:found};
   });
 
+  test('li:subtotalsRow',function(){
+    window.lineItems=[{sku:'A',description:'A',qty:2,unit_price:100,start_date:'2026-01-01',end_date:'2026-12-31',margin:20}];
+    render();
+    var row=document.querySelector('#liArea tr[style*="EBF3FB"]');
+    var text=row?row.textContent:'';
+    window.lineItems=[];render();
+    return{pass:text.includes('Subtotals')&&text.includes('200.00')&&text.includes('250.00'),detail:text.substring(0,60)};
+  });
+  test('grp:startDateRendered',function(){
+    window.lineItems=[{sku:'T',description:'T',qty:1,unit_price:100,start_date:'2026-06-21',end_date:'2027-06-20',margin:null}];
+    render();
+    var inputs=document.querySelectorAll('#liArea input[type="date"]');
+    var found=false;inputs.forEach(function(i){if(i.value==='2026-06-21')found=true;});
+    window.lineItems=[];render();return{pass:found};
+  });
   test('li:rightAlignHeaders',function(){
     addRow();render();
     var ths=Array.from(document.querySelectorAll('#liArea thead th'));
