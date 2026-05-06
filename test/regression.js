@@ -75,6 +75,21 @@ async function runRegressionTests() {
     return{pass:ok,detail:'order: '+window.lineItems.map?'verified':'err'};
   });
   // 5. Calcs
+  test('li:custUnitCalc',function(){
+    window.lineItems=[{sku:'T',description:'T',qty:1,unit_price:100,start_date:'',end_date:'',margin:20}];
+    render();
+    var cells=Array.from(document.querySelectorAll('#liArea tbody td'));
+    var found=cells.some(function(c){return c.textContent.trim()==='$125.00';});
+    window.lineItems=[];render();return{pass:found,detail:found?'found':'$125.00 not found'};
+  });
+  test('li:colOrder',function(){
+    var ths=Array.from(document.querySelectorAll('#liArea thead th')).map(function(t){return t.textContent.trim();});
+    var startIdx=ths.indexOf('Start'),qtyIdx=ths.indexOf('Qty'),vadUIdx=ths.indexOf('VAD Unit $');
+    var vadEIdx=ths.indexOf('VAD Ext. $'),mPctIdx=ths.indexOf('Margin%'),mDIdx=ths.indexOf('Margin$');
+    var custUIdx=ths.indexOf('Customer Unit $'),custEIdx=ths.indexOf('Customer Ext. $');
+    var ok=startIdx<qtyIdx&&qtyIdx<vadUIdx&&vadUIdx<vadEIdx&&vadEIdx<mPctIdx&&mPctIdx<mDIdx&&mDIdx<custUIdx&&custUIdx<custEIdx;
+    return{pass:ok,detail:'Start@'+startIdx+' Qty@'+qtyIdx+' VADu@'+vadUIdx+' M%@'+mPctIdx+' Cu@'+custUIdx+' Ce@'+custEIdx};
+  });
   test('calc:cprice',function(){return{pass:Math.abs(cprice(100,20)-125)<0.01,detail:cprice(100,20)};});
   test('calc:effectiveMargin override',function(){return{pass:effectiveMargin({margin:25},15)===25};});
   test('calc:effectiveMargin fallback',function(){return{pass:effectiveMargin({margin:null},15)===15};});
