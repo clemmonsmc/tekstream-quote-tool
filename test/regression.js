@@ -135,8 +135,29 @@ async function runRegressionTests() {
     return{pass:Math.abs(total-110)<0.01,detail:total.toFixed(2)};
   });
   // 9. Rep settings
-  test('rep:saveToStorage',function(){document.getElementById('repName').value='__tr__';saveRepSettings();return{pass:localStorage.getItem('ts_rep_name')==='__tr__'};});
-  test('rep:populatesHidden',function(){return{pass:document.getElementById('preparedBy').value==='__tr__'};});
+  test('rep:saveToStorage',function(){
+    var origName=localStorage.getItem('ts_rep_name')||'';
+    var origEmail=localStorage.getItem('ts_rep_email')||'';
+    document.getElementById('repName').value='__tr__';
+    saveRepSettings();
+    var ok=localStorage.getItem('ts_rep_name')==='__tr__';
+    // Restore original values
+    localStorage.setItem('ts_rep_name',origName);
+    localStorage.setItem('ts_rep_email',origEmail);
+    document.getElementById('repName').value=origName;
+    document.getElementById('repEmail').value=origEmail;
+    saveRepSettings();
+    return{pass:ok};
+  });
+  test('rep:populatesHidden',function(){
+    var origName=localStorage.getItem('ts_rep_name')||'';
+    document.getElementById('repName').value='__tr__';
+    saveRepSettings();
+    var ok=document.getElementById('preparedBy').value==='__tr__';
+    document.getElementById('repName').value=origName;
+    saveRepSettings();
+    return{pass:ok};
+  });
   // 10. Customer price back-calc margin
   test('custPrice:backCalcMargin',function(){
     window.lineItems=[{sku:'T',description:'T',qty:1,unit_price:100,start_date:'',end_date:'',margin:null}];
