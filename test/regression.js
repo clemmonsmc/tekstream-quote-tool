@@ -14,7 +14,7 @@ async function runRegressionTests() {
    'sendForSignature','openSignModal','closeSignModal','confirmSendForSignature','openDrawer','closeDrawer','renderSavedQuotes','restoreQuoteState',
    'saveRepSettings','loadRepSettings','autoSave','applySetTotal','updateTotalsOnly',
    'initDragDrop','moveRow','effectiveMargin','itemCprice','newQuote','addRow','recalcAll',
-   'checkExpiry','getQuoteState','generatePdfBlob'].forEach(function(fn){
+   'checkExpiry','getQuoteState','generatePdfBlob','fmtDateDisplay','updateGroupDates'].forEach(function(fn){
     test('fn:'+fn,function(){return{pass:typeof window[fn]==='function',detail:typeof window[fn]};});
   });
   // 2. DOM
@@ -90,10 +90,37 @@ async function runRegressionTests() {
     var ok=startIdx<qtyIdx&&qtyIdx<vadUIdx&&vadUIdx<vadEIdx&&vadEIdx<mPctIdx&&mPctIdx<mDIdx&&mDIdx<custUIdx&&custUIdx<custEIdx;
     return{pass:ok,detail:'Start@'+startIdx+' Qty@'+qtyIdx+' VADu@'+vadUIdx+' M%@'+mPctIdx+' Cu@'+custUIdx+' Ce@'+custEIdx};
   });
+
+  test('li:noDateCols',function(){
+    var ths=Array.from(document.querySelectorAll('#liArea thead th')).map(function(t){return t.textContent.trim();});
+    return{pass:!ths.includes('Start')&&!ths.includes('End'),detail:ths.join('|')};
+  });
+  test('grp:alwaysGroups',function(){
+    var items=[{sku:'A',description:'A',qty:1,unit_price:10,start_date:'2026-01-01',end_date:'2026-12-31',margin:null}];
+    var g=groupByYear(items);
+    return{pass:g!==null&&g.length===1&&g[0].label==='Payment 1',detail:g?g[0].label:null};
+  });
+  test('grp:datesInHeader',function(){
+    window.lineItems=[{sku:'T',description:'T',qty:1,unit_price:100,start_date:'2026-06-21',end_date:'2027-06-20',margin:null}];
+    render();
+    var grpHdr=document.querySelector('#liArea .drag-handle')?.closest('table')?.previousElementSibling;
+    var hasServiceDates=grpHdr&&grpHdr.textContent.includes('Service Dates');
+    window.lineItems=[];render();
+    return{pass:!!hasServiceDates};
+  });
+  test('grp:fmtDateDisplay',function(){
+    return{pass:fmtDateDisplay('2026-06-21')==='Jun 21, 2026',detail:fmtDateDisplay('2026-06-21')};
+  });
+  test('grp:updateGroupDates',function(){
+    window.lineItems=[{sku:'A',description:'A',qty:1,unit_price:10,start_date:'2026-01-01',end_date:'2026-12-31',margin:null},{sku:'B',description:'B',qty:1,unit_price:10,start_date:'2026-02-01',end_date:'2026-12-31',margin:null}];
+    updateGroupDates(0,'start_date','2026-03-01');
+    var ok=window.lineItems[0].start_date==='2026-03-01'&&window.lineItems[1].start_date==='2026-03-01';
+    window.lineItems=[];return{pass:ok};
+  });
   test('calc:cprice',function(){return{pass:Math.abs(cprice(100,20)-125)<0.01,detail:cprice(100,20)};});
   test('calc:effectiveMargin override',function(){return{pass:effectiveMargin({margin:25},15)===25};});
   test('calc:effectiveMargin fallback',function(){return{pass:effectiveMargin({margin:null},15)===15};});
-  test('calc:groupByYear single',function(){return{pass:groupByYear([{start_date:'2026-01-01'},{start_date:'2026-06-01'}])===null};});
+  test('calc:groupByYear single→group',function(){var g=groupByYear([{start_date:'2026-01-01'},{start_date:'2026-06-01'}]);return{pass:g!==null&&g.length===1};});
   test('calc:groupByYear multi',function(){var g=groupByYear([{start_date:'2026-01-01'},{start_date:'2027-01-01'}]);return{pass:g!==null&&g.length===2};});
   // 6. State save/restore
   test('state:saveRestore',function(){
