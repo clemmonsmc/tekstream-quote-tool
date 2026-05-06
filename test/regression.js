@@ -37,6 +37,24 @@ async function runRegressionTests() {
   test('li:addRow',function(){var b=window.lineItems.length;addRow();return{pass:window.lineItems.length===b+1};});
   test('li:renderTable',function(){render();return{pass:!!document.querySelector('#liArea table')};});
   test('li:removeRow',function(){var b=window.lineItems.length;removeRow(b-1);return{pass:window.lineItems.length===b-1};});
+  test('li:colHeaders',function(){
+    var ths=Array.from(document.querySelectorAll('#liArea thead th')).map(function(t){return t.textContent;});
+    var ok=ths.includes('VAD Unit $')&&ths.includes('VAD Ext. $')&&ths.includes('Customer $')&&ths.includes('Margin%')&&ths.includes('Margin$');
+    return{pass:ok,detail:ths.join('|')};
+  });
+  test('li:colOrder',function(){
+    var ths=Array.from(document.querySelectorAll('#liArea thead th')).map(function(t){return t.textContent;});
+    var custIdx=ths.indexOf('Customer $'),marginIdx=ths.indexOf('Margin%'),marginDIdx=ths.indexOf('Margin$');
+    return{pass:custIdx<marginIdx&&marginIdx<marginDIdx,detail:'Cust@'+custIdx+' M%@'+marginIdx+' M$@'+marginDIdx};
+  });
+  test('li:vadExtCalc',function(){
+    window.lineItems=[{sku:'T',description:'T',qty:5,unit_price:100,start_date:'',end_date:'',margin:null}];
+    render();
+    var cells=Array.from(document.querySelectorAll('#liArea tbody td'));
+    var found=cells.some(function(c){return c.textContent==='$500.00';});
+    window.lineItems=[];render();
+    return{pass:found,detail:found?'$500.00 found':'not found'};
+  });
   test('li:dragHandle',function(){addRow();render();var ok=!!document.querySelector('.drag-handle');removeRow(window.lineItems.length-1);return{pass:ok};});
   test('li:dragDropReorder',function(){
     // Set up 2 items with distinct SKUs
