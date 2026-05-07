@@ -91,6 +91,10 @@ async function runRegressionTests() {
     var redCell=cells.find(function(c){return c.style&&c.style.color==='rgb(204, 0, 0)';});
     window.lineItems=[];render();return{pass:!!redCell};
   });
+  test('pdf:noServiceDates',function(){
+    var fnStr=downloadPdf.toString();
+    return{pass:!fnStr.includes('Service Dates'),detail:fnStr.includes('Service Dates')?'found':'not found'};
+  });
   test('li:removeRow',function(){addRow();var b=window.lineItems.length;removeRow(b-1);return{pass:window.lineItems.length===b-1};});
   test('li:colHeaders',function(){
     var ths=Array.from(document.querySelectorAll('#liArea thead th')).map(function(t){return t.textContent;});
