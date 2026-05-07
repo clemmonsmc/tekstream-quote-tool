@@ -14,7 +14,7 @@ async function runRegressionTests() {
    'sendForSignature','openSignModal','closeSignModal','confirmSendForSignature','openDrawer','closeDrawer','renderSavedQuotes','restoreQuoteState',
    'saveRepSettings','loadRepSettings','autoSave','applySetTotal','updateTotalsOnly',
    'initDragDrop','moveRow','effectiveMargin','itemCprice','newQuote','addRow','recalcAll',
-   'checkExpiry','getQuoteState','generatePdfBlob','fmtDateDisplay','updateGroupDates','custExtFocus','custExtBlur'].forEach(function(fn){
+   'checkExpiry','getQuoteState','generatePdfBlob','fmtDateDisplay','updateGroupDates','custExtFocus','custExtBlur','updatePdfFileName'].forEach(function(fn){
     test('fn:'+fn,function(){return{pass:typeof window[fn]==='function',detail:typeof window[fn]};});
   });
   // 2. DOM
@@ -182,6 +182,26 @@ async function runRegressionTests() {
   test('calc:groupByYear single→group',function(){var g=groupByYear([{start_date:'2026-01-01'},{start_date:'2026-06-01'}]);return{pass:g!==null&&g.length===1};});
   test('calc:groupByYear multi',function(){var g=groupByYear([{start_date:'2026-01-01'},{start_date:'2027-01-01'}]);return{pass:g!==null&&g.length===2};});
   // 6. State save/restore
+  test('fileName:autoPopulates',function(){
+    document.getElementById('quoteNumber').value='TS-TEST-001';
+    document.getElementById('customerName').value='Acme Corp';
+    document.getElementById('pdfFileName').dataset.userEdited='';
+    updatePdfFileName();
+    return{pass:document.getElementById('pdfFileName').value==='TS-TEST-001 - Acme Corp'};
+  });
+  test('fileName:respectsUserEdit',function(){
+    document.getElementById('pdfFileName').value='Custom Name';
+    document.getElementById('pdfFileName').dataset.userEdited='1';
+    document.getElementById('quoteNumber').value='TS-TEST-002';
+    updatePdfFileName();
+    var ok=document.getElementById('pdfFileName').value==='Custom Name';
+    document.getElementById('pdfFileName').dataset.userEdited='';
+    return{pass:ok};
+  });
+  test('pdf:hasServiceDates',function(){
+    var fnStr=downloadPdf.toString();
+    return{pass:fnStr.includes('Service Dates')};
+  });
   test('state:saveRestore',function(){
     document.getElementById('customerName').value='__rt__';
     document.getElementById('quoteNumber').value='TEST-999';
