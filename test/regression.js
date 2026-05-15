@@ -427,6 +427,52 @@ async function runRegressionTests() {
     window.lineItems=[];render();
     return{pass:ok,detail:'g0='+g0+' g1='+g1};
   });
+  // ── Drag & drop fix: idempotent init, shared state, position-aware drop ──
+  test('dnd:initIsIdempotent',function(){
+    var area=document.getElementById('liArea');
+    // Reset flag, then call multiple times — should not throw or attach multiple listener sets
+    delete area._dragDropInitialized;
+    initDragDrop();
+    var firstFlag=area._dragDropInitialized;
+    initDragDrop();initDragDrop();initDragDrop();
+    return{pass:firstFlag===true&&area._dragDropInitialized===true,detail:'flag='+area._dragDropInitialized};
+  });
+  test('dnd:cssIndicatorsDefined',function(){
+    var styles=Array.prototype.map.call(document.querySelectorAll('style'),function(s){return s.textContent;}).join('\n');
+    var hasTop=/tr\.drag-over-top td\s*\{[^}]*box-shadow/.test(styles);
+    var hasBot=/tr\.drag-over-bottom td\s*\{[^}]*box-shadow/.test(styles);
+    var hasSrc=/tr\.drag-source\s*\{[^}]*opacity/.test(styles);
+    return{pass:hasTop&&hasBot&&hasSrc,detail:'top='+hasTop+' bot='+hasBot+' src='+hasSrc};
+  });
+  test('dnd:dragHandlesRender',function(){
+    window.lineItems=[{sku:'A',description:'',qty:1,unit_price:0,margin:null,originalIndex:0},{sku:'B',description:'',qty:1,unit_price:0,margin:null,originalIndex:1}];
+    render();
+    var handles=document.querySelectorAll('.drag-handle[draggable="true"][data-idx]');
+    window.lineItems=[];render();
+    return{pass:handles.length===2,detail:'handles='+handles.length};
+  });
+  test('dnd:moveRowHelperStillWorks',function(){
+    // moveRow is the keyboard-accessible reorder; ensure we didn't break it
+    window.lineItems=[{sku:'A',originalIndex:0,description:'',qty:1,unit_price:0,margin:null},{sku:'B',originalIndex:1,description:'',qty:1,unit_price:0,margin:null}];
+    moveRow(0,1);
+    var ok=window.lineItems[0].sku==='B'&&window.lineItems[1].sku==='A';
+    window.lineItems=[];render();
+    return{pass:ok,detail:window.lineItems.map(function(i){return i.sku;}).join(',')};
+  });
+  test('dnd:multipleDragsSimulated',function(){
+    // Simulate the bug scenario: re-render the table multiple times (which previously
+    // double-attached listeners) and verify drag handles still have the right indices.
+    window.lineItems=[
+      {sku:'A',description:'',qty:1,unit_price:0,margin:null,originalIndex:0},
+      {sku:'B',description:'',qty:1,unit_price:0,margin:null,originalIndex:1},
+      {sku:'C',description:'',qty:1,unit_price:0,margin:null,originalIndex:2}
+    ];
+    render();render();render(); // would previously stack listeners 3x
+    var handles=document.querySelectorAll('.drag-handle');
+    var indices=Array.prototype.map.call(handles,function(h){return h.getAttribute('data-idx');}).join(',');
+    window.lineItems=[];render();
+    return{pass:indices==='0,1,2',detail:indices};
+  });
   // Restore auto-save and cleanup
   window.autoSave = _origAutoSave;
   newQuote();loadRepSettings();

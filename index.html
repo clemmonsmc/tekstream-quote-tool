@@ -68,6 +68,9 @@ td input.cust-price{-moz-appearance:textfield}
 .modal-cancel{background:#f0f2f5;color:#717174}.modal-cancel:hover{background:#e2e8f0}
 .modal-confirm{background:#2d7a4f;color:#fff}.modal-confirm:hover{background:#245f3d}
 .drag-handle:active{cursor:grabbing}
+tr.drag-source{opacity:.4}
+tr.drag-over-top td{box-shadow:inset 0 3px 0 0 #003658}
+tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
 </style>
 </head>
 <body>
@@ -449,37 +452,76 @@ function moveRow(i,dir){
 }
 function initDragDrop(){
   var area=document.getElementById('liArea');
-  var dragIdx=null;
+  if(!area||area._dragDropInitialized)return;
+  area._dragDropInitialized=true;
+  // Shared state lives on the area element so all handlers see the same values
+  var state={dragIdx:null,dropIdx:null,dropPos:null};
+  function clearIndicators(){
+    area.querySelectorAll('tr.drag-over-top,tr.drag-over-bottom').forEach(function(r){
+      r.classList.remove('drag-over-top','drag-over-bottom');
+    });
+  }
+  function clearSourceStyle(){
+    area.querySelectorAll('tr.drag-source').forEach(function(r){r.classList.remove('drag-source');});
+  }
   area.addEventListener('dragstart',function(e){
     var handle=e.target.closest('.drag-handle');
-    if(!handle)return;
-    dragIdx=parseInt(handle.getAttribute('data-idx'));
+    if(!handle){e.preventDefault();return;}
+    var idx=parseInt(handle.getAttribute('data-idx'),10);
+    if(isNaN(idx)){e.preventDefault();return;}
+    state.dragIdx=idx;
+    state.dropIdx=null;
+    state.dropPos=null;
     e.dataTransfer.effectAllowed='move';
-    e.dataTransfer.setData('text/plain',dragIdx);
+    try{e.dataTransfer.setData('text/plain',String(idx));}catch(_){/* some browsers throw on empty data */}
+    // Mark the source row faded
+    var srcRow=handle.closest('tr[data-row]');
+    if(srcRow)srcRow.classList.add('drag-source');
   });
   area.addEventListener('dragover',function(e){
+    if(state.dragIdx===null)return;
     e.preventDefault();
     e.dataTransfer.dropEffect='move';
-    var row=e.target.closest('tr');
-    area.querySelectorAll('tr.drag-over').forEach(function(r){r.classList.remove('drag-over');});
-    if(row)row.classList.add('drag-over');
+    var row=e.target.closest('tr[data-row]');
+    if(!row){clearIndicators();state.dropIdx=null;state.dropPos=null;return;}
+    var idx=parseInt(row.getAttribute('data-row'),10);
+    if(isNaN(idx)||idx===state.dragIdx){clearIndicators();state.dropIdx=null;state.dropPos=null;return;}
+    var rect=row.getBoundingClientRect();
+    var pos=(e.clientY<rect.top+rect.height/2)?'top':'bottom';
+    if(state.dropIdx===idx&&state.dropPos===pos)return; // no change
+    clearIndicators();
+    row.classList.add(pos==='top'?'drag-over-top':'drag-over-bottom');
+    state.dropIdx=idx;
+    state.dropPos=pos;
   });
   area.addEventListener('dragleave',function(e){
+    // Only clear if leaving the area entirely
     if(!e.relatedTarget||!area.contains(e.relatedTarget)){
-      area.querySelectorAll('tr.drag-over').forEach(function(r){r.classList.remove('drag-over');});
+      clearIndicators();
     }
   });
   area.addEventListener('drop',function(e){
     e.preventDefault();
-    area.querySelectorAll('tr.drag-over').forEach(function(r){r.classList.remove('drag-over');});
-    var row=e.target.closest('tr[data-row]');
-    if(!row||dragIdx===null)return;
-    var dropIdx=parseInt(row.getAttribute('data-row'));
-    if(dropIdx===dragIdx)return;
-    var item=window.lineItems.splice(dragIdx,1)[0];
-    window.lineItems.splice(dropIdx,0,item);
-    dragIdx=null;
+    var srcIdx=state.dragIdx,tgtIdx=state.dropIdx,pos=state.dropPos;
+    clearIndicators();clearSourceStyle();
+    state.dragIdx=null;state.dropIdx=null;state.dropPos=null;
+    if(srcIdx===null||tgtIdx===null||pos===null)return;
+    if(srcIdx===tgtIdx)return;
+    // Compute final insertion index considering before/after position
+    // and the fact that removing the source first shifts subsequent indices.
+    var insertAt=pos==='top'?tgtIdx:tgtIdx+1;
+    if(srcIdx<insertAt)insertAt-=1; // account for splice removal shift
+    if(insertAt===srcIdx)return; // would be a no-op
+    var item=window.lineItems.splice(srcIdx,1)[0];
+    window.lineItems.splice(insertAt,0,item);
+    // Any drag-reorder invalidates the user's sort intent — fall back to manual order
+    window.sortState={col:null,dir:0};
     render();
+  });
+  // Cancel/abort path — drop outside, Esc, etc.
+  area.addEventListener('dragend',function(){
+    clearIndicators();clearSourceStyle();
+    state.dragIdx=null;state.dropIdx=null;state.dropPos=null;
   });
 }
 function renderRow(it,i,m){
