@@ -91,8 +91,18 @@ async function runRegressionTests() {
     var redCell=cells.find(function(c){return c.style&&c.style.color==='rgb(204, 0, 0)';});
     window.lineItems=[];render();return{pass:!!redCell};
   });
-  test('pdf:hasServiceDates',function(){var fnStr=downloadPdf.toString();return{pass:fnStr.includes('Service Dates')};});
-  test('pdf:noLineItemDates',function(){var fnStr=downloadPdf.toString();return{pass:!fnStr.includes('it.start_date)doc.text')};});
+  test('fileName:autoPopulates',function(){
+    document.getElementById('quoteNumber').value='TS-TEST-001';
+    document.getElementById('customerName').value='Acme Corp';
+    document.getElementById('pdfFileName').dataset.userEdited='';
+    updatePdfFileName();
+    return{pass:document.getElementById('pdfFileName').value==='TS-TEST-001 - Acme Corp'};
+  });
+  test('pdf:hasTermsAndConditions',function(){var s=downloadPdf.toString();return{pass:s.includes('Terms and Conditions')&&s.includes('OEM Terms')&&s.includes('WITNESS WHEREOF')};});
+  test('pdf:updatedSection8',function(){var s=downloadPdf.toString();return{pass:s.includes('FAILURE OF ESSENTIAL PURPOSE')&&!s.includes('TOTAL LIABILITY SHALL NOT EXCEED')};});
+  test('pdf:hasServiceDates',function(){var s=downloadPdf.toString();return{pass:s.includes('Service Dates')};});
+  test('pdf:noLineItemDates',function(){var s=downloadPdf.toString();return{pass:!s.includes('it.start_date)doc.text')};});
+
   test('li:removeRow',function(){addRow();var b=window.lineItems.length;removeRow(b-1);return{pass:window.lineItems.length===b-1};});
   test('li:colHeaders',function(){
     var ths=Array.from(document.querySelectorAll('#liArea thead th')).map(function(t){return t.textContent;});
