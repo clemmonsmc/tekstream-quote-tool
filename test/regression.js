@@ -375,9 +375,22 @@ async function runRegressionTests() {
     cycleSort('sku'); // asc
     var sorted=applySort(window.lineItems).map(function(i){return i.sku;}).join('');
     resetSort();
-    var reset=window.lineItems.slice().sort(function(a,b){return a.originalIndex-b.originalIndex;}).map(function(i){return i.sku;}).join('');
+    // After resetSort, lineItems itself should be back in original order
+    var resetActual=window.lineItems.map(function(i){return i.sku;}).join('');
     window.lineItems=[];render();
-    return{pass:sorted==='AMZ'&&reset==='ZAM',detail:'sorted='+sorted+' reset='+reset};
+    return{pass:sorted==='AMZ'&&resetActual==='ZAM',detail:'sorted='+sorted+' resetActual='+resetActual};
+  });
+  test('sort:resetUndoesDragReorder',function(){
+    // Simulate drag-reordering by mutating lineItems order directly (as drag-drop does)
+    window.loadLineItems([{sku:'X',description:'',qty:1,unit_price:0},{sku:'Y',description:'',qty:1,unit_price:0},{sku:'Z',description:'',qty:1,unit_price:0}]);
+    // Drag X to the end: simulates user drag
+    var dragged=window.lineItems.splice(0,1)[0];
+    window.lineItems.push(dragged);
+    var afterDrag=window.lineItems.map(function(i){return i.sku;}).join('');
+    resetSort();
+    var afterReset=window.lineItems.map(function(i){return i.sku;}).join('');
+    window.lineItems=[];render();
+    return{pass:afterDrag==='YZX'&&afterReset==='XYZ',detail:'afterDrag='+afterDrag+' afterReset='+afterReset};
   });
   test('sort:resetSortStateClears',function(){
     cycleSort('sku');resetSort();

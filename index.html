@@ -370,7 +370,17 @@ function cycleSort(col){
   }
   render();
 }
-function resetSort(){window.sortState={col:null,dir:0};render();}
+function resetSort(){
+  // Restore canonical order: sort lineItems by originalIndex (undoes drag-reorder too)
+  // and clear any active sort overlay.
+  window.lineItems.sort(function(a,b){
+    var ai=(typeof a.originalIndex==='number')?a.originalIndex:Infinity;
+    var bi=(typeof b.originalIndex==='number')?b.originalIndex:Infinity;
+    return ai-bi;
+  });
+  window.sortState={col:null,dir:0};
+  render();
+}
 function sortIndicator(col){
   if(window.sortState.col!==col)return '<span style="opacity:.3;font-size:9px;margin-left:3px">\u2195</span>';
   return window.sortState.dir===1?'<span style="font-size:9px;margin-left:3px">\u25B2</span>':'<span style="font-size:9px;margin-left:3px">\u25BC</span>';
