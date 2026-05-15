@@ -329,6 +329,104 @@ async function runRegressionTests() {
   test('signModal:dom',function(){
     return{pass:!!document.getElementById('signModal')&&!!document.getElementById('modalCustomerName')&&!!document.getElementById('modalCustomerEmail')&&!!document.getElementById('modalSignerEmail')};
   });
+  // ── Item 1: Sort columns + reset to original order ───────────────────
+  ['cycleSort','resetSort','sortIndicator','applySort','nextOriginalIndex'].forEach(function(fn){
+    test('fn:'+fn,function(){return{pass:typeof window[fn]==='function',detail:typeof window[fn]};});
+  });
+  test('sort:initialState',function(){
+    return{pass:window.sortState&&window.sortState.col===null&&window.sortState.dir===0,detail:JSON.stringify(window.sortState)};
+  });
+  test('sort:addRowAssignsOriginalIndex',function(){
+    window.lineItems=[];addRow();addRow();
+    var ok=window.lineItems.length===2 && window.lineItems[0].originalIndex===0 && window.lineItems[1].originalIndex===1;
+    var d='idx0='+window.lineItems[0].originalIndex+' idx1='+window.lineItems[1].originalIndex;
+    window.lineItems=[];render();return{pass:ok,detail:d};
+  });
+  test('sort:loadLineItemsAssignsOriginalIndex',function(){
+    window.loadLineItems([{sku:'B',description:'B',qty:1,unit_price:10},{sku:'A',description:'A',qty:1,unit_price:20}]);
+    var ok=window.lineItems[0].originalIndex===0 && window.lineItems[1].originalIndex===1;
+    var d='items='+JSON.stringify(window.lineItems.map(function(i){return{s:i.sku,o:i.originalIndex};}));
+    window.lineItems=[];render();return{pass:ok,detail:d};
+  });
+  test('sort:cycleSortToggles',function(){
+    window.sortState={col:null,dir:0};
+    cycleSort('sku');var s1=JSON.stringify(window.sortState);
+    cycleSort('sku');var s2=JSON.stringify(window.sortState);
+    cycleSort('sku');var s3=JSON.stringify(window.sortState);
+    var ok=s1==='{"col":"sku","dir":1}' && s2==='{"col":"sku","dir":-1}' && s3==='{"col":null,"dir":0}';
+    return{pass:ok,detail:s1+' | '+s2+' | '+s3};
+  });
+  test('sort:applySortAsc',function(){
+    var items=[{sku:'C',description:'',qty:1,unit_price:0,margin:null},{sku:'A',description:'',qty:1,unit_price:0,margin:null},{sku:'B',description:'',qty:1,unit_price:0,margin:null}];
+    window.lineItems=items;window.sortState={col:'sku',dir:1};
+    var sorted=applySort(items).map(function(i){return i.sku;}).join('');
+    window.lineItems=[];window.sortState={col:null,dir:0};render();
+    return{pass:sorted==='ABC',detail:sorted};
+  });
+  test('sort:applySortDesc',function(){
+    var items=[{sku:'A',description:'',qty:1,unit_price:0,margin:null},{sku:'C',description:'',qty:1,unit_price:0,margin:null},{sku:'B',description:'',qty:1,unit_price:0,margin:null}];
+    window.lineItems=items;window.sortState={col:'sku',dir:-1};
+    var sorted=applySort(items).map(function(i){return i.sku;}).join('');
+    window.lineItems=[];window.sortState={col:null,dir:0};render();
+    return{pass:sorted==='CBA',detail:sorted};
+  });
+  test('sort:resetReturnsOriginalOrder',function(){
+    window.loadLineItems([{sku:'Z',description:'',qty:1,unit_price:0},{sku:'A',description:'',qty:1,unit_price:0},{sku:'M',description:'',qty:1,unit_price:0}]);
+    cycleSort('sku'); // asc
+    var sorted=applySort(window.lineItems).map(function(i){return i.sku;}).join('');
+    resetSort();
+    var reset=window.lineItems.slice().sort(function(a,b){return a.originalIndex-b.originalIndex;}).map(function(i){return i.sku;}).join('');
+    window.lineItems=[];render();
+    return{pass:sorted==='AMZ'&&reset==='ZAM',detail:'sorted='+sorted+' reset='+reset};
+  });
+  test('sort:resetSortStateClears',function(){
+    cycleSort('sku');resetSort();
+    var ok=window.sortState.col===null&&window.sortState.dir===0;
+    return{pass:ok,detail:JSON.stringify(window.sortState)};
+  });
+  test('sort:headersRenderClickable',function(){
+    window.lineItems=[{sku:'A',description:'',qty:1,unit_price:10,margin:null,originalIndex:0}];
+    render();
+    var headers=document.querySelectorAll('#liArea th[onclick]');
+    window.lineItems=[];render();
+    return{pass:headers.length>=6,detail:'clickable headers='+headers.length};
+  });
+  test('sort:resetButtonExists',function(){
+    var btn=document.querySelector('button[onclick="resetSort()"]');
+    return{pass:!!btn,detail:btn?btn.textContent.trim():'not found'};
+  });
+  test('sort:legacyRestoreBackfillsOriginalIndex',function(){
+    var legacyState={customerName:'Legacy Co',quoteNumber:'TS-LEGACY',lineItems:[{sku:'X',description:'X',qty:1,unit_price:5,margin:null},{sku:'Y',description:'Y',qty:1,unit_price:6,margin:null}]};
+    restoreQuoteState(legacyState);
+    var ok=window.lineItems[0].originalIndex===0&&window.lineItems[1].originalIndex===1;
+    var d='idx0='+window.lineItems[0].originalIndex+' idx1='+window.lineItems[1].originalIndex;
+    window.lineItems=[];newQuote();return{pass:ok,detail:d};
+  });
+  test('sort:newQuoteResetsSort',function(){
+    cycleSort('sku');newQuote();
+    var ok=window.sortState.col===null&&window.sortState.dir===0;
+    return{pass:ok,detail:JSON.stringify(window.sortState)};
+  });
+  test('sort:sortWithinGroup',function(){
+    // Two payment groups, sort within each
+    window.loadLineItems([
+      {sku:'Z1',description:'',qty:1,unit_price:10,start_date:'2026-01-01',end_date:'2026-12-31'},
+      {sku:'A1',description:'',qty:1,unit_price:20,start_date:'2026-01-01',end_date:'2026-12-31'},
+      {sku:'Z2',description:'',qty:1,unit_price:30,start_date:'2027-01-01',end_date:'2027-12-31'},
+      {sku:'A2',description:'',qty:1,unit_price:40,start_date:'2027-01-01',end_date:'2027-12-31'}
+    ]);
+    cycleSort('sku');
+    // Render and read SKU order from rendered rows
+    var rows=document.querySelectorAll('#liArea tr[data-row] input');
+    var order=[];rows.forEach(function(r){if(r.value&&/^[AZ]\d$/.test(r.value))order.push(r.value);});
+    // We just check that sort produced something — direct applySort test is the real verification
+    var g=groupByYear(window.lineItems);
+    var g0=applySort(g[0].items).map(function(i){return i.sku;}).join(',');
+    var g1=applySort(g[1].items).map(function(i){return i.sku;}).join(',');
+    var ok=g0==='A1,Z1'&&g1==='A2,Z2';
+    window.lineItems=[];render();
+    return{pass:ok,detail:'g0='+g0+' g1='+g1};
+  });
   // Restore auto-save and cleanup
   window.autoSave = _origAutoSave;
   newQuote();loadRepSettings();

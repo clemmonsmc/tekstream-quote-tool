@@ -170,7 +170,10 @@ td input.cust-price{-moz-appearance:textfield}
         onkeydown="if(event.key==='Enter')applySetTotal()">
       <button class="btn btn-sm" style="background:#5B94CB" onclick="applySetTotal()">Apply</button>
     </div>
-    <div style="margin-top:10px"><button class="btn btn-sm" style="background:transparent;border:1.5px solid #003658;color:#003658" onclick="addRow()">+ Add line item</button></div>
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-sm" style="background:transparent;border:1.5px solid #003658;color:#003658" onclick="addRow()">+ Add line item</button>
+      <button class="btn btn-sm" style="background:transparent;border:1.5px solid #717174;color:#717174;font-size:11px" onclick="resetSort()" title="Restore original order (as imported)">&#8634; Reset Order</button>
+    </div>
     <div class="btn-row">
       <button class="btn dl-btn" onclick="downloadPdf()">Download PDF quote &#8595;</button>
       <button class="btn dl-btn" style="background:#717174" onclick="previewPdf()">Preview PDF &#128269;</button>
@@ -184,6 +187,7 @@ td input.cust-price{-moz-appearance:textfield}
 // v2
 window.lineItems = [];
 window.logoDataUrl = null;
+window.sortState = {col:null,dir:0};
 
 (function init() {
   fetch('/api/logo').then(function(r){return r.arrayBuffer();}).then(function(buf){
@@ -284,7 +288,11 @@ function restoreQuoteState(s){
   document.getElementById('preparedBy').value=s.preparedBy||'';
   document.getElementById('preparedByEmail').value=s.preparedByEmail||'';
   var pfEl=document.getElementById('pdfFileName');if(pfEl){pfEl.value=s.pdfFileName||'';pfEl.dataset.userEdited=s.pdfFileName?'1':'';}  
-  window.lineItems=s.lineItems||[];render();
+  window.lineItems=s.lineItems||[];
+  // Backfill originalIndex on legacy saved quotes
+  window.lineItems.forEach(function(it,idx){if(typeof it.originalIndex!=='number')it.originalIndex=idx;});
+  window.sortState={col:null,dir:0};
+  render();
   updatePdfFileName();
   // Always re-apply rep settings so name/email are never overwritten by saved state
   loadRepSettings();
@@ -348,7 +356,48 @@ function renderSavedQuotes(){
     list.appendChild(row);
   });
 }
-function addRow(){window.lineItems.push({sku:'',description:'',qty:1,unit_price:0,start_date:'',end_date:'',margin:null});render();}
+// ── Item 1: Sort columns + reset ────────────────────────────────────────
+function cycleSort(col){
+  // none -> asc -> desc -> none
+  if(window.sortState.col===col){
+    window.sortState.dir=window.sortState.dir===1?-1:window.sortState.dir===-1?0:1;
+    if(window.sortState.dir===0)window.sortState.col=null;
+  } else {
+    window.sortState.col=col;window.sortState.dir=1;
+  }
+  render();
+}
+function resetSort(){window.sortState={col:null,dir:0};render();}
+function sortIndicator(col){
+  if(window.sortState.col!==col)return '<span style="opacity:.3;font-size:9px;margin-left:3px">\u2195</span>';
+  return window.sortState.dir===1?'<span style="font-size:9px;margin-left:3px">\u25B2</span>':'<span style="font-size:9px;margin-left:3px">\u25BC</span>';
+}
+function applySort(items){
+  if(!window.sortState.col||!window.sortState.dir)return items;
+  var col=window.sortState.col,dir=window.sortState.dir,m=parseFloat(document.getElementById('marginPct').value)||0;
+  return items.slice().sort(function(a,b){
+    var va,vb;
+    switch(col){
+      case 'sku':va=(a.sku||'').toLowerCase();vb=(b.sku||'').toLowerCase();break;
+      case 'desc':va=(a.description||'').toLowerCase();vb=(b.description||'').toLowerCase();break;
+      case 'qty':va=+a.qty||0;vb=+b.qty||0;break;
+      case 'unit':va=+a.unit_price||0;vb=+b.unit_price||0;break;
+      case 'ext':va=(+a.unit_price||0)*(+a.qty||0);vb=(+b.unit_price||0)*(+b.qty||0);break;
+      case 'margin':va=effectiveMargin(a,m);vb=effectiveMargin(b,m);break;
+      case 'cust':va=itemCprice(a,m)*a.qty;vb=itemCprice(b,m)*b.qty;break;
+      default:return 0;
+    }
+    if(va<vb)return -1*dir;
+    if(va>vb)return 1*dir;
+    return 0;
+  });
+}
+
+function nextOriginalIndex(){
+  var max=-1;window.lineItems.forEach(function(it){if(typeof it.originalIndex==='number'&&it.originalIndex>max)max=it.originalIndex;});
+  return max+1;
+}
+function addRow(){window.lineItems.push({sku:'',description:'',qty:1,unit_price:0,start_date:'',end_date:'',margin:null,originalIndex:nextOriginalIndex()});window.sortState={col:null,dir:0};render();}
 function removeRow(i){window.lineItems.splice(i,1);render();}
 
 
@@ -527,10 +576,21 @@ function render(){
   var m=parseFloat(document.getElementById('marginPct').value)||0;
   var area=document.getElementById('liArea');
   if(!window.lineItems.length){area.innerHTML='<div class="empty">Add line items manually or upload a VAD quote.</div>';document.getElementById('totals').innerHTML='';updateMarginDollar(m,0,0);return;}
-  var tbl='<table><colgroup><col style="width:2%"><col style="width:10%"><col style="width:21%"><col style="width:8%"><col style="width:9%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:11%"><col style="width:11%"><col style="width:7%"></colgroup><thead><tr><th></th><th>SKU</th><th>Description</th><th style="text-align:right">Qty</th><th style="text-align:right">VAD Unit $</th><th style="text-align:right">VAD Ext. $</th><th>Margin%</th><th style="text-align:right">Margin$</th><th style="text-align:right">Customer Unit $</th><th style="text-align:right">Customer Ext. $</th><th></th></tr></thead><tbody>';
+  var tbl='<table><colgroup><col style="width:2%"><col style="width:10%"><col style="width:21%"><col style="width:8%"><col style="width:9%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:11%"><col style="width:11%"><col style="width:7%"></colgroup><thead><tr>'
+    +'<th></th>'
+    +'<th style="cursor:pointer;user-select:none" onclick="cycleSort(\'sku\')" title="Click to sort">SKU'+sortIndicator('sku')+'</th>'
+    +'<th style="cursor:pointer;user-select:none" onclick="cycleSort(\'desc\')" title="Click to sort">Description'+sortIndicator('desc')+'</th>'
+    +'<th style="text-align:right;cursor:pointer;user-select:none" onclick="cycleSort(\'qty\')" title="Click to sort">Qty'+sortIndicator('qty')+'</th>'
+    +'<th style="text-align:right;cursor:pointer;user-select:none" onclick="cycleSort(\'unit\')" title="Click to sort">VAD Unit $'+sortIndicator('unit')+'</th>'
+    +'<th style="text-align:right;cursor:pointer;user-select:none" onclick="cycleSort(\'ext\')" title="Click to sort">VAD Ext. $'+sortIndicator('ext')+'</th>'
+    +'<th style="cursor:pointer;user-select:none" onclick="cycleSort(\'margin\')" title="Click to sort">Margin%'+sortIndicator('margin')+'</th>'
+    +'<th style="text-align:right">Margin$</th>'
+    +'<th style="text-align:right">Customer Unit $</th>'
+    +'<th style="text-align:right;cursor:pointer;user-select:none" onclick="cycleSort(\'cust\')" title="Click to sort">Customer Ext. $'+sortIndicator('cust')+'</th>'
+    +'<th></th></tr></thead><tbody>';
   var h='',groups=groupByYear(window.lineItems);
   if(!groups){
-    h+=tbl;window.lineItems.forEach(function(it,i){h+=renderRow(it,i,m);});h+='</tbody></table>';
+    h+=tbl;applySort(window.lineItems).forEach(function(it){var i=window.lineItems.indexOf(it);h+=renderRow(it,i,m);});h+='</tbody></table>';
   } else {
     groups.forEach(function(grp){
       var gi=groups.indexOf(grp);
@@ -545,7 +605,7 @@ function render(){
       h+='</div>';
       h+=tbl;
       var gt=0,vadExt=0,marginTotal=0;
-      grp.items.forEach(function(it){
+      applySort(grp.items).forEach(function(it){
         var i=window.lineItems.indexOf(it);
         var cp=itemCprice(it,m);
         gt+=cp*it.qty;
@@ -580,6 +640,7 @@ function updateMarginDollar(m,c,v){var el=document.getElementById('marginDollar'
 function recalcAll(){var m=parseFloat(document.getElementById('marginPct').value)||0;document.getElementById('marginHint').textContent=m>0?m+'% margin applied':'';render();}
 function newQuote(){
   ['customerName','contactName','contactEmail','notes','preparedBy','preparedByEmail'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  window.sortState={col:null,dir:0};
   document.getElementById('preparedByCompany').value='TekStream';
   document.getElementById('terms').value='Net 30';
   document.getElementById('marginPct').value='15';
@@ -610,7 +671,7 @@ async function extractVAD(input){
     document.getElementById('extractStatus').textContent='\u2713 Extracted '+(parsed.lineItems&&parsed.lineItems.length||0)+' line items'+(parsed.vad?' ('+parsed.vad+')':'');
   }catch(e){document.getElementById('extractStatus').textContent='Error: '+e.message;}
 }
-window.loadLineItems=function(items){window.lineItems=items.map(function(it){return{sku:String(it.sku||''),description:String(it.description||''),qty:parseFloat(it.qty)||1,unit_price:parseFloat(String(it.unit_price||'0').replace(/[$,]/g,''))||0,start_date:String(it.start_date||''),end_date:String(it.end_date||''),margin:null};});render();};
+window.loadLineItems=function(items){window.lineItems=items.map(function(it,idx){return{sku:String(it.sku||''),description:String(it.description||''),qty:parseFloat(it.qty)||1,unit_price:parseFloat(String(it.unit_price||'0').replace(/[$,]/g,''))||0,start_date:String(it.start_date||''),end_date:String(it.end_date||''),margin:null,originalIndex:idx};});window.sortState={col:null,dir:0};render();};
 
 function openSignModal(){
   var customerEmail=document.getElementById('contactEmail').value;
