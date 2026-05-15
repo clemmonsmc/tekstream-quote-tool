@@ -103,6 +103,24 @@ async function runRegressionTests() {
   test('pdf:verbatimSection9',function(){var s=downloadPdf.toString();return{pass:s.includes('third-party intellectual property infringement claims')&&s.includes('Partner provides no indemnification')};});
   test('pdf:verbatimSection12',function(){var s=downloadPdf.toString();return{pass:s.includes('solely for administrative convenience')&&s.includes('expressly rejected and shall have no force or effect')};});
   test('pdf:fontBeforeSplit',function(){var s=downloadPdf.toString();return{pass:s.includes("setFontSize(7.5);\n        var bLines=doc.splitTextToSize")};});
+  test('pdf:dynamicOEM',function(){
+    var s=downloadPdf.toString();
+    return{pass:s.includes('_oemLinks')&&s.includes('_s1b')&&s.includes('sentinelone.com')&&s.includes('qualys.com')};
+  });
+  test('pdf:oemNoQualysForS1',function(){
+    var _skus='PF-PLT-FF-S1 PR-AIAST-ND-S1 S1-CMPAI-EN-S1';
+    var found=[];
+    if(/(^|\s)Q\-/.test(_skus)||/QUALYS/.test(_skus))found.push('Qualys');
+    if(/\-S1\b|\bS1\-|SENTINELONE/.test(_skus))found.push('SentinelOne');
+    return{pass:found.length===1&&found[0]==='SentinelOne',detail:found.join(',')};
+  });
+  test('pdf:oemQualysDetected',function(){
+    var _skus='Q-S-ETM Q-VM-ASST';
+    var found=[];
+    if(/(^|\s)Q\-/.test(_skus)||/QUALYS/.test(_skus))found.push('Qualys');
+    if(/\-S1\b|\bS1\-|SENTINELONE/.test(_skus))found.push('SentinelOne');
+    return{pass:found.length===1&&found[0]==='Qualys',detail:found.join(',')};
+  });
   test('pdf:updatedSection8',function(){var s=downloadPdf.toString();return{pass:s.includes('FAILURE OF ESSENTIAL PURPOSE')&&!s.includes('TOTAL LIABILITY SHALL NOT EXCEED')};});
   test('pdf:hasServiceDates',function(){var s=downloadPdf.toString();return{pass:s.includes('Service Dates')};});
   test('pdf:noLineItemDates',function(){var s=downloadPdf.toString();return{pass:!s.includes('it.start_date)doc.text')};});
