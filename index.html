@@ -157,7 +157,7 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
         <div class="field" style="margin:0"><label>Ship To address</label><input id="shipToAddress" autocomplete="off" placeholder="123 Main St" oninput="autoSave()"></div>
         <div class="field" style="margin:0"><label>Ship To city/state/zip</label><input id="shipToCityStateZip" autocomplete="off" placeholder="Atlanta, GA 30303" oninput="autoSave()"></div>
         <div class="field" style="margin:0"><label>Ship To phone</label><input id="shipToPhone" autocomplete="off" placeholder="404-555-1234" oninput="autoSave()"></div>
-        <div class="field" style="margin:0"><label>Vendor (VAD)</label>
+        <div class="field" style="margin:0"><label>VAD Name</label>
           <select id="vendorName" oninput="autoSave()" style="width:100%;padding:8px 10px;border:1px solid #d0d8e0;border-radius:6px;font-size:14px;background:#fff">
             <option value="">— Select —</option>
             <option value="Arrow ECS">Arrow ECS</option>
@@ -1573,7 +1573,7 @@ async function generatePoPdfBlob(){
   // RIGHT column (parallel)
   var ry=startY;
   doc.setFont('helvetica','bold');doc.setTextColor(0,54,88);
-  doc.text('Vendor Name:',colRX,ry);
+  doc.text('VAD Name:',colRX,ry);
   doc.setFont('helvetica','normal');doc.setTextColor(19,17,18);
   doc.text(vendor||'—',colRX+90,ry);ry+=14;
   ry+=11+14+18; // align with left's Company Address(2 lines)+gap+PO# gap
@@ -1686,7 +1686,7 @@ async function generatePoPdfBlob(){
 async function downloadPoPdf(){
   if(!window.lineItems||!window.lineItems.length){alert('Add line items before generating a PO.');return;}
   var vendor=(document.getElementById('vendorName')||{}).value||'';
-  if(!vendor){alert('Please select a Vendor (VAD) before generating a PO.');return;}
+  if(!vendor){alert('Please select a VAD Name before generating a PO.');return;}
   var qn=document.getElementById('quoteNumber').value||'TS-QUOTE';
   var cn=document.getElementById('customerName').value||'Customer';
   try{
