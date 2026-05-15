@@ -749,16 +749,21 @@ async function extractVAD(input){
     if(parsed.quote_expire_date){document.getElementById('expiryDate').value=parsed.quote_expire_date;document.getElementById('expiryDate').style.borderColor='';}
     else{document.getElementById('expiryDate').value='';document.getElementById('expiryDate').style.borderColor='#e53e3e';}
     if(parsed.lineItems&&parsed.lineItems.length)window.loadLineItems(parsed.lineItems);
-    // Item 7: Auto-populate Vendor dropdown from detected VAD
+    // Item 7: Auto-populate VAD Name dropdown from detected VAD
+    var vadAutoSet='';
     if(parsed.vad){
       var vnEl=document.getElementById('vendorName');
       if(vnEl){
         var map={'Arrow':'Arrow ECS','TD Synnex':'TD Synnex','Carahsoft':'Carahsoft'};
         var mapped=map[parsed.vad];
-        if(mapped)vnEl.value=mapped;
+        // Only auto-set if user hasn't manually chosen a different VAD
+        if(mapped&&(!vnEl.value||vnEl.value===mapped)){
+          vnEl.value=mapped;
+          vadAutoSet=mapped;
+        }
       }
     }
-    document.getElementById('extractStatus').textContent='\u2713 Extracted '+(parsed.lineItems&&parsed.lineItems.length||0)+' line items'+(parsed.vad?' ('+parsed.vad+')':'');
+    document.getElementById('extractStatus').textContent='\u2713 Extracted '+(parsed.lineItems&&parsed.lineItems.length||0)+' line items'+(parsed.vad?' ('+parsed.vad+')':'')+(vadAutoSet?' \u2192 VAD set to '+vadAutoSet:'');
   }catch(e){document.getElementById('extractStatus').textContent='Error: '+e.message;}
 }
 window.loadLineItems=function(items){window.lineItems=items.map(function(it,idx){return{sku:String(it.sku||''),description:String(it.description||''),qty:parseFloat(it.qty)||1,unit_price:parseFloat(String(it.unit_price||'0').replace(/[$,]/g,''))||0,start_date:String(it.start_date||''),end_date:String(it.end_date||''),margin:null,originalIndex:idx};});window.sortState={col:null,dir:0};render();};

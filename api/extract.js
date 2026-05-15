@@ -268,7 +268,7 @@ async function extractViaAI(res,pdf,txt,vad,checkQualys=false){
     }
   }
 
-  const instr='Return ONLY this JSON (no commentary):\n{"quote_expire_date":"","to":{"company":"","name":"","email":""},"for":{"company":"","name":"","email":""},"header_start_date":"","header_end_date":"","lineItems":[{"sku":"","description":"","qty":1,"unit_price":0,"start_date":"","end_date":""}]}\nRules:\n- to=reseller/TekStream, for=end customer\n- unit_price=distributor/net price per UNIT (divide total by qty)\n- All dates YYYY-MM-DD\n- quote_expire_date=quote validity/expiry from header if present else ""\n- header_start_date/header_end_date=document-level start/end dates else ""\n- Exclude discount lines\n- Line item dates: use line-level if present, else header dates, else leave ""';
+  const instr='Return ONLY this JSON (no commentary):\n{"vad":"","quote_expire_date":"","to":{"company":"","name":"","email":""},"for":{"company":"","name":"","email":""},"header_start_date":"","header_end_date":"","lineItems":[{"sku":"","description":"","qty":1,"unit_price":0,"start_date":"","end_date":""}]}\nRules:\n- to=reseller/TekStream, for=end customer\n- vad=name of the distributor/VAD issuing this quote. One of: "Arrow", "TD Synnex", "Carahsoft", or "" if not clearly one of those three. Look for company name, logo references, "Quote from", letterhead, or footer text.\n- unit_price=distributor/net price per UNIT (divide total by qty)\n- All dates YYYY-MM-DD\n- quote_expire_date=quote validity/expiry from header if present else ""\n- header_start_date/header_end_date=document-level start/end dates else ""\n- Exclude discount lines\n- Line item dates: use line-level if present, else header dates, else leave ""';
   const content=pdf
     ?[{type:'document',source:{type:'base64',media_type:'application/pdf',data:pdf}},{type:'text',text:instr}]
     :[{type:'text',text:instr+'\n\n'+txt}];
@@ -283,7 +283,17 @@ async function extractViaAI(res,pdf,txt,vad,checkQualys=false){
   const s=t.indexOf('{'),e=t.lastIndexOf('}');
   if(s===-1)return res.status(500).json({error:'No JSON in response'});
   const result=JSON.parse(t.slice(s,e+1));
+  // Use upstream vad (from text scan) if present, else trust AI's detection
   if(vad)result.vad=vad;
+  else if(result.vad){
+    // Normalize AI output to canonical names
+    var aiVad=String(result.vad).trim();
+    var lc=aiVad.toLowerCase();
+    if(lc.includes('arrow'))result.vad='Arrow';
+    else if(lc.includes('synnex')||lc.includes('td '))result.vad='TD Synnex';
+    else if(lc.includes('carahsoft'))result.vad='Carahsoft';
+    else result.vad='';
+  }
   if(result.lineItems)result.lineItems=applyDates(result.lineItems,result.header_start_date||'',result.header_end_date||'',result.quote_expire_date||'');
   return res.status(200).json(result);
 }
