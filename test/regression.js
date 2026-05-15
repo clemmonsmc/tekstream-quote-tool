@@ -99,6 +99,9 @@ async function runRegressionTests() {
     return{pass:document.getElementById('pdfFileName').value==='TS-TEST-001 - Acme Corp'};
   });
   test('pdf:hasTermsAndConditions',function(){var s=downloadPdf.toString();return{pass:s.includes('Terms and Conditions')&&s.includes('OEM Terms')&&s.includes('WITNESS WHEREOF')};});
+  test('pdf:verbatimSection1',function(){var s=downloadPdf.toString();return{pass:s.includes('submitting a purchase order, or using the programs')&&s.includes('Qualys Service User Agreement')};});
+  test('pdf:verbatimSection9',function(){var s=downloadPdf.toString();return{pass:s.includes('third-party intellectual property infringement claims')&&s.includes('Partner provides no indemnification')};});
+  test('pdf:verbatimSection12',function(){var s=downloadPdf.toString();return{pass:s.includes('solely for administrative convenience')&&s.includes('expressly rejected and shall have no force or effect')};});
   test('pdf:updatedSection8',function(){var s=downloadPdf.toString();return{pass:s.includes('FAILURE OF ESSENTIAL PURPOSE')&&!s.includes('TOTAL LIABILITY SHALL NOT EXCEED')};});
   test('pdf:hasServiceDates',function(){var s=downloadPdf.toString();return{pass:s.includes('Service Dates')};});
   test('pdf:noLineItemDates',function(){var s=downloadPdf.toString();return{pass:!s.includes('it.start_date)doc.text')};});
