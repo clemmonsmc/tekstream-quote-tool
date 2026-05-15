@@ -107,6 +107,12 @@ async function runRegressionTests() {
     var s=downloadPdf.toString();
     return{pass:s.includes('_oemLinks')&&s.includes('_s1b')&&s.includes('sentinelone.com')&&s.includes('qualys.com')};
   });
+  test('pdf:oemScansDescriptions',function(){var s=downloadPdf.toString();return{pass:s.includes('it.description')};});
+  test('pdf:oemSplunkViaDesc',function(){
+    var _skus='SE-T-LIC-ST SPLUNK ENTERPRISE TERM LICENSE';var found=[];
+    if(/SPL[EK\-]|SPLUNK/.test(_skus))found.push('Splunk');
+    return{pass:found.length===1&&found[0]==='Splunk',detail:found.join(',')};
+  });
   test('pdf:oemNoQualysForS1',function(){
     var _skus='PF-PLT-FF-S1 PR-AIAST-ND-S1 S1-CMPAI-EN-S1';
     var found=[];
