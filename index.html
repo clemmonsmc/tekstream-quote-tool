@@ -152,6 +152,22 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
         <div class="field" style="margin:0"><label>Payment terms</label><input id="terms" autocomplete="off" value="Net 30"></div>
         <div class="field" style="margin:0"><label>File name</label><input id="pdfFileName" autocomplete="off" placeholder="auto" oninput="this.dataset.userEdited=this.value?'1':'';updatePdfFileName()"></div>
       </div>
+      <!-- Item 7: Ship To address + Vendor (for PO generation) -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 160px;gap:10px 14px;align-items:start;margin-top:10px">
+        <div class="field" style="margin:0"><label>Ship To address</label><input id="shipToAddress" autocomplete="off" placeholder="123 Main St" oninput="autoSave()"></div>
+        <div class="field" style="margin:0"><label>Ship To city/state/zip</label><input id="shipToCityStateZip" autocomplete="off" placeholder="Atlanta, GA 30303" oninput="autoSave()"></div>
+        <div class="field" style="margin:0"><label>Ship To phone</label><input id="shipToPhone" autocomplete="off" placeholder="404-555-1234" oninput="autoSave()"></div>
+        <div class="field" style="margin:0"><label>Vendor (VAD)</label>
+          <select id="vendorName" oninput="autoSave()" style="width:100%;padding:8px 10px;border:1px solid #d0d8e0;border-radius:6px;font-size:14px;background:#fff">
+            <option value="">— Select —</option>
+            <option value="Arrow ECS">Arrow ECS</option>
+            <option value="TD Synnex">TD Synnex</option>
+            <option value="Carahsoft">Carahsoft</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0"></div>
+      </div>
       <input type="hidden" id="preparedBy"><input type="hidden" id="preparedByCompany" value="TekStream"><input type="hidden" id="signerEmailHidden">
       <input type="hidden" id="preparedByEmail">
     </div>
@@ -182,6 +198,7 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
       <button class="btn dl-btn" style="background:#717174" onclick="previewPdf()">Preview PDF &#128269;</button>
       <button class="btn dl-btn" style="background:#5B94CB" onclick="emailQuote()">Email Quote &#9993;</button>
       <button class="btn dl-btn" style="background:#2d7a4f" id="signBtn" onclick="sendForSignature()">Send for Signature &#9998;</button>
+      <button class="btn dl-btn" style="background:#8a4a9f" onclick="downloadPoPdf()" title="Generate TekStream PO for the VAD">Generate PO &#8595;</button>
     </div>
     <p style="font-size:11px;color:#717174;margin-top:8px;text-align:center">Email Quote downloads the PDF &#8212; attach it to the Outlook email before sending.</p>
   </div>
@@ -190,6 +207,7 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
 // v2
 window.lineItems = [];
 window.logoDataUrl = null;
+window.signatureDataUrl = null;
 window.sortState = {col:null,dir:0};
 
 (function init() {
@@ -197,6 +215,11 @@ window.sortState = {col:null,dir:0};
     var b=new Uint8Array(buf),s='';b.forEach(function(x){s+=String.fromCharCode(x);});
     window.logoDataUrl='data:image/png;base64,'+btoa(s);
     document.getElementById('hdrLogo').src=window.logoDataUrl;
+  }).catch(function(){});
+  // Item 7: Load CEO signature for PO generation
+  fetch('/api/signature').then(function(r){return r.arrayBuffer();}).then(function(buf){
+    var b=new Uint8Array(buf),s='';b.forEach(function(x){s+=String.fromCharCode(x);});
+    window.signatureDataUrl='data:image/png;base64,'+btoa(s);
   }).catch(function(){});
   var today=new Date().toISOString().split('T')[0];
   var exp=new Date(Date.now()+30*864e5).toISOString().split('T')[0];
@@ -273,7 +296,7 @@ function loadRepSettings(){
 }
 
 function getQuoteState(){
-  return{customerName:document.getElementById('customerName').value,contactName:document.getElementById('contactName').value,contactEmail:document.getElementById('contactEmail').value,quoteNumber:document.getElementById('quoteNumber').value,quoteDate:document.getElementById('quoteDate').value,expiryDate:document.getElementById('expiryDate').value,marginPct:document.getElementById('marginPct').value,notes:document.getElementById('notes').value,terms:document.getElementById('terms').value,preparedByCompany:document.getElementById('preparedByCompany').value,preparedBy:document.getElementById('preparedBy').value,preparedByEmail:document.getElementById('preparedByEmail').value,lineItems:JSON.parse(JSON.stringify(window.lineItems))};
+  return{customerName:document.getElementById('customerName').value,contactName:document.getElementById('contactName').value,contactEmail:document.getElementById('contactEmail').value,quoteNumber:document.getElementById('quoteNumber').value,quoteDate:document.getElementById('quoteDate').value,expiryDate:document.getElementById('expiryDate').value,marginPct:document.getElementById('marginPct').value,notes:document.getElementById('notes').value,terms:document.getElementById('terms').value,preparedByCompany:document.getElementById('preparedByCompany').value,preparedBy:document.getElementById('preparedBy').value,preparedByEmail:document.getElementById('preparedByEmail').value,shipToAddress:(document.getElementById('shipToAddress')||{}).value||'',shipToCityStateZip:(document.getElementById('shipToCityStateZip')||{}).value||'',shipToPhone:(document.getElementById('shipToPhone')||{}).value||'',vendorName:(document.getElementById('vendorName')||{}).value||'',lineItems:JSON.parse(JSON.stringify(window.lineItems))};
 }
 function restoreQuoteState(s){
   document.getElementById('customerName').value=s.customerName||'';
@@ -290,6 +313,11 @@ function restoreQuoteState(s){
   document.getElementById('preparedByCompany').value=s.preparedByCompany||'TekStream';
   document.getElementById('preparedBy').value=s.preparedBy||'';
   document.getElementById('preparedByEmail').value=s.preparedByEmail||'';
+  // Item 7: Ship To + Vendor restore
+  var stEl=document.getElementById('shipToAddress');if(stEl)stEl.value=s.shipToAddress||'';
+  var scEl=document.getElementById('shipToCityStateZip');if(scEl)scEl.value=s.shipToCityStateZip||'';
+  var spEl=document.getElementById('shipToPhone');if(spEl)spEl.value=s.shipToPhone||'';
+  var vnEl=document.getElementById('vendorName');if(vnEl)vnEl.value=s.vendorName||'';
   var pfEl=document.getElementById('pdfFileName');if(pfEl){pfEl.value=s.pdfFileName||'';pfEl.dataset.userEdited=s.pdfFileName?'1':'';}  
   window.lineItems=s.lineItems||[];
   // Backfill originalIndex on legacy saved quotes
@@ -691,7 +719,8 @@ function render(){
 function updateMarginDollar(m,c,v){var el=document.getElementById('marginDollar');if(el)el.textContent=(m>0&&c>v)?'$'+fmt(c-v):'';}
 function recalcAll(){var m=parseFloat(document.getElementById('marginPct').value)||0;document.getElementById('marginHint').textContent=m>0?m+'% margin applied':'';render();}
 function newQuote(){
-  ['customerName','contactName','contactEmail','notes','preparedBy','preparedByEmail'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  ['customerName','contactName','contactEmail','notes','preparedBy','preparedByEmail','shipToAddress','shipToCityStateZip','shipToPhone'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  var vnEl=document.getElementById('vendorName');if(vnEl)vnEl.value='';
   window.sortState={col:null,dir:0};
   document.getElementById('preparedByCompany').value='TekStream';
   document.getElementById('terms').value='Net 30';
@@ -720,6 +749,15 @@ async function extractVAD(input){
     if(parsed.quote_expire_date){document.getElementById('expiryDate').value=parsed.quote_expire_date;document.getElementById('expiryDate').style.borderColor='';}
     else{document.getElementById('expiryDate').value='';document.getElementById('expiryDate').style.borderColor='#e53e3e';}
     if(parsed.lineItems&&parsed.lineItems.length)window.loadLineItems(parsed.lineItems);
+    // Item 7: Auto-populate Vendor dropdown from detected VAD
+    if(parsed.vad){
+      var vnEl=document.getElementById('vendorName');
+      if(vnEl){
+        var map={'Arrow':'Arrow ECS','TD Synnex':'TD Synnex','Carahsoft':'Carahsoft'};
+        var mapped=map[parsed.vad];
+        if(mapped)vnEl.value=mapped;
+      }
+    }
     document.getElementById('extractStatus').textContent='\u2713 Extracted '+(parsed.lineItems&&parsed.lineItems.length||0)+' line items'+(parsed.vad?' ('+parsed.vad+')':'');
   }catch(e){document.getElementById('extractStatus').textContent='Error: '+e.message;}
 }
@@ -1463,6 +1501,206 @@ async function previewPdf(){
       doc.text('\u00A9 TekStream Solutions, LLC  |  1117 Perimeter Center West, Suite E400, Atlanta, GA 30338',L,y);
 
   window.open(doc.output('bloburl'), '_blank');
+}
+
+// ── Item 7: Universal TekStream PO Generator ──────────────────────────────
+async function generatePoPdfBlob(){
+  var jsPDF=window.jspdf.jsPDF;
+  var cn=document.getElementById('customerName').value||'Customer';
+  var co=document.getElementById('contactName').value||'';
+  var ce=document.getElementById('contactEmail').value||'';
+  var qn=document.getElementById('quoteNumber').value||'TS-QUOTE';
+  var qd=document.getElementById('quoteDate').value||(new Date().toISOString().split('T')[0]);
+  var tm=document.getElementById('terms').value||'Net 30';
+  var vendor=(document.getElementById('vendorName')||{}).value||'';
+  var shipAddr=(document.getElementById('shipToAddress')||{}).value||'';
+  var shipCSZ=(document.getElementById('shipToCityStateZip')||{}).value||'';
+  var shipPhone=(document.getElementById('shipToPhone')||{}).value||'';
+  var pdfGroups=groupByYear(window.lineItems);
+  var logoSrc=window.logoDataUrl||'';
+  var sigSrc=window.signatureDataUrl||'';
+
+  var doc=new jsPDF({unit:'pt',format:'letter'});
+  var W=612,L=36,R=576;
+
+  // Header bar (TekStream brand)
+  doc.setFillColor(0,54,88);doc.rect(0,0,W,68,'F');
+  if(logoSrc&&logoSrc.startsWith('data:')){
+    try{var li=new Image();await new Promise(function(res,rej){li.onload=res;li.onerror=rej;li.src=logoSrc;});
+      doc.addImage(logoSrc,'PNG',L,11,li.naturalWidth*(46/li.naturalHeight),46);
+    }catch(e){doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(255,255,255);doc.text('TekStream',L,36);}
+  }
+  doc.setFillColor(91,148,203);doc.rect(0,68,W,5,'F');
+
+  doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(255,255,255);
+  doc.text('PURCHASE ORDER',R,42,{align:'right'});
+
+  var y=92;
+  doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0,54,88);
+  doc.text('PO Generated for '+(vendor||'Vendor'),L,y);
+  doc.text('Customer Ref #:  '+qn,R,y,{align:'right'});
+  y+=14;
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(60,60,60);
+  doc.text('Date:  '+fmtDateDisplay(qd),R,y,{align:'right'});
+  y+=18;
+
+  // Two-column header info block
+  var colRX=R-270;
+  var startY=y;
+
+  // LEFT column
+  doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(0,54,88);
+  doc.text('Company Name:',L,y);
+  doc.setFont('helvetica','normal');doc.setTextColor(19,17,18);
+  doc.text('TekStream Solutions',L+105,y);y+=14;
+  doc.setFont('helvetica','bold');doc.setTextColor(0,54,88);
+  doc.text('Company Address:',L,y);
+  doc.setFont('helvetica','normal');doc.setTextColor(19,17,18);
+  doc.text('1117 Perimeter Center West, Suite E400',L+105,y);y+=11;
+  doc.text('Atlanta, GA 30338',L+105,y);y+=14;
+  doc.setFont('helvetica','bold');doc.setTextColor(0,54,88);
+  doc.text('PO #:',L,y);
+  doc.setFont('helvetica','normal');doc.setTextColor(19,17,18);
+  doc.text(qn,L+105,y);y+=18;
+  doc.setFont('helvetica','bold');doc.setTextColor(0,54,88);
+  doc.text('Bill to:',L,y);
+  doc.setFont('helvetica','normal');doc.setTextColor(19,17,18);
+  doc.text('TekStream Solutions, LLC',L+105,y);y+=11;
+  doc.text('Attention: Accounts Payable',L+105,y);y+=11;
+  doc.text('1117 Perimeter Center West, Suite E400',L+105,y);y+=11;
+  doc.text('Atlanta, GA 30338',L+105,y);y+=18;
+
+  // RIGHT column (parallel)
+  var ry=startY;
+  doc.setFont('helvetica','bold');doc.setTextColor(0,54,88);
+  doc.text('Vendor Name:',colRX,ry);
+  doc.setFont('helvetica','normal');doc.setTextColor(19,17,18);
+  doc.text(vendor||'—',colRX+90,ry);ry+=14;
+  ry+=11+14+18; // align with left's Company Address(2 lines)+gap+PO# gap
+
+  doc.setFont('helvetica','bold');doc.setTextColor(0,54,88);
+  doc.text('Ship to:',colRX,ry);
+  doc.setFont('helvetica','normal');doc.setTextColor(19,17,18);
+  var rxText=colRX+90;
+  if(co){doc.text(co,rxText,ry);ry+=11;} else { ry+=11; }
+  if(ce){doc.text(ce,rxText,ry);ry+=11;} else { ry+=11; }
+  doc.text(cn,rxText,ry);ry+=11;
+  if(shipAddr){doc.text(shipAddr,rxText,ry);ry+=11;}
+  if(shipCSZ){doc.text(shipCSZ,rxText,ry);ry+=11;}
+  if(shipPhone){doc.text(shipPhone,rxText,ry);ry+=11;}
+
+  y=Math.max(y,ry)+10;
+  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);
+  doc.text('Product Detail:',L,y);y+=18;
+
+  // Column geometry: Line | Item # | Description | Start | End | Qty | Reseller Price | Reseller Price Ext
+  var lineW=24,itemW=62,startW=58,endW=58,qtyW=34,priceW=68,extW=78;
+  var descW=(R-L)-lineW-itemW-startW-endW-qtyW-priceW-extW;
+  var cLine=L,cItem=cLine+lineW,cDesc=cItem+itemW,cStart=cDesc+descW,cEnd=cStart+startW,cQty=cEnd+endW,cPrice=cQty+qtyW,cExt=cPrice+priceW;
+  function poNewPageIfNeeded(n){if(y+n>720){doc.addPage();y=48;}}
+  function drawPoColHeaders(){
+    doc.setFillColor(91,148,203);doc.rect(L,y,R-L,18,'F');
+    doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(255,255,255);
+    doc.text('Line',cLine+lineW/2,y+12,{align:'center'});
+    doc.text('Item Number',cItem+4,y+12);
+    doc.text('Description',cDesc+4,y+12);
+    doc.text('Service Start',cStart+startW/2,y+12,{align:'center'});
+    doc.text('Service End',cEnd+endW/2,y+12,{align:'center'});
+    doc.text('Qty',cQty+qtyW-2,y+12,{align:'right'});
+    doc.text('Reseller Price',cPrice+priceW-2,y+12,{align:'right'});
+    doc.text('Reseller Price Ext',cExt+extW-2,y+12,{align:'right'});
+    y+=18;
+  }
+  function renderPoRow(it,lineNum,alt){
+    var price=it.unit_price||0,ext=price*(it.qty||0);
+    var skuL=doc.splitTextToSize(it.sku||'',itemW-4);
+    var descL=doc.splitTextToSize(it.description||'',descW-4);
+    var nL=Math.max(skuL.length,descL.length,1),rowH=nL*10+8;
+    poNewPageIfNeeded(rowH);
+    if(alt){doc.setFillColor(245,248,251);doc.rect(L,y,R-L,rowH,'F');}
+    doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(19,17,18);
+    doc.text(String(lineNum),cLine+lineW/2,y+9,{align:'center'});
+    doc.text(skuL,cItem+4,y+9);
+    doc.text(descL,cDesc+4,y+9);
+    var mid=y+rowH/2+3;
+    doc.text(fmtDateDisplay(it.start_date||''),cStart+startW/2,mid,{align:'center'});
+    doc.text(fmtDateDisplay(it.end_date||''),cEnd+endW/2,mid,{align:'center'});
+    doc.text(String(it.qty||0),cQty+qtyW-2,mid,{align:'right'});
+    doc.text(price>0?'$'+fmt(price):'$ —',cPrice+priceW-2,mid,{align:'right'});
+    doc.text(ext>0?'$'+fmt(ext):'$ —',cExt+extW-2,mid,{align:'right'});
+    y+=rowH;
+  }
+
+  var groups=pdfGroups||[{label:'Payment 1',start:'',end:'',items:window.lineItems}];
+  groups.forEach(function(grp,gIdx){
+    poNewPageIfNeeded(60);
+    doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);
+    doc.text(grp.label,L,y);y+=4;
+    drawPoColHeaders();
+    var groupTotal=0,lineCounter=1;
+    grp.items.forEach(function(it,i){
+      renderPoRow(it,lineCounter++,i%2===1);
+      groupTotal+=(it.unit_price||0)*(it.qty||0);
+    });
+    poNewPageIfNeeded(22);
+    doc.setFillColor(235,243,251);doc.rect(L,y,R-L,18,'F');
+    doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(0,54,88);
+    var yearNum=gIdx+1;
+    doc.text('Total Year '+yearNum+' USD due per contracted terms with '+(vendor||'Vendor')+' from the invoice date:',cExt-6,y+12,{align:'right'});
+    doc.text('$'+fmt(groupTotal),cExt+extW-2,y+12,{align:'right'});
+    y+=24;
+  });
+
+  // Payment Terms + signature
+  poNewPageIfNeeded(120);
+  y+=8;
+  doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(0,54,88);
+  doc.text('Payment Terms: ',L,y);
+  doc.setFont('helvetica','normal');doc.setTextColor(19,17,18);
+  doc.text('TekStream will pay the amounts due as described above ('+tm+')',L+92,y);
+  y+=24;
+
+  doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(0,54,88);
+  doc.text('Signed By:',L,y);y+=4;
+  if(sigSrc&&sigSrc.startsWith('data:')){
+    try{
+      var si=new Image();await new Promise(function(res,rej){si.onload=res;si.onerror=rej;si.src=sigSrc;});
+      var sigH=36;var sigW=si.naturalWidth*(sigH/si.naturalHeight);
+      doc.addImage(sigSrc,'PNG',L,y,sigW,sigH);
+      y+=sigH+2;
+    }catch(e){y+=38;}
+  } else { y+=38; }
+  doc.setDrawColor(160,160,160);doc.line(L,y,L+220,y);y+=12;
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(19,17,18);
+  doc.text('Robert C Jansen, CEO, TekStream Solutions, LLC',L,y);
+
+  // Footer bar
+  doc.setFillColor(0,54,88);doc.rect(0,748,W,6,'F');
+  doc.setFillColor(91,148,203);doc.rect(0,754,W,14,'F');
+  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(255,255,255);
+  doc.text('Copyright \u00A9 TekStream Solutions, LLC '+new Date().getFullYear()+' | tekstream.com | Confidential',W/2,763,{align:'center'});
+
+  return doc.output('blob');
+}
+
+async function downloadPoPdf(){
+  if(!window.lineItems||!window.lineItems.length){alert('Add line items before generating a PO.');return;}
+  var vendor=(document.getElementById('vendorName')||{}).value||'';
+  if(!vendor){alert('Please select a Vendor (VAD) before generating a PO.');return;}
+  var qn=document.getElementById('quoteNumber').value||'TS-QUOTE';
+  var cn=document.getElementById('customerName').value||'Customer';
+  try{
+    var blob=await generatePoPdfBlob();
+    var fname=qn+' - '+vendor+' PO - '+cn+'.pdf';
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=fname;
+    document.body.appendChild(a);a.click();
+    setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(a.href);},100);
+  }catch(e){
+    alert('PO generation failed: '+e.message);
+    console.error(e);
+  }
 }
 </script>
 </body>
