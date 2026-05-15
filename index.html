@@ -736,7 +736,67 @@ async function generatePdfBlob(){
   doc.setFillColor(0,54,88);doc.rect(0,748,W,6,'F');doc.setFillColor(91,148,203);doc.rect(0,754,W,14,'F');
   doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(255,255,255);
   doc.text('Copyright © TekStream Solutions, LLC 2026 | tekstream.com | Confidential',W/2,763,{align:'center'});
-  return doc.output('blob');
+  
+      // ── Legal Language ────────────────────────────────────────────────────
+      y+=20;
+      newPageIfNeeded(400);
+      doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0,54,88);
+      doc.text('Terms and Conditions',L,y);y+=14;
+      doc.setDrawColor(91,148,203);doc.line(L,y,R,y);y+=10;
+      var tcs=[
+        {h:'1. OEM Terms.',b:'Partner is an authorized reseller of the programs listed on this Ordering Document. The programs are licensed to Customer directly by the applicable manufacturer or publisher (each, an "OEM"). Customer\'s right to access, use, deploy, and receive support for the programs is governed exclusively by the applicable OEM\'s end user license agreement, subscription agreement, terms of service, support terms, and/or acceptable use policy (collectively, the "OEM Terms"). By accepting this Ordering Document, Customer consents to the applicable OEM Terms. Partner is not a party to the OEM Terms and has no authority to modify, waive, or supplement them.'},
+        {h:'2. Quote Validity; Order Acceptance.',b:'This quote is valid for the period stated above. All orders are subject to acceptance by Partner and confirmation of pricing and availability by the applicable OEM. Partner reserves the right to correct pricing errors or decline orders prior to fulfillment.'},
+        {h:'3. Fees, Taxes, and Payment.',b:'All fees are in U.S. Dollars and exclusive of applicable taxes, all of which are the responsibility of Customer. Unpaid balances accrue interest at 1.5% per month. Customer agrees to pay applicable sales/use tax, media, and shipping and handling charges.'},
+        {h:'4. Delivery.',b:'Programs are delivered electronically. Delivery is deemed complete upon transmission of license keys or activation credentials, or OEM activation of Customer\'s subscription, whichever occurs first. Risk of loss passes to Customer upon delivery.'},
+        {h:'5. Non-Cancellable, Non-Returnable.',b:'ALL ORDERS ARE FINAL, NON-CANCELLABLE, AND NON-REFUNDABLE ONCE ACCEPTED BY PARTNER, EXCEPT AS EXPRESSLY REQUIRED BY THE APPLICABLE OEM UNDER THE OEM TERMS.'},
+        {h:'6. Support and Maintenance.',b:'All technical support, maintenance, and updates are provided exclusively by the applicable OEM pursuant to the OEM Terms. Partner has no obligation to provide technical support under this Ordering Document.'},
+        {h:'7. No Warranties by Partner.',b:'PARTNER MAKES NO WARRANTIES, EXPRESS OR IMPLIED, WITH RESPECT TO THE PROGRAMS, AND SPECIFICALLY DISCLAIMS ALL IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. ANY WARRANTIES ARE PROVIDED SOLELY BY THE APPLICABLE OEM.'},
+        {h:'8. Limitation of Liability.',b:'IN NO EVENT SHALL PARTNER BE LIABLE FOR ANY INDIRECT, INCIDENTAL, CONSEQUENTIAL, SPECIAL, EXEMPLARY, OR PUNITIVE DAMAGES, INCLUDING WITHOUT LIMITATION LOST PROFITS, LOST REVENUE, LOST DATA, BUSINESS INTERRUPTION, OR COST OF SUBSTITUTE PROGRAMS, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. THE FOREGOING LIMITATIONS APPLY NOTWITHSTANDING THE FAILURE OF ESSENTIAL PURPOSE OF ANY LIMITED REMEDY.'S TOTAL LIABILITY SHALL NOT EXCEED AMOUNTS PAID BY CUSTOMER IN THE TWELVE (12) MONTHS PRECEDING THE EVENT GIVING RISE TO LIABILITY. IN NO EVENT SHALL PARTNER BE LIABLE FOR INDIRECT, INCIDENTAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOST PROFITS OR BUSINESS INTERRUPTION.'},
+        {h:'9. Indemnification.',b:'Customer shall indemnify and hold harmless Partner and its affiliates from any claims arising out of (a) Customer\'s use or misuse of the programs, (b) breach of applicable OEM Terms, or (c) breach of this Ordering Document.'},
+        {h:'10. Compliance; Export Control.',b:'Customer shall comply with all applicable laws including U.S. export control laws and sanctions regulations. Customer represents it is not subject to comprehensive U.S. sanctions and is not on any U.S. government restricted-party list.'},
+        {h:'11. Confidentiality.',b:'Pricing, discount levels, and the terms of this Ordering Document are confidential and shall not be disclosed to any third party without Partner\'s prior written consent, except as required by law.'},
+        {h:'12. Order of Precedence.',b:'Order of precedence: (a) any signed written agreement between parties; (b) applicable OEM Terms; (c) this Ordering Document. Preprinted terms on Customer purchase orders are expressly rejected.'},
+        {h:'13. Assignment.',b:'Customer may not assign this Ordering Document without Partner\'s prior written consent. Partner may assign to an affiliate or successor in interest.'},
+        {h:'14. Governing Law; Venue; Attorney Fees.',b:'Governed by the laws of the State of Georgia. Customer submits to exclusive jurisdiction of Georgia courts. The prevailing party in any dispute is entitled to reasonable attorney fees. THE PARTIES WAIVE ANY RIGHT TO A JURY TRIAL.'},
+        {h:'15. Entire Agreement.',b:'This Ordering Document constitutes the entire agreement between the parties. Any modification shall be in writing and signed by both parties. Sections 1, 3, 5, 7, 8, 9, 10, 11, 12, and 14 survive termination or expiration.'}
+      ];
+      tcs.forEach(function(tc){
+        var hLines=doc.splitTextToSize(tc.h,R-L);
+        var bLines=doc.splitTextToSize(tc.b,R-L);
+        newPageIfNeeded(hLines.length*10+bLines.length*9+10);
+        doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(0,54,88);
+        doc.text(hLines,L,y);y+=hLines.length*10;
+        doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(60,60,60);
+        doc.text(bLines,L,y);y+=bLines.length*9+8;
+      });
+      // ── Approval / Signature Block ─────────────────────────────────────────
+      newPageIfNeeded(180);
+      y+=10;
+      doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0,54,88);
+      doc.text('Approval',L,y);y+=14;
+      doc.setDrawColor(91,148,203);doc.line(L,y,R,y);y+=12;
+      doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(60,60,60);
+      var witnessLines=doc.splitTextToSize('IN WITNESS WHEREOF, the parties have executed this Ordering Document by their duly authorized representatives.',R-L);
+      doc.text(witnessLines,L,y);y+=witnessLines.length*10+14;
+      var col1=L,col2=L+(R-L)/2+10,colW=(R-L)/2-14;
+      doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(0,54,88);
+      doc.text('TekStream Solutions, LLC (Partner)',col1,y);
+      var cnLabel=doc.splitTextToSize(cn+' (Customer)',colW);
+      doc.text(cnLabel,col2,y);y+=cnLabel.length*11+8;
+      ['Signature','Printed Name','Title','Date'].forEach(function(f){
+        newPageIfNeeded(28);
+        doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(100,100,100);
+        doc.text(f+':',col1,y);doc.text(f+':',col2,y);
+        doc.setDrawColor(160,160,160);
+        doc.line(col1+40,y+1,col1+colW,y+1);
+        doc.line(col2+40,y+1,col2+colW,y+1);
+        y+=22;
+      });
+      y+=6;
+      doc.setFont('helvetica','italic');doc.setFontSize(7);doc.setTextColor(150,150,150);
+      doc.text('\u00A9 TekStream Solutions, LLC  |  1117 Perimeter Center West, Suite E400, Atlanta, GA 30338',L,y);
+
+      return doc.output('blob');
 }
 
 async function emailQuote(){
@@ -811,6 +871,66 @@ async function previewPdf(){
   doc.setFillColor(0,54,88);doc.rect(0,748,W,6,'F');doc.setFillColor(91,148,203);doc.rect(0,754,W,14,'F');
   doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(255,255,255);
   doc.text('Copyright \u00A9 TekStream Solutions, LLC 2026 | tekstream.com | Confidential',W/2,763,{align:'center'});
+  
+      // ── Legal Language ────────────────────────────────────────────────────
+      y+=20;
+      newPageIfNeeded(400);
+      doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0,54,88);
+      doc.text('Terms and Conditions',L,y);y+=14;
+      doc.setDrawColor(91,148,203);doc.line(L,y,R,y);y+=10;
+      var tcs=[
+        {h:'1. OEM Terms.',b:'Partner is an authorized reseller of the programs listed on this Ordering Document. The programs are licensed to Customer directly by the applicable manufacturer or publisher (each, an "OEM"). Customer\'s right to access, use, deploy, and receive support for the programs is governed exclusively by the applicable OEM\'s end user license agreement, subscription agreement, terms of service, support terms, and/or acceptable use policy (collectively, the "OEM Terms"). By accepting this Ordering Document, Customer consents to the applicable OEM Terms. Partner is not a party to the OEM Terms and has no authority to modify, waive, or supplement them.'},
+        {h:'2. Quote Validity; Order Acceptance.',b:'This quote is valid for the period stated above. All orders are subject to acceptance by Partner and confirmation of pricing and availability by the applicable OEM. Partner reserves the right to correct pricing errors or decline orders prior to fulfillment.'},
+        {h:'3. Fees, Taxes, and Payment.',b:'All fees are in U.S. Dollars and exclusive of applicable taxes, all of which are the responsibility of Customer. Unpaid balances accrue interest at 1.5% per month. Customer agrees to pay applicable sales/use tax, media, and shipping and handling charges.'},
+        {h:'4. Delivery.',b:'Programs are delivered electronically. Delivery is deemed complete upon transmission of license keys or activation credentials, or OEM activation of Customer\'s subscription, whichever occurs first. Risk of loss passes to Customer upon delivery.'},
+        {h:'5. Non-Cancellable, Non-Returnable.',b:'ALL ORDERS ARE FINAL, NON-CANCELLABLE, AND NON-REFUNDABLE ONCE ACCEPTED BY PARTNER, EXCEPT AS EXPRESSLY REQUIRED BY THE APPLICABLE OEM UNDER THE OEM TERMS.'},
+        {h:'6. Support and Maintenance.',b:'All technical support, maintenance, and updates are provided exclusively by the applicable OEM pursuant to the OEM Terms. Partner has no obligation to provide technical support under this Ordering Document.'},
+        {h:'7. No Warranties by Partner.',b:'PARTNER MAKES NO WARRANTIES, EXPRESS OR IMPLIED, WITH RESPECT TO THE PROGRAMS, AND SPECIFICALLY DISCLAIMS ALL IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. ANY WARRANTIES ARE PROVIDED SOLELY BY THE APPLICABLE OEM.'},
+        {h:'8. Limitation of Liability.',b:'IN NO EVENT SHALL PARTNER BE LIABLE FOR ANY INDIRECT, INCIDENTAL, CONSEQUENTIAL, SPECIAL, EXEMPLARY, OR PUNITIVE DAMAGES, INCLUDING WITHOUT LIMITATION LOST PROFITS, LOST REVENUE, LOST DATA, BUSINESS INTERRUPTION, OR COST OF SUBSTITUTE PROGRAMS, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. THE FOREGOING LIMITATIONS APPLY NOTWITHSTANDING THE FAILURE OF ESSENTIAL PURPOSE OF ANY LIMITED REMEDY.'S TOTAL LIABILITY SHALL NOT EXCEED AMOUNTS PAID BY CUSTOMER IN THE TWELVE (12) MONTHS PRECEDING THE EVENT GIVING RISE TO LIABILITY. IN NO EVENT SHALL PARTNER BE LIABLE FOR INDIRECT, INCIDENTAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOST PROFITS OR BUSINESS INTERRUPTION.'},
+        {h:'9. Indemnification.',b:'Customer shall indemnify and hold harmless Partner and its affiliates from any claims arising out of (a) Customer\'s use or misuse of the programs, (b) breach of applicable OEM Terms, or (c) breach of this Ordering Document.'},
+        {h:'10. Compliance; Export Control.',b:'Customer shall comply with all applicable laws including U.S. export control laws and sanctions regulations. Customer represents it is not subject to comprehensive U.S. sanctions and is not on any U.S. government restricted-party list.'},
+        {h:'11. Confidentiality.',b:'Pricing, discount levels, and the terms of this Ordering Document are confidential and shall not be disclosed to any third party without Partner\'s prior written consent, except as required by law.'},
+        {h:'12. Order of Precedence.',b:'Order of precedence: (a) any signed written agreement between parties; (b) applicable OEM Terms; (c) this Ordering Document. Preprinted terms on Customer purchase orders are expressly rejected.'},
+        {h:'13. Assignment.',b:'Customer may not assign this Ordering Document without Partner\'s prior written consent. Partner may assign to an affiliate or successor in interest.'},
+        {h:'14. Governing Law; Venue; Attorney Fees.',b:'Governed by the laws of the State of Georgia. Customer submits to exclusive jurisdiction of Georgia courts. The prevailing party in any dispute is entitled to reasonable attorney fees. THE PARTIES WAIVE ANY RIGHT TO A JURY TRIAL.'},
+        {h:'15. Entire Agreement.',b:'This Ordering Document constitutes the entire agreement between the parties. Any modification shall be in writing and signed by both parties. Sections 1, 3, 5, 7, 8, 9, 10, 11, 12, and 14 survive termination or expiration.'}
+      ];
+      tcs.forEach(function(tc){
+        var hLines=doc.splitTextToSize(tc.h,R-L);
+        var bLines=doc.splitTextToSize(tc.b,R-L);
+        newPageIfNeeded(hLines.length*10+bLines.length*9+10);
+        doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(0,54,88);
+        doc.text(hLines,L,y);y+=hLines.length*10;
+        doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(60,60,60);
+        doc.text(bLines,L,y);y+=bLines.length*9+8;
+      });
+      // ── Approval / Signature Block ─────────────────────────────────────────
+      newPageIfNeeded(180);
+      y+=10;
+      doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0,54,88);
+      doc.text('Approval',L,y);y+=14;
+      doc.setDrawColor(91,148,203);doc.line(L,y,R,y);y+=12;
+      doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(60,60,60);
+      var witnessLines=doc.splitTextToSize('IN WITNESS WHEREOF, the parties have executed this Ordering Document by their duly authorized representatives.',R-L);
+      doc.text(witnessLines,L,y);y+=witnessLines.length*10+14;
+      var col1=L,col2=L+(R-L)/2+10,colW=(R-L)/2-14;
+      doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(0,54,88);
+      doc.text('TekStream Solutions, LLC (Partner)',col1,y);
+      var cnLabel=doc.splitTextToSize(cn+' (Customer)',colW);
+      doc.text(cnLabel,col2,y);y+=cnLabel.length*11+8;
+      ['Signature','Printed Name','Title','Date'].forEach(function(f){
+        newPageIfNeeded(28);
+        doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(100,100,100);
+        doc.text(f+':',col1,y);doc.text(f+':',col2,y);
+        doc.setDrawColor(160,160,160);
+        doc.line(col1+40,y+1,col1+colW,y+1);
+        doc.line(col2+40,y+1,col2+colW,y+1);
+        y+=22;
+      });
+      y+=6;
+      doc.setFont('helvetica','italic');doc.setFontSize(7);doc.setTextColor(150,150,150);
+      doc.text('\u00A9 TekStream Solutions, LLC  |  1117 Perimeter Center West, Suite E400, Atlanta, GA 30338',L,y);
+
   window.open(doc.output('bloburl'), '_blank');
 }
 
@@ -885,6 +1005,66 @@ async function previewPdf(){
   doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(255,255,255);
   doc.text('Copyright \u00A9 TekStream Solutions, LLC 2026 | tekstream.com | Confidential',W/2,763,{align:'center'});
   // Open in new tab instead of downloading
+  
+      // ── Legal Language ────────────────────────────────────────────────────
+      y+=20;
+      newPageIfNeeded(400);
+      doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0,54,88);
+      doc.text('Terms and Conditions',L,y);y+=14;
+      doc.setDrawColor(91,148,203);doc.line(L,y,R,y);y+=10;
+      var tcs=[
+        {h:'1. OEM Terms.',b:'Partner is an authorized reseller of the programs listed on this Ordering Document. The programs are licensed to Customer directly by the applicable manufacturer or publisher (each, an "OEM"). Customer\'s right to access, use, deploy, and receive support for the programs is governed exclusively by the applicable OEM\'s end user license agreement, subscription agreement, terms of service, support terms, and/or acceptable use policy (collectively, the "OEM Terms"). By accepting this Ordering Document, Customer consents to the applicable OEM Terms. Partner is not a party to the OEM Terms and has no authority to modify, waive, or supplement them.'},
+        {h:'2. Quote Validity; Order Acceptance.',b:'This quote is valid for the period stated above. All orders are subject to acceptance by Partner and confirmation of pricing and availability by the applicable OEM. Partner reserves the right to correct pricing errors or decline orders prior to fulfillment.'},
+        {h:'3. Fees, Taxes, and Payment.',b:'All fees are in U.S. Dollars and exclusive of applicable taxes, all of which are the responsibility of Customer. Unpaid balances accrue interest at 1.5% per month. Customer agrees to pay applicable sales/use tax, media, and shipping and handling charges.'},
+        {h:'4. Delivery.',b:'Programs are delivered electronically. Delivery is deemed complete upon transmission of license keys or activation credentials, or OEM activation of Customer\'s subscription, whichever occurs first. Risk of loss passes to Customer upon delivery.'},
+        {h:'5. Non-Cancellable, Non-Returnable.',b:'ALL ORDERS ARE FINAL, NON-CANCELLABLE, AND NON-REFUNDABLE ONCE ACCEPTED BY PARTNER, EXCEPT AS EXPRESSLY REQUIRED BY THE APPLICABLE OEM UNDER THE OEM TERMS.'},
+        {h:'6. Support and Maintenance.',b:'All technical support, maintenance, and updates are provided exclusively by the applicable OEM pursuant to the OEM Terms. Partner has no obligation to provide technical support under this Ordering Document.'},
+        {h:'7. No Warranties by Partner.',b:'PARTNER MAKES NO WARRANTIES, EXPRESS OR IMPLIED, WITH RESPECT TO THE PROGRAMS, AND SPECIFICALLY DISCLAIMS ALL IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. ANY WARRANTIES ARE PROVIDED SOLELY BY THE APPLICABLE OEM.'},
+        {h:'8. Limitation of Liability.',b:'IN NO EVENT SHALL PARTNER BE LIABLE FOR ANY INDIRECT, INCIDENTAL, CONSEQUENTIAL, SPECIAL, EXEMPLARY, OR PUNITIVE DAMAGES, INCLUDING WITHOUT LIMITATION LOST PROFITS, LOST REVENUE, LOST DATA, BUSINESS INTERRUPTION, OR COST OF SUBSTITUTE PROGRAMS, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. THE FOREGOING LIMITATIONS APPLY NOTWITHSTANDING THE FAILURE OF ESSENTIAL PURPOSE OF ANY LIMITED REMEDY.'S TOTAL LIABILITY SHALL NOT EXCEED AMOUNTS PAID BY CUSTOMER IN THE TWELVE (12) MONTHS PRECEDING THE EVENT GIVING RISE TO LIABILITY. IN NO EVENT SHALL PARTNER BE LIABLE FOR INDIRECT, INCIDENTAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOST PROFITS OR BUSINESS INTERRUPTION.'},
+        {h:'9. Indemnification.',b:'Customer shall indemnify and hold harmless Partner and its affiliates from any claims arising out of (a) Customer\'s use or misuse of the programs, (b) breach of applicable OEM Terms, or (c) breach of this Ordering Document.'},
+        {h:'10. Compliance; Export Control.',b:'Customer shall comply with all applicable laws including U.S. export control laws and sanctions regulations. Customer represents it is not subject to comprehensive U.S. sanctions and is not on any U.S. government restricted-party list.'},
+        {h:'11. Confidentiality.',b:'Pricing, discount levels, and the terms of this Ordering Document are confidential and shall not be disclosed to any third party without Partner\'s prior written consent, except as required by law.'},
+        {h:'12. Order of Precedence.',b:'Order of precedence: (a) any signed written agreement between parties; (b) applicable OEM Terms; (c) this Ordering Document. Preprinted terms on Customer purchase orders are expressly rejected.'},
+        {h:'13. Assignment.',b:'Customer may not assign this Ordering Document without Partner\'s prior written consent. Partner may assign to an affiliate or successor in interest.'},
+        {h:'14. Governing Law; Venue; Attorney Fees.',b:'Governed by the laws of the State of Georgia. Customer submits to exclusive jurisdiction of Georgia courts. The prevailing party in any dispute is entitled to reasonable attorney fees. THE PARTIES WAIVE ANY RIGHT TO A JURY TRIAL.'},
+        {h:'15. Entire Agreement.',b:'This Ordering Document constitutes the entire agreement between the parties. Any modification shall be in writing and signed by both parties. Sections 1, 3, 5, 7, 8, 9, 10, 11, 12, and 14 survive termination or expiration.'}
+      ];
+      tcs.forEach(function(tc){
+        var hLines=doc.splitTextToSize(tc.h,R-L);
+        var bLines=doc.splitTextToSize(tc.b,R-L);
+        newPageIfNeeded(hLines.length*10+bLines.length*9+10);
+        doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(0,54,88);
+        doc.text(hLines,L,y);y+=hLines.length*10;
+        doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(60,60,60);
+        doc.text(bLines,L,y);y+=bLines.length*9+8;
+      });
+      // ── Approval / Signature Block ─────────────────────────────────────────
+      newPageIfNeeded(180);
+      y+=10;
+      doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0,54,88);
+      doc.text('Approval',L,y);y+=14;
+      doc.setDrawColor(91,148,203);doc.line(L,y,R,y);y+=12;
+      doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(60,60,60);
+      var witnessLines=doc.splitTextToSize('IN WITNESS WHEREOF, the parties have executed this Ordering Document by their duly authorized representatives.',R-L);
+      doc.text(witnessLines,L,y);y+=witnessLines.length*10+14;
+      var col1=L,col2=L+(R-L)/2+10,colW=(R-L)/2-14;
+      doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(0,54,88);
+      doc.text('TekStream Solutions, LLC (Partner)',col1,y);
+      var cnLabel=doc.splitTextToSize(cn+' (Customer)',colW);
+      doc.text(cnLabel,col2,y);y+=cnLabel.length*11+8;
+      ['Signature','Printed Name','Title','Date'].forEach(function(f){
+        newPageIfNeeded(28);
+        doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(100,100,100);
+        doc.text(f+':',col1,y);doc.text(f+':',col2,y);
+        doc.setDrawColor(160,160,160);
+        doc.line(col1+40,y+1,col1+colW,y+1);
+        doc.line(col2+40,y+1,col2+colW,y+1);
+        y+=22;
+      });
+      y+=6;
+      doc.setFont('helvetica','italic');doc.setFontSize(7);doc.setTextColor(150,150,150);
+      doc.text('\u00A9 TekStream Solutions, LLC  |  1117 Perimeter Center West, Suite E400, Atlanta, GA 30338',L,y);
+
   window.open(doc.output('bloburl'), '_blank');
 }
 
@@ -970,7 +1150,81 @@ async function downloadPdf(){
   doc.setFillColor(0,54,88);doc.rect(0,748,W,6,'F');doc.setFillColor(91,148,203);doc.rect(0,754,W,14,'F');
   doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(255,255,255);
   doc.text('Copyright \u00A9 TekStream Solutions, LLC 2026 | tekstream.com | Confidential',W/2,763,{align:'center'});
-  var fname=(document.getElementById('pdfFileName').value||qn+' - '+cn).replace(/\.pdf$/i,'');doc.save(fname+'.pdf');
+  
+      // ── Legal Language ────────────────────────────────────────────────────
+      y+=20;
+      newPageIfNeeded(400);
+      doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0,54,88);
+      doc.text('Terms and Conditions',L,y);y+=14;
+      doc.setDrawColor(91,148,203);doc.line(L,y,R,y);y+=10;
+
+      var tcs=[
+        {h:'1. OEM Terms.',b:'Partner is an authorized reseller of the programs listed on this Ordering Document. The programs are licensed to Customer directly by the applicable manufacturer or publisher (each, an "OEM"). Customer's right to access, use, deploy, and receive support for the programs is governed exclusively by the applicable OEM's end user license agreement, subscription agreement, terms of service, support terms, and/or acceptable use policy (collectively, the "OEM Terms"). By accepting this Ordering Document, submitting a purchase order, or using the programs, Customer consents to the applicable OEM Terms. Partner is not a party to the OEM Terms and has no authority to modify, waive, or supplement them. Customer is responsible for reviewing the applicable OEM Terms prior to placing an order.'},
+        {h:'2. Quote Validity; Order Acceptance.',b:'This quote is valid for the period stated above. All orders are subject to acceptance by Partner and confirmation of pricing and availability by the applicable OEM. Partner reserves the right to correct pricing errors or decline orders prior to fulfillment.'},
+        {h:'3. Fees, Taxes, and Payment.',b:'All fees on this Ordering Document are in U.S. Dollars and exclusive of applicable shipping charges and sales, use, excise, value-added, and similar taxes, all of which are the responsibility of Customer. All amounts due under this Ordering Document shall be paid in full per the terms defined above. If not paid within that time, interest shall accrue on any unpaid balance at 1.5% per month, or such higher rate as may be allowed by law. Customer agrees to pay applicable sales/use tax, media, and shipping and handling charges.'},
+        {h:'4. Delivery.',b:'Programs are delivered electronically. Delivery is deemed complete upon Partner's transmission of license keys or activation credentials to Customer or the OEM's activation of Customer's subscription, whichever occurs first. Risk of loss passes to Customer upon delivery.'},
+        {h:'5. Non-Cancellable, Non-Returnable.',b:'ALL ORDERS FOR PROGRAMS ARE FINAL, NON-CANCELLABLE, AND NON-REFUNDABLE ONCE ACCEPTED BY PARTNER, EXCEPT AS EXPRESSLY REQUIRED BY THE APPLICABLE OEM UNDER THE OEM TERMS, IN WHICH CASE CUSTOMER'S SOLE REMEDY SHALL BE AGAINST THE OEM.'},
+        {h:'6. Support and Maintenance.',b:'All technical support, maintenance, updates, upgrades, and service level commitments for the programs are provided exclusively by the applicable OEM pursuant to the OEM Terms. Partner has no obligation to provide technical support for the programs under this Ordering Document.'},
+        {h:'7. No Warranties by Partner.',b:'PARTNER MAKES NO WARRANTIES, EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, WITH RESPECT TO THE PROGRAMS, AND SPECIFICALLY DISCLAIMS ALL IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, AND ANY WARRANTIES ARISING FROM COURSE OF DEALING OR USAGE OF TRADE. ANY WARRANTIES APPLICABLE TO THE PROGRAMS ARE PROVIDED SOLELY BY THE APPLICABLE OEM UNDER THE OEM TERMS.'},
+        {h:'8. Limitation of Liability.',b:'IN NO EVENT SHALL PARTNER BE LIABLE FOR ANY INDIRECT, INCIDENTAL, CONSEQUENTIAL, SPECIAL, EXEMPLARY, OR PUNITIVE DAMAGES, INCLUDING WITHOUT LIMITATION LOST PROFITS, LOST REVENUE, LOST DATA, BUSINESS INTERRUPTION, OR COST OF SUBSTITUTE PROGRAMS, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. THE FOREGOING LIMITATIONS APPLY NOTWITHSTANDING THE FAILURE OF ESSENTIAL PURPOSE OF ANY LIMITED REMEDY.'S TOTAL CUMULATIVE LIABILITY ARISING OUT OF OR RELATED TO THIS ORDERING DOCUMENT OR THE PROGRAMS EXCEED THE AMOUNTS ACTUALLY PAID BY CUSTOMER TO PARTNER FOR THE SPECIFIC PROGRAMS GIVING RISE TO THE CLAIM IN THE TWELVE (12) MONTHS PRECEDING THE EVENT GIVING RISE TO LIABILITY. IN NO EVENT SHALL PARTNER BE LIABLE FOR ANY INDIRECT, INCIDENTAL, CONSEQUENTIAL, SPECIAL, EXEMPLARY, OR PUNITIVE DAMAGES, INCLUDING WITHOUT LIMITATION LOST PROFITS, LOST REVENUE, LOST DATA, OR BUSINESS INTERRUPTION.'},
+        {h:'9. Indemnification.',b:'Customer shall indemnify, defend, and hold harmless Partner and its officers, employees, and affiliates from and against any claims, damages, liabilities, costs, and expenses (including reasonable attorneys' fees) arising out of (a) Customer's use or misuse of the programs, (b) Customer's breach of the applicable OEM Terms, or (c) Customer's breach of this Ordering Document.'},
+        {h:'10. Compliance; Export Control.',b:'Customer shall comply with all applicable laws and regulations, including U.S. export control laws, sanctions regulations, and anti-corruption laws, in connection with its acquisition and use of the programs. Customer represents that it is not located in, organized under the laws of, or ordinarily resident in any country or territory subject to comprehensive U.S. sanctions, and is not identified on any U.S. government restricted-party list.'},
+        {h:'11. Confidentiality.',b:'Pricing, discount levels, and the terms of this Ordering Document are confidential information of Partner and shall not be disclosed by Customer to any third party without Partner's prior written consent, except as required by law.'},
+        {h:'12. Order of Precedence.',b:'In the event of conflict among documents, the following order of precedence applies: (a) any signed written agreement between Partner and Customer expressly governing this transaction; (b) the applicable OEM Terms with respect to Customer's use of the programs; and (c) this Ordering Document. Any preprinted terms on Customer purchase orders or other ordering documents are expressly rejected and shall have no force or effect.'},
+        {h:'13. Assignment.',b:'Customer may not assign or transfer this Ordering Document or any rights hereunder without Partner's prior written consent. Partner may assign this Ordering Document to an affiliate or successor in interest.'},
+        {h:'14. Governing Law; Venue; Attorney Fees.',b:'This Ordering Document is governed by the laws of the State of Georgia, without regard to its conflict of laws principles. Customer agrees to submit to the exclusive jurisdiction of state and federal courts located in the State of Georgia. The prevailing party in any dispute shall be entitled to reasonable attorney fees and costs. THE PARTIES WAIVE ANY RIGHT TO A JURY TRIAL.'},
+        {h:'15. Entire Agreement.',b:'This Ordering Document constitutes the entire agreement between the parties with respect to this subject matter. Any modification shall be in writing and signed by both parties. Sections 1, 3, 5, 7, 8, 9, 10, 11, 12, and 14 survive termination or expiration of this Ordering Document.'}
+      ];
+
+      tcs.forEach(function(tc){
+        doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(0,54,88);
+        var hLines=doc.splitTextToSize(tc.h,R-L);
+        doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(60,60,60);
+        var bLines=doc.splitTextToSize(tc.b,R-L);
+        var blockH=hLines.length*10+bLines.length*9+8;
+        newPageIfNeeded(blockH);
+        doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(0,54,88);
+        doc.text(hLines,L,y);y+=hLines.length*10;
+        doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(60,60,60);
+        doc.text(bLines,L,y);y+=bLines.length*9+8;
+      });
+
+      // ── Approval / Signature Block ─────────────────────────────────────────
+      newPageIfNeeded(180);
+      y+=10;
+      doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0,54,88);
+      doc.text('Approval',L,y);y+=14;
+      doc.setDrawColor(91,148,203);doc.line(L,y,R,y);y+=12;
+      doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(60,60,60);
+      var witnessLines=doc.splitTextToSize('IN WITNESS WHEREOF, the parties have executed this Ordering Document by their duly authorized representatives.',R-L);
+      doc.text(witnessLines,L,y);y+=witnessLines.length*10+14;
+
+      var col1=L,col2=L+(R-L)/2+10,colW=(R-L)/2-14;
+
+      // Column headers
+      doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(0,54,88);
+      doc.text('TekStream Solutions, LLC (Partner)',col1,y);
+      var cnLabel=doc.splitTextToSize(cn+' (Customer)',colW);
+      doc.text(cnLabel,col2,y);
+      y+=cnLabel.length*11+8;
+
+      // Signature fields
+      ['Signature','Printed Name','Title','Date'].forEach(function(f){
+        newPageIfNeeded(28);
+        doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(100,100,100);
+        doc.text(f+':',col1,y);
+        doc.text(f+':',col2,y);
+        doc.setDrawColor(160,160,160);
+        doc.line(col1+40,y+1,col1+colW,y+1);
+        doc.line(col2+40,y+1,col2+colW,y+1);
+        y+=22;
+      });
+
+      y+=6;
+      doc.setFont('helvetica','italic');doc.setFontSize(7);doc.setTextColor(150,150,150);
+      doc.text('\u00A9 TekStream Solutions, LLC  |  1117 Perimeter Center West, Suite E400, Atlanta, GA 30338',L,y);
+
+      var fname=(document.getElementById('pdfFileName').value||qn+' - '+cn).replace(/\.pdf$/i,'');doc.save(fname+'.pdf');
 }
 async function previewPdf(){
   // Re-run PDF generation but open in new tab instead of downloading
@@ -979,6 +1233,66 @@ async function previewPdf(){
       var pdfGrpLabel=grp.label+(grp.start||grp.end?'  |  Service Dates: '+fmtDateDisplay(grp.start)+(grp.end?' \u2013 '+fmtDateDisplay(grp.end):''):'');
       doc.text(pdfGrpLabel,L+6,y+11);y+=16;drawColHeaders();var prev=subtotal;grp.items.forEach(function(it,i){renderPdfRow(it,i,i%2===1);});var gs=subtotal-prev;newPageIfNeeded(20);doc.setFillColor(235,243,251);doc.rect(L,y,R-L,14,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(0,54,88);doc.text(grp.label+' Subtotal',colPr+priceW,y+10,{align:'right'});doc.text('$'+fmt(gs),colEx,y+10,{align:'right'});y+=18;});}newPageIfNeeded(80);y+=6;doc.setDrawColor(91,148,203);doc.setLineWidth(0.5);doc.line(R-190,y,R,y);y+=14;doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});y+=28;doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(113,113,116);doc.text('Payment terms: '+tm+(pdfGroups?'  |  Invoiced annually':''),L,y);y+=12;doc.text('This quote is valid through the expiration date above. All prices are in USD.',L,y);y+=12;doc.text('Quote subject to change without notice.',L,y);doc.setFillColor(0,54,88);doc.rect(0,748,W,6,'F');doc.setFillColor(91,148,203);doc.rect(0,754,W,14,'F');doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(255,255,255);doc.text('Copyright © TekStream Solutions, LLC 2026 | tekstream.com | Confidential',W/2,763,{align:'center'});
   // Open in new tab instead of downloading
+  
+      // ── Legal Language ────────────────────────────────────────────────────
+      y+=20;
+      newPageIfNeeded(400);
+      doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0,54,88);
+      doc.text('Terms and Conditions',L,y);y+=14;
+      doc.setDrawColor(91,148,203);doc.line(L,y,R,y);y+=10;
+      var tcs=[
+        {h:'1. OEM Terms.',b:'Partner is an authorized reseller of the programs listed on this Ordering Document. The programs are licensed to Customer directly by the applicable manufacturer or publisher (each, an "OEM"). Customer\'s right to access, use, deploy, and receive support for the programs is governed exclusively by the applicable OEM\'s end user license agreement, subscription agreement, terms of service, support terms, and/or acceptable use policy (collectively, the "OEM Terms"). By accepting this Ordering Document, Customer consents to the applicable OEM Terms. Partner is not a party to the OEM Terms and has no authority to modify, waive, or supplement them.'},
+        {h:'2. Quote Validity; Order Acceptance.',b:'This quote is valid for the period stated above. All orders are subject to acceptance by Partner and confirmation of pricing and availability by the applicable OEM. Partner reserves the right to correct pricing errors or decline orders prior to fulfillment.'},
+        {h:'3. Fees, Taxes, and Payment.',b:'All fees are in U.S. Dollars and exclusive of applicable taxes, all of which are the responsibility of Customer. Unpaid balances accrue interest at 1.5% per month. Customer agrees to pay applicable sales/use tax, media, and shipping and handling charges.'},
+        {h:'4. Delivery.',b:'Programs are delivered electronically. Delivery is deemed complete upon transmission of license keys or activation credentials, or OEM activation of Customer\'s subscription, whichever occurs first. Risk of loss passes to Customer upon delivery.'},
+        {h:'5. Non-Cancellable, Non-Returnable.',b:'ALL ORDERS ARE FINAL, NON-CANCELLABLE, AND NON-REFUNDABLE ONCE ACCEPTED BY PARTNER, EXCEPT AS EXPRESSLY REQUIRED BY THE APPLICABLE OEM UNDER THE OEM TERMS.'},
+        {h:'6. Support and Maintenance.',b:'All technical support, maintenance, and updates are provided exclusively by the applicable OEM pursuant to the OEM Terms. Partner has no obligation to provide technical support under this Ordering Document.'},
+        {h:'7. No Warranties by Partner.',b:'PARTNER MAKES NO WARRANTIES, EXPRESS OR IMPLIED, WITH RESPECT TO THE PROGRAMS, AND SPECIFICALLY DISCLAIMS ALL IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. ANY WARRANTIES ARE PROVIDED SOLELY BY THE APPLICABLE OEM.'},
+        {h:'8. Limitation of Liability.',b:'IN NO EVENT SHALL PARTNER BE LIABLE FOR ANY INDIRECT, INCIDENTAL, CONSEQUENTIAL, SPECIAL, EXEMPLARY, OR PUNITIVE DAMAGES, INCLUDING WITHOUT LIMITATION LOST PROFITS, LOST REVENUE, LOST DATA, BUSINESS INTERRUPTION, OR COST OF SUBSTITUTE PROGRAMS, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. THE FOREGOING LIMITATIONS APPLY NOTWITHSTANDING THE FAILURE OF ESSENTIAL PURPOSE OF ANY LIMITED REMEDY.'S TOTAL LIABILITY SHALL NOT EXCEED AMOUNTS PAID BY CUSTOMER IN THE TWELVE (12) MONTHS PRECEDING THE EVENT GIVING RISE TO LIABILITY. IN NO EVENT SHALL PARTNER BE LIABLE FOR INDIRECT, INCIDENTAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOST PROFITS OR BUSINESS INTERRUPTION.'},
+        {h:'9. Indemnification.',b:'Customer shall indemnify and hold harmless Partner and its affiliates from any claims arising out of (a) Customer\'s use or misuse of the programs, (b) breach of applicable OEM Terms, or (c) breach of this Ordering Document.'},
+        {h:'10. Compliance; Export Control.',b:'Customer shall comply with all applicable laws including U.S. export control laws and sanctions regulations. Customer represents it is not subject to comprehensive U.S. sanctions and is not on any U.S. government restricted-party list.'},
+        {h:'11. Confidentiality.',b:'Pricing, discount levels, and the terms of this Ordering Document are confidential and shall not be disclosed to any third party without Partner\'s prior written consent, except as required by law.'},
+        {h:'12. Order of Precedence.',b:'Order of precedence: (a) any signed written agreement between parties; (b) applicable OEM Terms; (c) this Ordering Document. Preprinted terms on Customer purchase orders are expressly rejected.'},
+        {h:'13. Assignment.',b:'Customer may not assign this Ordering Document without Partner\'s prior written consent. Partner may assign to an affiliate or successor in interest.'},
+        {h:'14. Governing Law; Venue; Attorney Fees.',b:'Governed by the laws of the State of Georgia. Customer submits to exclusive jurisdiction of Georgia courts. The prevailing party in any dispute is entitled to reasonable attorney fees. THE PARTIES WAIVE ANY RIGHT TO A JURY TRIAL.'},
+        {h:'15. Entire Agreement.',b:'This Ordering Document constitutes the entire agreement between the parties. Any modification shall be in writing and signed by both parties. Sections 1, 3, 5, 7, 8, 9, 10, 11, 12, and 14 survive termination or expiration.'}
+      ];
+      tcs.forEach(function(tc){
+        var hLines=doc.splitTextToSize(tc.h,R-L);
+        var bLines=doc.splitTextToSize(tc.b,R-L);
+        newPageIfNeeded(hLines.length*10+bLines.length*9+10);
+        doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(0,54,88);
+        doc.text(hLines,L,y);y+=hLines.length*10;
+        doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(60,60,60);
+        doc.text(bLines,L,y);y+=bLines.length*9+8;
+      });
+      // ── Approval / Signature Block ─────────────────────────────────────────
+      newPageIfNeeded(180);
+      y+=10;
+      doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0,54,88);
+      doc.text('Approval',L,y);y+=14;
+      doc.setDrawColor(91,148,203);doc.line(L,y,R,y);y+=12;
+      doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(60,60,60);
+      var witnessLines=doc.splitTextToSize('IN WITNESS WHEREOF, the parties have executed this Ordering Document by their duly authorized representatives.',R-L);
+      doc.text(witnessLines,L,y);y+=witnessLines.length*10+14;
+      var col1=L,col2=L+(R-L)/2+10,colW=(R-L)/2-14;
+      doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(0,54,88);
+      doc.text('TekStream Solutions, LLC (Partner)',col1,y);
+      var cnLabel=doc.splitTextToSize(cn+' (Customer)',colW);
+      doc.text(cnLabel,col2,y);y+=cnLabel.length*11+8;
+      ['Signature','Printed Name','Title','Date'].forEach(function(f){
+        newPageIfNeeded(28);
+        doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(100,100,100);
+        doc.text(f+':',col1,y);doc.text(f+':',col2,y);
+        doc.setDrawColor(160,160,160);
+        doc.line(col1+40,y+1,col1+colW,y+1);
+        doc.line(col2+40,y+1,col2+colW,y+1);
+        y+=22;
+      });
+      y+=6;
+      doc.setFont('helvetica','italic');doc.setFontSize(7);doc.setTextColor(150,150,150);
+      doc.text('\u00A9 TekStream Solutions, LLC  |  1117 Perimeter Center West, Suite E400, Atlanta, GA 30338',L,y);
+
   window.open(doc.output('bloburl'), '_blank');
 }
 </script>
