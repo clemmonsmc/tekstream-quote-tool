@@ -177,7 +177,13 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
 <div style="padding:0 24px 28px;max-width:1400px;margin:0 auto">
   <div class="card">
     <div class="section-label" style="margin-bottom:14px">Line Items</div>
-    <div id="liArea"><div class="empty">Add line items manually or upload a VAD quote.</div></div>
+    <div style="border:1px solid #d0d8e0;border-radius:8px;padding:14px;background:#fafbfc">
+      <div id="liArea"><div class="empty">Add line items manually or upload a VAD quote.</div></div>
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-sm" style="background:transparent;border:1.5px solid #003658;color:#003658" onclick="addRow()">+ Add line item</button>
+        <button class="btn btn-sm" style="background:transparent;border:1.5px solid #5B94CB;color:#5B94CB" onclick="resetSort()" title="Restore original order (as imported)">&#8634; Reset Order</button>
+      </div>
+    </div>
     <div id="totals"></div>
     <div style="display:flex;align-items:center;gap:8px;margin-top:8px;justify-content:flex-end">
       <label style="font-size:12px;color:#717174;white-space:nowrap">Set total:</label>
@@ -190,10 +196,6 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
       <button class="btn btn-sm" style="background:#5B94CB" onclick="applySetTotal()">Apply</button>
     </div>
     <div id="commissionPanel"></div>
-    <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-sm" style="background:transparent;border:1.5px solid #003658;color:#003658" onclick="addRow()">+ Add line item</button>
-      <button class="btn btn-sm" style="background:transparent;border:1.5px solid #5B94CB;color:#5B94CB" onclick="resetSort()" title="Restore original order (as imported)">&#8634; Reset Order</button>
-    </div>
     <div class="btn-row">
       <button class="btn dl-btn" onclick="downloadPdf()">Download PDF quote &#8595;</button>
       <button class="btn dl-btn" style="background:#717174" onclick="previewPdf()">Preview PDF &#128269;</button>
