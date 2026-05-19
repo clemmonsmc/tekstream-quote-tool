@@ -179,7 +179,6 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
     <div class="section-label" style="margin-bottom:14px">Line Items</div>
     <div id="liArea"><div class="empty">Add line items manually or upload a VAD quote.</div></div>
     <div id="totals"></div>
-    <div id="commissionPanel"></div>
     <div style="display:flex;align-items:center;gap:8px;margin-top:8px;justify-content:flex-end">
       <label style="font-size:12px;color:#717174;white-space:nowrap">Set total:</label>
       <input id="setTotalInput" type="number" min="0" step="0.01" autocomplete="off"
@@ -190,6 +189,7 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
         onkeydown="if(event.key==='Enter')applySetTotal()">
       <button class="btn btn-sm" style="background:#5B94CB" onclick="applySetTotal()">Apply</button>
     </div>
+    <div id="commissionPanel"></div>
     <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button class="btn btn-sm" style="background:transparent;border:1.5px solid #003658;color:#003658" onclick="addRow()">+ Add line item</button>
       <button class="btn btn-sm" style="background:transparent;border:1.5px solid #5B94CB;color:#5B94CB" onclick="resetSort()" title="Restore original order (as imported)">&#8634; Reset Order</button>
@@ -249,6 +249,12 @@ function checkExpiry(el){el.style.borderColor=el.value?"":"#e53e3e";}
 function escH(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
 function cprice(vad,m){return(!vad||vad<=0||m>=100)?0:vad/(1-m/100);}
 function fmt(n){return n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtPlain(n){
+  // For input fields — no commas, drop trailing .00 if integer
+  if(typeof n!=='number'||isNaN(n))return '';
+  if(Math.floor(n)===n)return String(n);
+  return String(Math.round(n*100)/100);
+}
 function effectiveMargin(it,globalM){return(it.margin!==null&&it.margin!==undefined&&it.margin!=='')? parseFloat(it.margin):globalM;}
 function itemCprice(it,globalM){return cprice(it.unit_price,effectiveMargin(it,globalM));}
 
@@ -661,16 +667,57 @@ function custExtBlur(el,i){
 }
 
 // ── Item 8: Margin & Commission Summary ─────────────────────────────────
+function commissionRowKey(label){return label.replace(/[^a-zA-Z0-9]/g,'_');}
 function updateServicesRev(label,val){
-  window.commissionState.servicesRevByGroup[label]=parseFloat(val)||0;
-  renderCommissionPanel();
+  // Strip non-numeric input (allow digits, single decimal point)
+  var clean=String(val).replace(/[^0-9.]/g,'');
+  var parts=clean.split('.');if(parts.length>2)clean=parts[0]+'.'+parts.slice(1).join('');
+  window.commissionState.servicesRevByGroup[label]=parseFloat(clean)||0;
+  recomputeCommissionCells();
   autoSave();
 }
 function updateAeMultiplier(val){
-  var n=parseFloat(val);
+  var clean=String(val).replace(/[^0-9.]/g,'');
+  var parts=clean.split('.');if(parts.length>2)clean=parts[0]+'.'+parts.slice(1).join('');
+  var n=parseFloat(clean);
   window.commissionState.aeMultiplier=isNaN(n)?20:n;
-  renderCommissionPanel();
+  recomputeCommissionCells();
   autoSave();
+}
+// Surgically update dependent cells without re-rendering inputs (preserves focus)
+function recomputeCommissionCells(){
+  if(!window.lineItems||!window.lineItems.length)return;
+  var m=parseFloat(document.getElementById('marginPct').value)||0;
+  var groups=groupByYear(window.lineItems);
+  var rows=[];
+  if(!groups){
+    var vt=window.lineItems.reduce(function(s,it){return s+(it.unit_price||0)*(it.qty||0);},0);
+    var ct=window.lineItems.reduce(function(s,it){return s+itemCprice(it,m)*(it.qty||0);},0);
+    rows.push({label:'Payment 1',invoiced:ct,cost:vt});
+  } else {
+    groups.forEach(function(grp){
+      var vt=grp.items.reduce(function(s,it){return s+(it.unit_price||0)*(it.qty||0);},0);
+      var ct=grp.items.reduce(function(s,it){return s+itemCprice(it,m)*(it.qty||0);},0);
+      rows.push({label:grp.label,invoiced:ct,cost:vt});
+    });
+  }
+  var aeMult=(window.commissionState&&typeof window.commissionState.aeMultiplier==='number')?window.commissionState.aeMultiplier:20;
+  var srv=(window.commissionState&&window.commissionState.servicesRevByGroup)||{};
+  rows.forEach(function(r){
+    var k=commissionRowKey(r.label);
+    var sv=srv[r.label]||0;
+    var tm=(r.invoiced-r.cost)-sv;
+    var commission=tm*(aeMult/100);
+    var tmEl=document.getElementById('cm_tm_'+k);
+    var coEl=document.getElementById('cm_co_'+k);
+    if(tmEl){
+      tmEl.textContent='$'+fmt(tm);
+      tmEl.style.color=tm>0?'#2d7a4f':tm<0?'#c00':'#131112';
+    }
+    if(coEl)coEl.textContent='$'+fmt(commission);
+  });
+  // Update read-only multiplier displays (columns 2+)
+  document.querySelectorAll('[data-cm-mult-readonly]').forEach(function(el){el.textContent=aeMult+'%';});
 }
 function renderCommissionPanel(){
   var panel=document.getElementById('commissionPanel');
@@ -696,7 +743,6 @@ function renderCommissionPanel(){
   var h='<div style="margin-top:18px;border:1px solid #d0d8e0;border-radius:8px;overflow:hidden">';
   h+='<div style="background:#003658;color:#fff;padding:10px 14px;font-size:13px;font-weight:700;letter-spacing:.04em">Margin &amp; Commission Detail</div>';
   h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed">';
-  // Column widths: metric label gets ~36%, rest split evenly
   var dataColPct=(64/rows.length).toFixed(2);
   h+='<colgroup><col style="width:36%">';
   rows.forEach(function(){h+='<col style="width:'+dataColPct+'%">';});
@@ -706,7 +752,7 @@ function renderCommissionPanel(){
   rows.forEach(function(r){h+='<th style="text-align:right;padding:7px 12px;font-weight:700">'+escH(r.label)+'</th>';});
   h+='</tr></thead><tbody>';
 
-  // Row 1: Invoiced to customer (less sales tax) — gross customer ext for now (tax handling = backlog item 12)
+  // Row 1: Invoiced
   h+='<tr><td style="padding:7px 12px;color:#131112">Invoiced to customer (less sales tax)</td>';
   rows.forEach(function(r){h+='<td style="text-align:right;padding:7px 12px">$'+fmt(r.invoiced)+'</td>';});
   h+='</tr>';
@@ -716,51 +762,53 @@ function renderCommissionPanel(){
   rows.forEach(function(r){h+='<td style="text-align:right;padding:7px 12px">$'+fmt(r.cost)+'</td>';});
   h+='</tr>';
 
-  // Row 3: Services Rev Paid by Margin (editable per group, red text)
+  // Row 3: Services Rev Paid by Margin — text input with inputmode decimal (no spinners), no re-render on input
   h+='<tr><td style="padding:7px 12px;color:#c00">Services Rev Paid by Margin</td>';
   rows.forEach(function(r){
     var sv=srv[r.label]||0;
     var label=r.label.replace(/'/g,"\\'");
     h+='<td style="text-align:right;padding:5px 8px">'
-      +'<input type="number" min="0" step="0.01" value="'+(sv||'')+'" placeholder="0.00" '
+      +'<input type="text" inputmode="decimal" value="'+(sv?fmtPlain(sv):'')+'" placeholder="0.00" '
       +'style="width:100%;max-width:140px;text-align:right;color:#c00;font-size:12px;border:1px solid #d0d8e0;border-radius:4px;padding:4px 6px" '
       +'oninput="updateServicesRev(\''+label+'\',this.value)" autocomplete="off">'
       +'</td>';
   });
   h+='</tr>';
 
-  // Row 4: Total Margin = (Invoiced - Cost) - ServicesRev   (read-only, formula transparency)
-  var totalMargins=[];
+  // Row 4: Total Margin (computed, color-coded, ID'd for surgical updates)
   h+='<tr style="background:#fafbfc"><td style="padding:7px 12px;font-weight:600;color:#131112">Total Margin</td>';
   rows.forEach(function(r){
     var sv=srv[r.label]||0;
     var tm=(r.invoiced-r.cost)-sv;
-    totalMargins.push(tm);
     var color=tm>0?'#2d7a4f':tm<0?'#c00':'#131112';
-    h+='<td style="text-align:right;padding:7px 12px;font-weight:600;color:'+color+'">$'+fmt(tm)+'</td>';
+    var k=commissionRowKey(r.label);
+    h+='<td id="cm_tm_'+k+'" style="text-align:right;padding:7px 12px;font-weight:600;color:'+color+'">$'+fmt(tm)+'</td>';
   });
   h+='</tr>';
 
-  // Row 5: AE Software Multiplier (single editable, displayed in first column, read-only in others)
+  // Row 5: AE Software Multiplier (single editable col 1; read-only display in 2+)
   h+='<tr><td style="padding:7px 12px;color:#131112">Current AE Software Multiplier</td>';
   rows.forEach(function(r,i){
     if(i===0){
       h+='<td style="text-align:right;padding:5px 8px;white-space:nowrap">'
-        +'<input type="number" min="0" max="100" step="0.5" value="'+aeMult+'" '
-        +'style="width:70px;text-align:right;font-size:12px;border:1px solid #d0d8e0;border-radius:4px;padding:4px 6px" '
+        +'<input type="text" inputmode="decimal" value="'+aeMult+'" '
+        +'style="width:60px;text-align:right;font-size:12px;border:1px solid #d0d8e0;border-radius:4px;padding:4px 6px" '
         +'oninput="updateAeMultiplier(this.value)" autocomplete="off"> %'
         +'</td>';
     } else {
-      h+='<td style="text-align:right;padding:7px 12px;color:#717174">'+aeMult+'%</td>';
+      h+='<td data-cm-mult-readonly style="text-align:right;padding:7px 12px;color:#717174">'+aeMult+'%</td>';
     }
   });
   h+='</tr>';
 
   // Row 6: Total Est. Commission to AE
   h+='<tr style="background:#EBF3FB;color:#003658"><td style="padding:9px 12px;font-weight:700">Total Est. Commission to AE</td>';
-  rows.forEach(function(r,i){
-    var commission=totalMargins[i]*(aeMult/100);
-    h+='<td style="text-align:right;padding:9px 12px;font-weight:700">$'+fmt(commission)+'</td>';
+  rows.forEach(function(r){
+    var sv=srv[r.label]||0;
+    var tm=(r.invoiced-r.cost)-sv;
+    var commission=tm*(aeMult/100);
+    var k=commissionRowKey(r.label);
+    h+='<td id="cm_co_'+k+'" style="text-align:right;padding:9px 12px;font-weight:700">$'+fmt(commission)+'</td>';
   });
   h+='</tr>';
 

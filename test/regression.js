@@ -588,6 +588,66 @@ async function runRegressionTests() {
     window.lineItems=[];newQuote();
     return{pass:ok,detail:JSON.stringify(window.commissionState)};
   });
+  test('commission:recomputeCellsExists',function(){
+    return{pass:typeof window.recomputeCommissionCells==='function',detail:typeof window.recomputeCommissionCells};
+  });
+  test('commission:servicesRevInputIsText',function(){
+    // Item 8 fix: input should be type=text with inputmode=decimal (no spinners, preserves focus)
+    window.loadLineItems([{sku:'X',description:'',qty:1,unit_price:100}]);
+    var input=document.querySelector('input[oninput^="updateServicesRev"]');
+    var ok=input&&input.type==='text'&&input.getAttribute('inputmode')==='decimal';
+    window.lineItems=[];render();
+    return{pass:ok,detail:input?'type='+input.type+' inputmode='+input.getAttribute('inputmode'):'no input'};
+  });
+  test('commission:multiplierInputIsText',function(){
+    window.loadLineItems([{sku:'X',description:'',qty:1,unit_price:100}]);
+    var input=document.querySelector('input[oninput^="updateAeMultiplier"]');
+    var ok=input&&input.type==='text'&&input.getAttribute('inputmode')==='decimal';
+    window.lineItems=[];render();
+    return{pass:ok,detail:input?'type='+input.type+' inputmode='+input.getAttribute('inputmode'):'no input'};
+  });
+  test('commission:servicesRevPreservesFocusOnUpdate',function(){
+    window.loadLineItems([{sku:'X',description:'',qty:1,unit_price:100}]);
+    var input=document.querySelector('input[oninput^="updateServicesRev"]');
+    if(!input){window.lineItems=[];render();return{pass:false,detail:'no input rendered'};}
+    input.focus();
+    var beforeFocused=document.activeElement===input;
+    updateServicesRev('Payment 1',50);
+    // After update, the input must STILL be the same element and still focused
+    var afterEl=document.querySelector('input[oninput^="updateServicesRev"]');
+    var sameElement=afterEl===input;
+    var stillFocused=document.activeElement===input;
+    window.lineItems=[];render();
+    return{pass:sameElement&&stillFocused,detail:'sameEl='+sameElement+' stillFocused='+stillFocused+' beforeFocused='+beforeFocused};
+  });
+  test('commission:setTotalAboveCommissionPanel',function(){
+    var setTotalLabel=document.querySelector('label');
+    // find by text content
+    var labels=Array.from(document.querySelectorAll('label'));
+    var setTotal=labels.filter(function(l){return l.textContent.indexOf('Set total')>=0;})[0];
+    var panel=document.getElementById('commissionPanel');
+    if(!setTotal||!panel)return{pass:false,detail:'st='+!!setTotal+' panel='+!!panel};
+    // Compare DOCUMENT_POSITION via compareDocumentPosition
+    var pos=setTotal.compareDocumentPosition(panel);
+    // panel should come AFTER setTotal (Node.DOCUMENT_POSITION_FOLLOWING = 4)
+    var ok=(pos&4)===4;
+    return{pass:ok,detail:'pos='+pos};
+  });
+  test('commission:cellsUpdateOnServicesRevChange',function(){
+    // Reset commission state to avoid leakage from prior tests
+    window.commissionState={servicesRevByGroup:{},aeMultiplier:20};
+    window.loadLineItems([{sku:'X',description:'',qty:1,unit_price:100}]);
+    document.getElementById('marginPct').value='25';
+    render();
+    // initial total margin = 33.33 (133.33 - 100)
+    var tmEl=document.getElementById('cm_tm_Payment_1');
+    if(!tmEl){window.lineItems=[];render();return{pass:false,detail:'no tm cell'};}
+    var beforeText=tmEl.textContent;
+    updateServicesRev('Payment 1',10);
+    var afterText=tmEl.textContent;
+    window.lineItems=[];window.commissionState={servicesRevByGroup:{},aeMultiplier:20};render();
+    return{pass:beforeText==='$33.33'&&afterText==='$23.33',detail:'before='+beforeText+' after='+afterText};
+  });
   // ── Drag & drop fix: idempotent init, shared state, position-aware drop ──
   test('dnd:initIsIdempotent',function(){
     var area=document.getElementById('liArea');
