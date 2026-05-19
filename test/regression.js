@@ -495,6 +495,99 @@ async function runRegressionTests() {
     var ok=window.signatureDataUrl===null||(typeof window.signatureDataUrl==='string'&&window.signatureDataUrl.indexOf('data:')===0);
     return{pass:ok,detail:typeof window.signatureDataUrl};
   });
+  // ── Item 8: Margin & Commission Summary ──────────────────────────────
+  ['updateServicesRev','updateAeMultiplier','renderCommissionPanel'].forEach(function(fn){
+    test('fn:'+fn,function(){return{pass:typeof window[fn]==='function',detail:typeof window[fn]};});
+  });
+  test('commission:initialState',function(){
+    var s=window.commissionState;
+    var ok=s&&s.aeMultiplier===20&&s.servicesRevByGroup&&Object.keys(s.servicesRevByGroup).length===0;
+    return{pass:ok,detail:JSON.stringify(s)};
+  });
+  test('commission:panelContainerInDom',function(){
+    return{pass:!!document.getElementById('commissionPanel')};
+  });
+  test('commission:panelHiddenWhenEmpty',function(){
+    window.lineItems=[];render();
+    var panel=document.getElementById('commissionPanel');
+    return{pass:panel&&panel.innerHTML==='',detail:'innerHTML len='+(panel?panel.innerHTML.length:'no panel')};
+  });
+  test('commission:panelShowsWithLineItems',function(){
+    window.loadLineItems([{sku:'X',description:'',qty:1,unit_price:100}]);
+    var panel=document.getElementById('commissionPanel');
+    var has=panel&&(panel.innerHTML.indexOf('Margin &amp; Commission')>=0||panel.innerHTML.indexOf('Margin & Commission')>=0);
+    window.lineItems=[];render();
+    return{pass:has,detail:panel?panel.innerHTML.substring(0,80):'no panel'};
+  });
+  test('commission:singlePaymentTotalMargin',function(){
+    // 1 item, qty 1, VAD cost 100, margin 25% → customer ext = 133.33, total margin = 33.33
+    window.loadLineItems([{sku:'X',description:'',qty:1,unit_price:100}]);
+    document.getElementById('marginPct').value='25';
+    render();
+    // (cust - cost) - servicesRev (0) = (133.33 - 100) - 0 = 33.33
+    var panel=document.getElementById('commissionPanel');
+    var ok=panel.innerHTML.indexOf('$33.33')>=0;
+    window.lineItems=[];render();
+    return{pass:ok,detail:'looking for $33.33 in panel'};
+  });
+  test('commission:updateServicesRevAffectsMargin',function(){
+    window.loadLineItems([{sku:'X',description:'',qty:1,unit_price:100}]);
+    document.getElementById('marginPct').value='25';
+    updateServicesRev('Payment 1',10);
+    // (133.33 - 100) - 10 = 23.33
+    var panel=document.getElementById('commissionPanel');
+    var ok=panel.innerHTML.indexOf('$23.33')>=0;
+    var stored=window.commissionState.servicesRevByGroup['Payment 1'];
+    window.lineItems=[];window.commissionState={servicesRevByGroup:{},aeMultiplier:20};render();
+    return{pass:ok&&stored===10,detail:'stored='+stored};
+  });
+  test('commission:updateAeMultiplierAffectsCommission',function(){
+    window.loadLineItems([{sku:'X',description:'',qty:1,unit_price:100}]);
+    document.getElementById('marginPct').value='25';
+    updateAeMultiplier(50);
+    // total margin = 33.33, commission = 33.33 * 0.5 = 16.67
+    var panel=document.getElementById('commissionPanel');
+    var ok=panel.innerHTML.indexOf('$16.67')>=0;
+    var stored=window.commissionState.aeMultiplier;
+    window.lineItems=[];window.commissionState={servicesRevByGroup:{},aeMultiplier:20};render();
+    return{pass:ok&&stored===50,detail:'stored='+stored};
+  });
+  test('commission:multipleGroupsRender',function(){
+    window.loadLineItems([
+      {sku:'A',description:'',qty:1,unit_price:100,start_date:'2026-01-01',end_date:'2026-12-31'},
+      {sku:'B',description:'',qty:1,unit_price:200,start_date:'2027-01-01',end_date:'2027-12-31'}
+    ]);
+    var panel=document.getElementById('commissionPanel');
+    var hasP1=panel.innerHTML.indexOf('Payment 1')>=0;
+    var hasP2=panel.innerHTML.indexOf('Payment 2')>=0;
+    window.lineItems=[];render();
+    return{pass:hasP1&&hasP2,detail:'p1='+hasP1+' p2='+hasP2};
+  });
+  test('commission:servicesRevPersistsViaStateRoundtrip',function(){
+    window.loadLineItems([{sku:'X',description:'',qty:1,unit_price:100}]);
+    updateServicesRev('Payment 1',42);
+    updateAeMultiplier(15);
+    var s=getQuoteState();
+    window.lineItems=[];window.commissionState={servicesRevByGroup:{},aeMultiplier:20};
+    restoreQuoteState(s);
+    var ok=window.commissionState.servicesRevByGroup['Payment 1']===42&&window.commissionState.aeMultiplier===15;
+    window.lineItems=[];newQuote();
+    return{pass:ok,detail:'srv='+window.commissionState.servicesRevByGroup['Payment 1']+' mult='+window.commissionState.aeMultiplier};
+  });
+  test('commission:newQuoteResetsState',function(){
+    updateServicesRev('Payment 1',99);
+    updateAeMultiplier(33);
+    newQuote();
+    var ok=window.commissionState.aeMultiplier===20&&Object.keys(window.commissionState.servicesRevByGroup).length===0;
+    return{pass:ok,detail:JSON.stringify(window.commissionState)};
+  });
+  test('commission:legacyRestoreNoCommissionStateDefaults',function(){
+    // Legacy saved quote with no commissionState field — should default to {servicesRevByGroup:{},aeMultiplier:20}
+    restoreQuoteState({customerName:'Old Co',quoteNumber:'TS-OLD',lineItems:[{sku:'X',description:'',qty:1,unit_price:100}]});
+    var ok=window.commissionState.aeMultiplier===20&&Object.keys(window.commissionState.servicesRevByGroup).length===0;
+    window.lineItems=[];newQuote();
+    return{pass:ok,detail:JSON.stringify(window.commissionState)};
+  });
   // ── Drag & drop fix: idempotent init, shared state, position-aware drop ──
   test('dnd:initIsIdempotent',function(){
     var area=document.getElementById('liArea');

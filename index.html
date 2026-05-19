@@ -179,6 +179,7 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
     <div class="section-label" style="margin-bottom:14px">Line Items</div>
     <div id="liArea"><div class="empty">Add line items manually or upload a VAD quote.</div></div>
     <div id="totals"></div>
+    <div id="commissionPanel"></div>
     <div style="display:flex;align-items:center;gap:8px;margin-top:8px;justify-content:flex-end">
       <label style="font-size:12px;color:#717174;white-space:nowrap">Set total:</label>
       <input id="setTotalInput" type="number" min="0" step="0.01" autocomplete="off"
@@ -209,6 +210,8 @@ window.lineItems = [];
 window.logoDataUrl = null;
 window.signatureDataUrl = null;
 window.sortState = {col:null,dir:0};
+// Item 8: Margin & Commission state — servicesRev keyed by 'Payment N' label, aeMultiplier as single global %
+window.commissionState = {servicesRevByGroup:{},aeMultiplier:20};
 
 (function init() {
   fetch('/api/logo').then(function(r){return r.arrayBuffer();}).then(function(buf){
@@ -296,7 +299,7 @@ function loadRepSettings(){
 }
 
 function getQuoteState(){
-  return{customerName:document.getElementById('customerName').value,contactName:document.getElementById('contactName').value,contactEmail:document.getElementById('contactEmail').value,quoteNumber:document.getElementById('quoteNumber').value,quoteDate:document.getElementById('quoteDate').value,expiryDate:document.getElementById('expiryDate').value,marginPct:document.getElementById('marginPct').value,notes:document.getElementById('notes').value,terms:document.getElementById('terms').value,preparedByCompany:document.getElementById('preparedByCompany').value,preparedBy:document.getElementById('preparedBy').value,preparedByEmail:document.getElementById('preparedByEmail').value,shipToAddress:(document.getElementById('shipToAddress')||{}).value||'',shipToCityStateZip:(document.getElementById('shipToCityStateZip')||{}).value||'',shipToPhone:(document.getElementById('shipToPhone')||{}).value||'',vendorName:(document.getElementById('vendorName')||{}).value||'',lineItems:JSON.parse(JSON.stringify(window.lineItems))};
+  return{customerName:document.getElementById('customerName').value,contactName:document.getElementById('contactName').value,contactEmail:document.getElementById('contactEmail').value,quoteNumber:document.getElementById('quoteNumber').value,quoteDate:document.getElementById('quoteDate').value,expiryDate:document.getElementById('expiryDate').value,marginPct:document.getElementById('marginPct').value,notes:document.getElementById('notes').value,terms:document.getElementById('terms').value,preparedByCompany:document.getElementById('preparedByCompany').value,preparedBy:document.getElementById('preparedBy').value,preparedByEmail:document.getElementById('preparedByEmail').value,shipToAddress:(document.getElementById('shipToAddress')||{}).value||'',shipToCityStateZip:(document.getElementById('shipToCityStateZip')||{}).value||'',shipToPhone:(document.getElementById('shipToPhone')||{}).value||'',vendorName:(document.getElementById('vendorName')||{}).value||'',commissionState:JSON.parse(JSON.stringify(window.commissionState||{servicesRevByGroup:{},aeMultiplier:20})),lineItems:JSON.parse(JSON.stringify(window.lineItems))};
 }
 function restoreQuoteState(s){
   document.getElementById('customerName').value=s.customerName||'';
@@ -318,6 +321,11 @@ function restoreQuoteState(s){
   var scEl=document.getElementById('shipToCityStateZip');if(scEl)scEl.value=s.shipToCityStateZip||'';
   var spEl=document.getElementById('shipToPhone');if(spEl)spEl.value=s.shipToPhone||'';
   var vnEl=document.getElementById('vendorName');if(vnEl)vnEl.value=s.vendorName||'';
+  // Item 8: Restore commission state
+  window.commissionState={
+    servicesRevByGroup:(s.commissionState&&s.commissionState.servicesRevByGroup)||{},
+    aeMultiplier:(s.commissionState&&typeof s.commissionState.aeMultiplier==='number')?s.commissionState.aeMultiplier:20
+  };
   var pfEl=document.getElementById('pdfFileName');if(pfEl){pfEl.value=s.pdfFileName||'';pfEl.dataset.userEdited=s.pdfFileName?'1':'';}  
   window.lineItems=s.lineItems||[];
   // Backfill originalIndex on legacy saved quotes
@@ -652,10 +660,118 @@ function custExtBlur(el,i){
   updateTotalsOnly();
 }
 
+// ── Item 8: Margin & Commission Summary ─────────────────────────────────
+function updateServicesRev(label,val){
+  window.commissionState.servicesRevByGroup[label]=parseFloat(val)||0;
+  renderCommissionPanel();
+  autoSave();
+}
+function updateAeMultiplier(val){
+  var n=parseFloat(val);
+  window.commissionState.aeMultiplier=isNaN(n)?20:n;
+  renderCommissionPanel();
+  autoSave();
+}
+function renderCommissionPanel(){
+  var panel=document.getElementById('commissionPanel');
+  if(!panel)return;
+  if(!window.lineItems||!window.lineItems.length){panel.innerHTML='';return;}
+  var m=parseFloat(document.getElementById('marginPct').value)||0;
+  var groups=groupByYear(window.lineItems);
+  var rows=[];
+  if(!groups){
+    var vt=window.lineItems.reduce(function(s,it){return s+(it.unit_price||0)*(it.qty||0);},0);
+    var ct=window.lineItems.reduce(function(s,it){return s+itemCprice(it,m)*(it.qty||0);},0);
+    rows.push({label:'Payment 1',invoiced:ct,cost:vt});
+  } else {
+    groups.forEach(function(grp){
+      var vt=grp.items.reduce(function(s,it){return s+(it.unit_price||0)*(it.qty||0);},0);
+      var ct=grp.items.reduce(function(s,it){return s+itemCprice(it,m)*(it.qty||0);},0);
+      rows.push({label:grp.label,invoiced:ct,cost:vt});
+    });
+  }
+  var aeMult=(window.commissionState&&typeof window.commissionState.aeMultiplier==='number')?window.commissionState.aeMultiplier:20;
+  var srv=(window.commissionState&&window.commissionState.servicesRevByGroup)||{};
+
+  var h='<div style="margin-top:18px;border:1px solid #d0d8e0;border-radius:8px;overflow:hidden">';
+  h+='<div style="background:#003658;color:#fff;padding:10px 14px;font-size:13px;font-weight:700;letter-spacing:.04em">Margin &amp; Commission Detail</div>';
+  h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed">';
+  // Column widths: metric label gets ~36%, rest split evenly
+  var dataColPct=(64/rows.length).toFixed(2);
+  h+='<colgroup><col style="width:36%">';
+  rows.forEach(function(){h+='<col style="width:'+dataColPct+'%">';});
+  h+='</colgroup>';
+  h+='<thead><tr style="background:#EBF3FB;color:#003658">';
+  h+='<th style="text-align:left;padding:7px 12px;font-weight:700">Metric</th>';
+  rows.forEach(function(r){h+='<th style="text-align:right;padding:7px 12px;font-weight:700">'+escH(r.label)+'</th>';});
+  h+='</tr></thead><tbody>';
+
+  // Row 1: Invoiced to customer (less sales tax) — gross customer ext for now (tax handling = backlog item 12)
+  h+='<tr><td style="padding:7px 12px;color:#131112">Invoiced to customer (less sales tax)</td>';
+  rows.forEach(function(r){h+='<td style="text-align:right;padding:7px 12px">$'+fmt(r.invoiced)+'</td>';});
+  h+='</tr>';
+
+  // Row 2: TekStream Cost
+  h+='<tr style="background:#fafbfc"><td style="padding:7px 12px;color:#131112">TekStream Cost</td>';
+  rows.forEach(function(r){h+='<td style="text-align:right;padding:7px 12px">$'+fmt(r.cost)+'</td>';});
+  h+='</tr>';
+
+  // Row 3: Services Rev Paid by Margin (editable per group, red text)
+  h+='<tr><td style="padding:7px 12px;color:#c00">Services Rev Paid by Margin</td>';
+  rows.forEach(function(r){
+    var sv=srv[r.label]||0;
+    var label=r.label.replace(/'/g,"\\'");
+    h+='<td style="text-align:right;padding:5px 8px">'
+      +'<input type="number" min="0" step="0.01" value="'+(sv||'')+'" placeholder="0.00" '
+      +'style="width:100%;max-width:140px;text-align:right;color:#c00;font-size:12px;border:1px solid #d0d8e0;border-radius:4px;padding:4px 6px" '
+      +'oninput="updateServicesRev(\''+label+'\',this.value)" autocomplete="off">'
+      +'</td>';
+  });
+  h+='</tr>';
+
+  // Row 4: Total Margin = (Invoiced - Cost) - ServicesRev   (read-only, formula transparency)
+  var totalMargins=[];
+  h+='<tr style="background:#fafbfc"><td style="padding:7px 12px;font-weight:600;color:#131112">Total Margin</td>';
+  rows.forEach(function(r){
+    var sv=srv[r.label]||0;
+    var tm=(r.invoiced-r.cost)-sv;
+    totalMargins.push(tm);
+    var color=tm>0?'#2d7a4f':tm<0?'#c00':'#131112';
+    h+='<td style="text-align:right;padding:7px 12px;font-weight:600;color:'+color+'">$'+fmt(tm)+'</td>';
+  });
+  h+='</tr>';
+
+  // Row 5: AE Software Multiplier (single editable, displayed in first column, read-only in others)
+  h+='<tr><td style="padding:7px 12px;color:#131112">Current AE Software Multiplier</td>';
+  rows.forEach(function(r,i){
+    if(i===0){
+      h+='<td style="text-align:right;padding:5px 8px;white-space:nowrap">'
+        +'<input type="number" min="0" max="100" step="0.5" value="'+aeMult+'" '
+        +'style="width:70px;text-align:right;font-size:12px;border:1px solid #d0d8e0;border-radius:4px;padding:4px 6px" '
+        +'oninput="updateAeMultiplier(this.value)" autocomplete="off"> %'
+        +'</td>';
+    } else {
+      h+='<td style="text-align:right;padding:7px 12px;color:#717174">'+aeMult+'%</td>';
+    }
+  });
+  h+='</tr>';
+
+  // Row 6: Total Est. Commission to AE
+  h+='<tr style="background:#EBF3FB;color:#003658"><td style="padding:9px 12px;font-weight:700">Total Est. Commission to AE</td>';
+  rows.forEach(function(r,i){
+    var commission=totalMargins[i]*(aeMult/100);
+    h+='<td style="text-align:right;padding:9px 12px;font-weight:700">$'+fmt(commission)+'</td>';
+  });
+  h+='</tr>';
+
+  h+='</tbody></table></div></div>';
+  panel.innerHTML=h;
+}
+
 function render(){
   var m=parseFloat(document.getElementById('marginPct').value)||0;
   var area=document.getElementById('liArea');
-  if(!window.lineItems.length){area.innerHTML='<div class="empty">Add line items manually or upload a VAD quote.</div>';document.getElementById('totals').innerHTML='';updateMarginDollar(m,0,0);return;}
+  if(!window.lineItems.length){area.innerHTML='<div class="empty">Add line items manually or upload a VAD quote.</div>';document.getElementById('totals').innerHTML='';updateMarginDollar(m,0,0);renderCommissionPanel();return;}
   var tbl='<table><colgroup><col style="width:2%"><col style="width:10%"><col style="width:21%"><col style="width:8%"><col style="width:9%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:11%"><col style="width:11%"><col style="width:7%"></colgroup><thead><tr>'
     +'<th></th>'
     +'<th style="cursor:pointer;user-select:none" onclick="cycleSort(\'sku\')" title="Click to sort">SKU'+sortIndicator('sku')+'</th>'
@@ -715,12 +831,15 @@ function render(){
   updateMarginDollar(m,sub,vt);
   if(window.lineItems.length) autoSave();
   initDragDrop();
+  renderCommissionPanel();
 }
 function updateMarginDollar(m,c,v){var el=document.getElementById('marginDollar');if(el)el.textContent=(m>0&&c>v)?'$'+fmt(c-v):'';}
 function recalcAll(){var m=parseFloat(document.getElementById('marginPct').value)||0;document.getElementById('marginHint').textContent=m>0?m+'% margin applied':'';render();}
 function newQuote(){
   ['customerName','contactName','contactEmail','notes','preparedBy','preparedByEmail','shipToAddress','shipToCityStateZip','shipToPhone'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   var vnEl=document.getElementById('vendorName');if(vnEl)vnEl.value='';
+  // Item 8: Reset commission state
+  window.commissionState={servicesRevByGroup:{},aeMultiplier:20};
   window.sortState={col:null,dir:0};
   document.getElementById('preparedByCompany').value='TekStream';
   document.getElementById('terms').value='Net 30';
