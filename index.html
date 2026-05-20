@@ -150,6 +150,7 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
         </div>
         <div class="field" style="margin:0"><label>Personalized note</label><textarea id="notes" autocomplete="off" placeholder="Thank you for the opportunity..." style="min-height:52px"></textarea></div>
         <div class="field" style="margin:0"><label>Payment terms</label><input id="terms" autocomplete="off" value="Net 30"></div>
+        <div class="field" style="margin:0;grid-column:1/-1"><label>Additional terms <span style="color:#717174;font-weight:400;font-size:11px">(appended after standard T&amp;C in quote PDF)</span></label><textarea id="additionalTerms" autocomplete="off" placeholder="Optional. Custom legal language, NDA references, MSA exceptions, etc." style="min-height:60px" oninput="autoSave()"></textarea></div>
         <div class="field" style="margin:0"><label>File name</label><input id="pdfFileName" autocomplete="off" placeholder="auto" oninput="this.dataset.userEdited=this.value?'1':'';updatePdfFileName()"></div>
       </div>
       <!-- Item 7: Ship To address + Vendor (for PO generation) -->
@@ -307,7 +308,7 @@ function loadRepSettings(){
 }
 
 function getQuoteState(){
-  return{customerName:document.getElementById('customerName').value,contactName:document.getElementById('contactName').value,contactEmail:document.getElementById('contactEmail').value,quoteNumber:document.getElementById('quoteNumber').value,quoteDate:document.getElementById('quoteDate').value,expiryDate:document.getElementById('expiryDate').value,marginPct:document.getElementById('marginPct').value,notes:document.getElementById('notes').value,terms:document.getElementById('terms').value,preparedByCompany:document.getElementById('preparedByCompany').value,preparedBy:document.getElementById('preparedBy').value,preparedByEmail:document.getElementById('preparedByEmail').value,shipToAddress:(document.getElementById('shipToAddress')||{}).value||'',shipToCityStateZip:(document.getElementById('shipToCityStateZip')||{}).value||'',shipToPhone:(document.getElementById('shipToPhone')||{}).value||'',vendorName:(document.getElementById('vendorName')||{}).value||'',commissionState:JSON.parse(JSON.stringify(window.commissionState||{servicesRevByGroup:{},aeMultiplier:20})),lineItems:JSON.parse(JSON.stringify(window.lineItems))};
+  return{customerName:document.getElementById('customerName').value,contactName:document.getElementById('contactName').value,contactEmail:document.getElementById('contactEmail').value,quoteNumber:document.getElementById('quoteNumber').value,quoteDate:document.getElementById('quoteDate').value,expiryDate:document.getElementById('expiryDate').value,marginPct:document.getElementById('marginPct').value,notes:document.getElementById('notes').value,terms:document.getElementById('terms').value,additionalTerms:(document.getElementById('additionalTerms')||{}).value||'',preparedByCompany:document.getElementById('preparedByCompany').value,preparedBy:document.getElementById('preparedBy').value,preparedByEmail:document.getElementById('preparedByEmail').value,shipToAddress:(document.getElementById('shipToAddress')||{}).value||'',shipToCityStateZip:(document.getElementById('shipToCityStateZip')||{}).value||'',shipToPhone:(document.getElementById('shipToPhone')||{}).value||'',vendorName:(document.getElementById('vendorName')||{}).value||'',commissionState:JSON.parse(JSON.stringify(window.commissionState||{servicesRevByGroup:{},aeMultiplier:20})),lineItems:JSON.parse(JSON.stringify(window.lineItems))};
 }
 function restoreQuoteState(s){
   document.getElementById('customerName').value=s.customerName||'';
@@ -321,6 +322,8 @@ function restoreQuoteState(s){
   document.getElementById('marginHint').textContent=(s.marginPct||'15')+'% margin applied';
   document.getElementById('notes').value=s.notes||'';
   document.getElementById('terms').value=s.terms||'Net 30';
+  // Item 5: Additional terms
+  var atEl=document.getElementById('additionalTerms');if(atEl)atEl.value=s.additionalTerms||'';
   document.getElementById('preparedByCompany').value=s.preparedByCompany||'TekStream';
   document.getElementById('preparedBy').value=s.preparedBy||'';
   document.getElementById('preparedByEmail').value=s.preparedByEmail||'';
@@ -886,7 +889,7 @@ function render(){
 function updateMarginDollar(m,c,v){var el=document.getElementById('marginDollar');if(el)el.textContent=(m>0&&c>v)?'$'+fmt(c-v):'';}
 function recalcAll(){var m=parseFloat(document.getElementById('marginPct').value)||0;document.getElementById('marginHint').textContent=m>0?m+'% margin applied':'';render();}
 function newQuote(){
-  ['customerName','contactName','contactEmail','notes','preparedBy','preparedByEmail','shipToAddress','shipToCityStateZip','shipToPhone'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  ['customerName','contactName','contactEmail','notes','preparedBy','preparedByEmail','shipToAddress','shipToCityStateZip','shipToPhone','additionalTerms'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   var vnEl=document.getElementById('vendorName');if(vnEl)vnEl.value='';
   // Item 10 fix: clear pdfFileName and its user-edited flag so auto-naming resumes for the new quote
   var pfEl=document.getElementById('pdfFileName');
@@ -1114,6 +1117,10 @@ async function generatePdfBlob(){
         {h:'14. Governing Law; Venue; Attorney Fees.',b:'In the event of any dispute between Customer and Partner which arises out of or is related to this Ordering Document, the prevailing party in that dispute shall be entitled to its reasonable attorney fees and costs whether the matter results in litigation or not, and regardless how the dispute is resolved (including without limitation, through negotiation, arbitration, mediation, or trial) and regardless whether or not judgment is entered. This Ordering Document is governed by the laws of the State of Georgia, without regard to its conflict of laws principles, and Customer agrees to submit to the exclusive jurisdiction of, and venue in, the state and federal courts located in the State of Georgia in any dispute arising out of or relating to this Ordering Document. THE PARTIES WAIVE ANY RIGHT TO A JURY TRIAL.'},
         {h:'15. Entire Agreement; Miscellaneous.',b:'This Ordering Document constitutes the entire agreement between the parties with respect to this subject matter. No other agreement, statement, or promise made on or before the effective date of this Ordering Document with respect to this subject matter will be binding on the parties. Any modification of this Ordering Document shall be in writing and shall be signed by the parties hereto. If any provision is held unenforceable, the remaining provisions shall remain in full force and effect. No waiver shall be effective unless in writing. Sections 1, 3, 5, 7, 8, 9, 10, 11, 12, and 14 survive termination or expiration of this Ordering Document.'}
       ];
+      // Item 5: append additional terms if provided (quote PDF only — not on PO)
+      var _atEl = document.getElementById('additionalTerms');
+      var _at = _atEl ? _atEl.value.trim() : '';
+      if (_at) { tcs.push({h: '16. Additional Terms.', b: _at}); }
       tcs.forEach(function(tc){
         doc.setFont('helvetica','bold');doc.setFontSize(8);
         var hLines=doc.splitTextToSize(tc.h,R-L);
@@ -1263,6 +1270,10 @@ async function previewPdf(){
         {h:'14. Governing Law; Venue; Attorney Fees.',b:'In the event of any dispute between Customer and Partner which arises out of or is related to this Ordering Document, the prevailing party in that dispute shall be entitled to its reasonable attorney fees and costs whether the matter results in litigation or not, and regardless how the dispute is resolved (including without limitation, through negotiation, arbitration, mediation, or trial) and regardless whether or not judgment is entered. This Ordering Document is governed by the laws of the State of Georgia, without regard to its conflict of laws principles, and Customer agrees to submit to the exclusive jurisdiction of, and venue in, the state and federal courts located in the State of Georgia in any dispute arising out of or relating to this Ordering Document. THE PARTIES WAIVE ANY RIGHT TO A JURY TRIAL.'},
         {h:'15. Entire Agreement; Miscellaneous.',b:'This Ordering Document constitutes the entire agreement between the parties with respect to this subject matter. No other agreement, statement, or promise made on or before the effective date of this Ordering Document with respect to this subject matter will be binding on the parties. Any modification of this Ordering Document shall be in writing and shall be signed by the parties hereto. If any provision is held unenforceable, the remaining provisions shall remain in full force and effect. No waiver shall be effective unless in writing. Sections 1, 3, 5, 7, 8, 9, 10, 11, 12, and 14 survive termination or expiration of this Ordering Document.'}
       ];
+      // Item 5: append additional terms if provided (quote PDF only — not on PO)
+      var _atEl = document.getElementById('additionalTerms');
+      var _at = _atEl ? _atEl.value.trim() : '';
+      if (_at) { tcs.push({h: '16. Additional Terms.', b: _at}); }
       tcs.forEach(function(tc){
         doc.setFont('helvetica','bold');doc.setFontSize(8);
         var hLines=doc.splitTextToSize(tc.h,R-L);
@@ -1411,6 +1422,10 @@ async function previewPdf(){
         {h:'14. Governing Law; Venue; Attorney Fees.',b:'In the event of any dispute between Customer and Partner which arises out of or is related to this Ordering Document, the prevailing party in that dispute shall be entitled to its reasonable attorney fees and costs whether the matter results in litigation or not, and regardless how the dispute is resolved (including without limitation, through negotiation, arbitration, mediation, or trial) and regardless whether or not judgment is entered. This Ordering Document is governed by the laws of the State of Georgia, without regard to its conflict of laws principles, and Customer agrees to submit to the exclusive jurisdiction of, and venue in, the state and federal courts located in the State of Georgia in any dispute arising out of or relating to this Ordering Document. THE PARTIES WAIVE ANY RIGHT TO A JURY TRIAL.'},
         {h:'15. Entire Agreement; Miscellaneous.',b:'This Ordering Document constitutes the entire agreement between the parties with respect to this subject matter. No other agreement, statement, or promise made on or before the effective date of this Ordering Document with respect to this subject matter will be binding on the parties. Any modification of this Ordering Document shall be in writing and shall be signed by the parties hereto. If any provision is held unenforceable, the remaining provisions shall remain in full force and effect. No waiver shall be effective unless in writing. Sections 1, 3, 5, 7, 8, 9, 10, 11, 12, and 14 survive termination or expiration of this Ordering Document.'}
       ];
+      // Item 5: append additional terms if provided (quote PDF only — not on PO)
+      var _atEl = document.getElementById('additionalTerms');
+      var _at = _atEl ? _atEl.value.trim() : '';
+      if (_at) { tcs.push({h: '16. Additional Terms.', b: _at}); }
       tcs.forEach(function(tc){
         doc.setFont('helvetica','bold');doc.setFontSize(8);
         var hLines=doc.splitTextToSize(tc.h,R-L);
@@ -1570,6 +1585,10 @@ async function downloadPdf(){
         {h:'14. Governing Law; Venue; Attorney Fees.',b:'In the event of any dispute between Customer and Partner which arises out of or is related to this Ordering Document, the prevailing party in that dispute shall be entitled to its reasonable attorney fees and costs whether the matter results in litigation or not, and regardless how the dispute is resolved (including without limitation, through negotiation, arbitration, mediation, or trial) and regardless whether or not judgment is entered. This Ordering Document is governed by the laws of the State of Georgia, without regard to its conflict of laws principles, and Customer agrees to submit to the exclusive jurisdiction of, and venue in, the state and federal courts located in the State of Georgia in any dispute arising out of or relating to this Ordering Document. THE PARTIES WAIVE ANY RIGHT TO A JURY TRIAL.'},
         {h:'15. Entire Agreement; Miscellaneous.',b:'This Ordering Document constitutes the entire agreement between the parties with respect to this subject matter. No other agreement, statement, or promise made on or before the effective date of this Ordering Document with respect to this subject matter will be binding on the parties. Any modification of this Ordering Document shall be in writing and shall be signed by the parties hereto. If any provision is held unenforceable, the remaining provisions shall remain in full force and effect. No waiver shall be effective unless in writing. Sections 1, 3, 5, 7, 8, 9, 10, 11, 12, and 14 survive termination or expiration of this Ordering Document.'}
       ];
+      // Item 5: append additional terms if provided (quote PDF only — not on PO)
+      var _atEl = document.getElementById('additionalTerms');
+      var _at = _atEl ? _atEl.value.trim() : '';
+      if (_at) { tcs.push({h: '16. Additional Terms.', b: _at}); }
       tcs.forEach(function(tc){
         doc.setFont('helvetica','bold');doc.setFontSize(8);
         var hLines=doc.splitTextToSize(tc.h,R-L);
@@ -1653,6 +1672,10 @@ async function previewPdf(){
         {h:'14. Governing Law; Venue; Attorney Fees.',b:'In the event of any dispute between Customer and Partner which arises out of or is related to this Ordering Document, the prevailing party in that dispute shall be entitled to its reasonable attorney fees and costs whether the matter results in litigation or not, and regardless how the dispute is resolved (including without limitation, through negotiation, arbitration, mediation, or trial) and regardless whether or not judgment is entered. This Ordering Document is governed by the laws of the State of Georgia, without regard to its conflict of laws principles, and Customer agrees to submit to the exclusive jurisdiction of, and venue in, the state and federal courts located in the State of Georgia in any dispute arising out of or relating to this Ordering Document. THE PARTIES WAIVE ANY RIGHT TO A JURY TRIAL.'},
         {h:'15. Entire Agreement; Miscellaneous.',b:'This Ordering Document constitutes the entire agreement between the parties with respect to this subject matter. No other agreement, statement, or promise made on or before the effective date of this Ordering Document with respect to this subject matter will be binding on the parties. Any modification of this Ordering Document shall be in writing and shall be signed by the parties hereto. If any provision is held unenforceable, the remaining provisions shall remain in full force and effect. No waiver shall be effective unless in writing. Sections 1, 3, 5, 7, 8, 9, 10, 11, 12, and 14 survive termination or expiration of this Ordering Document.'}
       ];
+      // Item 5: append additional terms if provided (quote PDF only — not on PO)
+      var _atEl = document.getElementById('additionalTerms');
+      var _at = _atEl ? _atEl.value.trim() : '';
+      if (_at) { tcs.push({h: '16. Additional Terms.', b: _at}); }
       tcs.forEach(function(tc){
         doc.setFont('helvetica','bold');doc.setFontSize(8);
         var hLines=doc.splitTextToSize(tc.h,R-L);

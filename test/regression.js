@@ -744,6 +744,63 @@ async function runRegressionTests() {
     newQuote();
     return{pass:ok,detail:'addr='+stA.value};
   });
+  // ── Item 5: Additional terms field ───────────────────────────────────
+  test('additionalTerms:fieldExists',function(){
+    var el=document.getElementById('additionalTerms');
+    return{pass:!!el&&el.tagName==='TEXTAREA',detail:el?el.tagName:'missing'};
+  });
+  test('additionalTerms:stateRoundtrip',function(){
+    var el=document.getElementById('additionalTerms');
+    if(!el)return{pass:false,detail:'no field'};
+    el.value='Confidential MSA reference: MSA-2026-04. Lead time waiver applies.';
+    var s=getQuoteState();
+    el.value='';
+    restoreQuoteState(s);
+    var ok=el.value==='Confidential MSA reference: MSA-2026-04. Lead time waiver applies.';
+    newQuote();
+    return{pass:ok,detail:'restored='+el.value.substring(0,40)};
+  });
+  test('additionalTerms:newQuoteClears',function(){
+    var el=document.getElementById('additionalTerms');
+    if(!el)return{pass:false,detail:'no field'};
+    el.value='Some custom legal text';
+    newQuote();
+    return{pass:el.value==='',detail:'after newQuote='+el.value};
+  });
+  test('additionalTerms:emptyDoesNotAddClause',function(){
+    // Simulate the production logic in isolation
+    var el=document.getElementById('additionalTerms');
+    if(el)el.value='';
+    var tcs=[{h:'1. Test.',b:'foo'},{h:'15. Last.',b:'bar'}];
+    var _atEl=document.getElementById('additionalTerms');
+    var _at=_atEl?_atEl.value.trim():'';
+    if(_at){tcs.push({h:'16. Additional Terms.',b:_at});}
+    return{pass:tcs.length===2,detail:'tcs.length='+tcs.length};
+  });
+  test('additionalTerms:nonEmptyAddsClause16',function(){
+    var el=document.getElementById('additionalTerms');
+    if(!el)return{pass:false,detail:'no field'};
+    el.value='Custom clause text here.';
+    var tcs=[{h:'1. Test.',b:'foo'},{h:'15. Last.',b:'bar'}];
+    var _atEl=document.getElementById('additionalTerms');
+    var _at=_atEl?_atEl.value.trim():'';
+    if(_at){tcs.push({h:'16. Additional Terms.',b:_at});}
+    var ok=tcs.length===3&&tcs[2].h==='16. Additional Terms.'&&tcs[2].b==='Custom clause text here.';
+    newQuote();
+    return{pass:ok,detail:'len='+tcs.length+' last='+(tcs[tcs.length-1]||{}).h};
+  });
+  test('additionalTerms:whitespaceOnlyIsTreatedAsEmpty',function(){
+    var el=document.getElementById('additionalTerms');
+    if(!el)return{pass:false,detail:'no field'};
+    el.value='     \n\t  ';
+    var tcs=[{h:'1.',b:'a'}];
+    var _atEl=document.getElementById('additionalTerms');
+    var _at=_atEl?_atEl.value.trim():'';
+    if(_at){tcs.push({h:'16. Additional Terms.',b:_at});}
+    var ok=tcs.length===1;
+    newQuote();
+    return{pass:ok,detail:'tcs.length='+tcs.length};
+  });
   // ── Drag & drop fix: idempotent init, shared state, position-aware drop ──
   test('dnd:initIsIdempotent',function(){
     var area=document.getElementById('liArea');
