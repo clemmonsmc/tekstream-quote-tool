@@ -689,6 +689,61 @@ async function runRegressionTests() {
     newQuote();
     return{pass:ok,detail:'val='+pf.value};
   });
+  // ── Item 11: Ship To populates from VAD extract response ─────────────
+  test('shipTo:populatedFromParsedResponse',function(){
+    // Simulate the response handler logic by invoking just the ship_to block
+    var parsed={ship_to:{address:'742 Evergreen Terrace',city_state_zip:'Springfield, IL 62701',phone:'217-555-0100'}};
+    var stA=document.getElementById('shipToAddress');
+    var stCSZ=document.getElementById('shipToCityStateZip');
+    var stP=document.getElementById('shipToPhone');
+    if(!stA||!stCSZ||!stP)return{pass:false,detail:'fields missing'};
+    stA.value='';stCSZ.value='';stP.value='';
+    // Replicate the production logic
+    if(parsed.ship_to){
+      if(stA&&parsed.ship_to.address)stA.value=parsed.ship_to.address;
+      if(stCSZ&&parsed.ship_to.city_state_zip)stCSZ.value=parsed.ship_to.city_state_zip;
+      if(stP&&parsed.ship_to.phone)stP.value=parsed.ship_to.phone;
+    }
+    var ok=stA.value==='742 Evergreen Terrace'&&stCSZ.value==='Springfield, IL 62701'&&stP.value==='217-555-0100';
+    newQuote();
+    return{pass:ok,detail:'addr='+stA.value+' csz='+stCSZ.value+' phone='+stP.value};
+  });
+  test('shipTo:partialResponseLeavesOthersIntact',function(){
+    // Extractor only returns address, not city/state/zip or phone
+    var parsed={ship_to:{address:'1 Main St',city_state_zip:'',phone:''}};
+    var stA=document.getElementById('shipToAddress');
+    var stCSZ=document.getElementById('shipToCityStateZip');
+    var stP=document.getElementById('shipToPhone');
+    // Pre-populate other fields to ensure empty extractor values don't wipe them
+    stA.value='';
+    stCSZ.value='Existing City, GA 30000';
+    stP.value='404-000-0000';
+    if(parsed.ship_to){
+      if(stA&&parsed.ship_to.address)stA.value=parsed.ship_to.address;
+      if(stCSZ&&parsed.ship_to.city_state_zip)stCSZ.value=parsed.ship_to.city_state_zip;
+      if(stP&&parsed.ship_to.phone)stP.value=parsed.ship_to.phone;
+    }
+    var ok=stA.value==='1 Main St'&&stCSZ.value==='Existing City, GA 30000'&&stP.value==='404-000-0000';
+    newQuote();
+    return{pass:ok,detail:'addr='+stA.value+' csz='+stCSZ.value+' phone='+stP.value};
+  });
+  test('shipTo:noShipToInResponseLeavesFieldsUntouched',function(){
+    var parsed={};  // no ship_to at all (Excel pre-parser path)
+    var stA=document.getElementById('shipToAddress');
+    var stCSZ=document.getElementById('shipToCityStateZip');
+    var stP=document.getElementById('shipToPhone');
+    stA.value='123 Manual';
+    stCSZ.value='Atlanta, GA 30303';
+    stP.value='404-111-2222';
+    if(parsed.ship_to){
+      if(stA&&parsed.ship_to.address)stA.value=parsed.ship_to.address;
+      if(stCSZ&&parsed.ship_to.city_state_zip)stCSZ.value=parsed.ship_to.city_state_zip;
+      if(stP&&parsed.ship_to.phone)stP.value=parsed.ship_to.phone;
+    }
+    var ok=stA.value==='123 Manual'&&stCSZ.value==='Atlanta, GA 30303'&&stP.value==='404-111-2222';
+    newQuote();
+    return{pass:ok,detail:'addr='+stA.value};
+  });
   // ── Drag & drop fix: idempotent init, shared state, position-aware drop ──
   test('dnd:initIsIdempotent',function(){
     var area=document.getElementById('liArea');

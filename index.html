@@ -920,6 +920,17 @@ async function extractVAD(input){
     var parsed=await resp.json();
     if(parsed.to)document.getElementById('preparedByCompany').value=parsed.to.company||'';
     if(parsed.for){document.getElementById('customerName').value=parsed.for.company||'';document.getElementById('contactName').value=parsed.for.name||'';document.getElementById('contactEmail').value=parsed.for.email||'';}
+    // Item 11: Populate Ship To fields if the extractor returned them
+    if(parsed.ship_to){
+      var stA=document.getElementById('shipToAddress');
+      var stCSZ=document.getElementById('shipToCityStateZip');
+      var stP=document.getElementById('shipToPhone');
+      // Only overwrite if extractor gave a value AND user hasn't manually entered something different.
+      // A safer simple rule: always set when extractor returns non-empty (mirrors how customer name is set).
+      if(stA&&parsed.ship_to.address)stA.value=parsed.ship_to.address;
+      if(stCSZ&&parsed.ship_to.city_state_zip)stCSZ.value=parsed.ship_to.city_state_zip;
+      if(stP&&parsed.ship_to.phone)stP.value=parsed.ship_to.phone;
+    }
     if(parsed.quote_expire_date){document.getElementById('expiryDate').value=parsed.quote_expire_date;document.getElementById('expiryDate').style.borderColor='';}
     else{document.getElementById('expiryDate').value='';document.getElementById('expiryDate').style.borderColor='#e53e3e';}
     if(parsed.lineItems&&parsed.lineItems.length)window.loadLineItems(parsed.lineItems);
