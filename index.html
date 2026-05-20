@@ -888,6 +888,9 @@ function recalcAll(){var m=parseFloat(document.getElementById('marginPct').value
 function newQuote(){
   ['customerName','contactName','contactEmail','notes','preparedBy','preparedByEmail','shipToAddress','shipToCityStateZip','shipToPhone'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   var vnEl=document.getElementById('vendorName');if(vnEl)vnEl.value='';
+  // Item 10 fix: clear pdfFileName and its user-edited flag so auto-naming resumes for the new quote
+  var pfEl=document.getElementById('pdfFileName');
+  if(pfEl){pfEl.value='';delete pfEl.dataset.userEdited;}
   // Item 8: Reset commission state
   window.commissionState={servicesRevByGroup:{},aeMultiplier:20};
   window.sortState={col:null,dir:0};
@@ -904,6 +907,8 @@ function newQuote(){
   document.getElementById('extractStatus').textContent='No file selected';
   document.getElementById('vadPdf').value='';
   loadRepSettings();
+  // Item 10 fix: trigger auto-name now that the new quote number has been set
+  updatePdfFileName();
 }
 async function extractVAD(input){
   var file=input.files[0];if(!file)return;

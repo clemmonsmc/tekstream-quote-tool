@@ -648,6 +648,47 @@ async function runRegressionTests() {
     window.lineItems=[];window.commissionState={servicesRevByGroup:{},aeMultiplier:20};render();
     return{pass:beforeText==='$33.33'&&afterText==='$23.33',detail:'before='+beforeText+' after='+afterText};
   });
+  // ── Item 10 fix: pdfFileName cleared and auto-regenerated on newQuote ──
+  test('pdfFileName:clearedOnNewQuote',function(){
+    var pf=document.getElementById('pdfFileName');
+    if(!pf)return{pass:false,detail:'no pdfFileName field'};
+    // Simulate a stale user-edited filename from prior quote
+    pf.value='OLD-STALE-NAME-FROM-PREVIOUS-QUOTE.pdf';
+    pf.dataset.userEdited='1';
+    document.getElementById('customerName').value='Old Customer';
+    newQuote();
+    // After newQuote, customer name is cleared and a new TS-YYYY-NNN is generated
+    var newQn=document.getElementById('quoteNumber').value;
+    // Auto-generated filename should be just the new quote number (no customer since it was cleared)
+    var ok=pf.value===newQn&&!pf.dataset.userEdited;
+    return{pass:ok,detail:'val='+pf.value+' qn='+newQn+' userEdited='+pf.dataset.userEdited};
+  });
+  test('pdfFileName:autoUpdatesWhenQuoteNumberChangesAfterNewQuote',function(){
+    var pf=document.getElementById('pdfFileName');
+    if(!pf)return{pass:false,detail:'no field'};
+    newQuote();
+    // Type a customer name — should now append to the auto-generated quote number
+    var qn=document.getElementById('quoteNumber').value;
+    document.getElementById('customerName').value='ACME Corp';
+    updatePdfFileName();
+    var ok=pf.value===qn+' - ACME Corp';
+    newQuote();
+    return{pass:ok,detail:'val='+pf.value+' expected='+qn+' - ACME Corp'};
+  });
+  test('pdfFileName:respectsUserEditAfterNewQuote',function(){
+    var pf=document.getElementById('pdfFileName');
+    if(!pf)return{pass:false,detail:'no field'};
+    newQuote();
+    // User manually overrides the filename
+    pf.value='Custom Manual Name';
+    pf.dataset.userEdited='1';
+    // Customer name change shouldn't overwrite their custom name
+    document.getElementById('customerName').value='Different Co';
+    updatePdfFileName();
+    var ok=pf.value==='Custom Manual Name';
+    newQuote();
+    return{pass:ok,detail:'val='+pf.value};
+  });
   // ── Drag & drop fix: idempotent init, shared state, position-aware drop ──
   test('dnd:initIsIdempotent',function(){
     var area=document.getElementById('liArea');
