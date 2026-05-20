@@ -103,6 +103,22 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
     </div>
   </div>
 </div>
+<!-- Item 9: Delete-saved-quote confirmation modal -->
+<div class="modal-overlay" id="deleteQuoteModal">
+  <div class="modal">
+    <h3>Delete saved quote?</h3>
+    <p>This will permanently remove the saved quote below. This cannot be undone.</p>
+    <div class="modal-row">
+      <label>Quote</label>
+      <span id="deleteQuoteLabel"></span>
+      <span class="sub" id="deleteQuoteMeta"></span>
+    </div>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeDeleteQuoteModal()">Cancel</button>
+      <button class="modal-confirm" style="background:#c33;" onmouseover="this.style.background='#a02525'" onmouseout="this.style.background='#c33'" id="deleteQuoteConfirmBtn" onclick="confirmDeleteSavedQuote()">Delete</button>
+    </div>
+  </div>
+</div>
 <div class="hdr">
   <img class="hdr-logo" id="hdrLogo" alt="TekStream">
   <span class="hdr-tag">VAD Quote Generator</span>
@@ -370,6 +386,29 @@ function deleteSavedQuote(key){
   localStorage.setItem('ts_saved_quotes',JSON.stringify(saved));
   renderSavedQuotes();
 }
+// ── Item 9: Delete-confirmation modal handlers ─────────────────────────
+window._deleteQuoteKey=null;
+function openDeleteQuoteModal(idx,q){
+  // Prefer key (stable id); fall back to nothing if missing
+  window._deleteQuoteKey=q.key||null;
+  var lbl=(q.quoteNumber||q.key||'(untitled)')+(q.customerName?' — '+q.customerName:'');
+  document.getElementById('deleteQuoteLabel').textContent=lbl;
+  document.getElementById('deleteQuoteMeta').textContent=q.savedAt?'Saved '+q.savedAt:'';
+  document.getElementById('deleteQuoteModal').classList.add('open');
+}
+function closeDeleteQuoteModal(){
+  window._deleteQuoteKey=null;
+  document.getElementById('deleteQuoteModal').classList.remove('open');
+}
+function confirmDeleteSavedQuote(){
+  var k=window._deleteQuoteKey;
+  if(!k){closeDeleteQuoteModal();return;}
+  var sv=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
+  sv=sv.filter(function(q){return q.key!==k;});
+  localStorage.setItem('ts_saved_quotes',JSON.stringify(sv));
+  closeDeleteQuoteModal();
+  renderSavedQuotes();
+}
 function renderSavedQuotes(){
   var saved=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
   var card=null;
@@ -391,12 +430,11 @@ function renderSavedQuotes(){
     var del=document.createElement('button');
     del.className='saved-del';
     del.innerHTML='&times;';
+    del.title='Delete saved quote';
     del.onclick=function(e){
       e.stopPropagation();
-      var sv=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
-      sv.splice(i,1);
-      localStorage.setItem('ts_saved_quotes',JSON.stringify(sv));
-      renderSavedQuotes();
+      // Item 9: open confirmation modal instead of deleting immediately
+      openDeleteQuoteModal(i,q);
     };
     row.onclick=function(){
       var sv=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');

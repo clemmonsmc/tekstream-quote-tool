@@ -801,6 +801,71 @@ async function runRegressionTests() {
     newQuote();
     return{pass:ok,detail:'tcs.length='+tcs.length};
   });
+  // ── Item 9: Delete-saved-quote confirmation modal ────────────────────
+  ['openDeleteQuoteModal','closeDeleteQuoteModal','confirmDeleteSavedQuote'].forEach(function(fn){
+    test('fn:'+fn,function(){return{pass:typeof window[fn]==='function',detail:typeof window[fn]};});
+  });
+  test('deleteModal:dom',function(){
+    var ok=!!document.getElementById('deleteQuoteModal')
+      &&!!document.getElementById('deleteQuoteLabel')
+      &&!!document.getElementById('deleteQuoteMeta')
+      &&!!document.getElementById('deleteQuoteConfirmBtn');
+    return{pass:ok};
+  });
+  test('deleteModal:initiallyClosed',function(){
+    var m=document.getElementById('deleteQuoteModal');
+    return{pass:!m.classList.contains('open'),detail:'classes='+m.className};
+  });
+  test('deleteModal:openSetsClassesAndContent',function(){
+    var m=document.getElementById('deleteQuoteModal');
+    openDeleteQuoteModal(2,{key:'q-test-1',quoteNumber:'TS-TEST-001',customerName:'Test Co',savedAt:'2026-05-20 10:00'});
+    var lbl=document.getElementById('deleteQuoteLabel').textContent;
+    var meta=document.getElementById('deleteQuoteMeta').textContent;
+    var isOpen=m.classList.contains('open');
+    closeDeleteQuoteModal();
+    var ok=isOpen&&lbl==='TS-TEST-001 — Test Co'&&meta==='Saved 2026-05-20 10:00';
+    return{pass:ok,detail:'open='+isOpen+' lbl='+lbl+' meta='+meta};
+  });
+  test('deleteModal:closeRemovesClassAndClearsKey',function(){
+    openDeleteQuoteModal(0,{key:'k1',quoteNumber:'TS-001'});
+    closeDeleteQuoteModal();
+    var m=document.getElementById('deleteQuoteModal');
+    var ok=!m.classList.contains('open')&&window._deleteQuoteKey===null;
+    return{pass:ok,detail:'classes='+m.className+' key='+window._deleteQuoteKey};
+  });
+  test('deleteModal:confirmDeletesOnlyTargetedKey',function(){
+    var seed=[
+      {key:'k1',quoteNumber:'TS-A',customerName:'A Co',savedAt:'',state:{lineItems:[{sku:'x'}]}},
+      {key:'k2',quoteNumber:'TS-B',customerName:'B Co',savedAt:'',state:{lineItems:[{sku:'y'}]}},
+      {key:'k3',quoteNumber:'TS-C',customerName:'C Co',savedAt:'',state:{lineItems:[{sku:'z'}]}}
+    ];
+    localStorage.setItem('ts_saved_quotes',JSON.stringify(seed));
+    openDeleteQuoteModal(1,seed[1]); // target the middle one (k2)
+    confirmDeleteSavedQuote();
+    var after=JSON.parse(localStorage.getItem('ts_saved_quotes'));
+    var keys=after.map(function(q){return q.key;}).join(',');
+    localStorage.setItem('ts_saved_quotes','[]');
+    return{pass:keys==='k1,k3',detail:'remaining keys='+keys};
+  });
+  test('deleteModal:confirmWithNoKeyBecomesNoop',function(){
+    var seed=[{key:'k1',quoteNumber:'TS-A',customerName:'A',savedAt:'',state:{lineItems:[{sku:'x'}]}}];
+    localStorage.setItem('ts_saved_quotes',JSON.stringify(seed));
+    window._deleteQuoteKey=null;
+    confirmDeleteSavedQuote();
+    var after=JSON.parse(localStorage.getItem('ts_saved_quotes'));
+    localStorage.setItem('ts_saved_quotes','[]');
+    return{pass:after.length===1,detail:'after.length='+after.length};
+  });
+  test('deleteModal:deleteButtonIsRedConfirm',function(){
+    var btn=document.getElementById('deleteQuoteConfirmBtn');
+    // Inline style set to #c33 — sanity check the danger styling is present
+    var ok=btn&&(btn.getAttribute('style')||'').indexOf('#c33')>=0;
+    return{pass:ok,detail:btn?(btn.getAttribute('style')||'').substring(0,60):'no button'};
+  });
+  test('deleteModal:cancelButtonExists',function(){
+    var btn=document.querySelector('#deleteQuoteModal .modal-cancel');
+    return{pass:!!btn&&btn.textContent==='Cancel',detail:btn?btn.textContent:'not found'};
+  });
   // ── Drag & drop fix: idempotent init, shared state, position-aware drop ──
   test('dnd:initIsIdempotent',function(){
     var area=document.getElementById('liArea');
