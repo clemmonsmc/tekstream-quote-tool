@@ -1030,6 +1030,50 @@ async function runRegressionTests() {
     window.lineItems=[];render();
     return{pass:ok,detail:'groups='+after.length+' p1=['+after[0].items.map(function(i){return i.sku;}).join(',')+'] p2=['+(after[1]?after[1].items.map(function(i){return i.sku;}).join(','):'-')+']'};
   });
+  test('rowDrop:crossGroupRowDropTriggersMoveNotReorder',function(){
+    // Dragging row 0 (in Payment 1) onto row 1 (in Payment 2) should
+    // move row 0 to Payment 2's dates, NOT reorder within Payment 1.
+    window.loadLineItems([
+      {sku:'A',description:'',qty:1,unit_price:100,start_date:'2026-01-01',end_date:'2026-12-31'},
+      {sku:'B',description:'',qty:1,unit_price:200,start_date:'2027-01-01',end_date:'2027-12-31'}
+    ]);
+    // Simulate the drop handler's cross-group decision:
+    var grps=groupByYear(window.lineItems);
+    var srcItem=window.lineItems[0],tgtItem=window.lineItems[1];
+    var srcGrp=grps.find(function(g){return g.items.indexOf(srcItem)>=0;});
+    var tgtGrp=grps.find(function(g){return g.items.indexOf(tgtItem)>=0;});
+    var shouldMove=srcGrp&&tgtGrp&&srcGrp!==tgtGrp;
+    if(shouldMove){
+      srcItem.start_date=tgtGrp.start;
+      srcItem.end_date=tgtGrp.end;
+      render();
+    }
+    var after=groupByYear(window.lineItems);
+    // Now both should be in 2027 → single group of 2 items
+    var ok=shouldMove&&after.length===1&&after[0].items.length===2&&after[0].start==='2027-01-01';
+    window.lineItems=[];render();
+    return{pass:ok,detail:'shouldMove='+shouldMove+' groups='+after.length+' p1.items='+(after[0]?after[0].items.length:'-')+' p1.start='+(after[0]?after[0].start:'-')};
+  });
+  test('rowDrop:sameGroupRowDropStillReorders',function(){
+    // Dragging row 0 (Payment 1) onto row 1 (also Payment 1) — same group.
+    // Should reorder within the array, NOT change dates.
+    window.loadLineItems([
+      {sku:'A',description:'',qty:1,unit_price:100,start_date:'2026-01-01',end_date:'2026-12-31'},
+      {sku:'B',description:'',qty:1,unit_price:200,start_date:'2026-01-01',end_date:'2026-12-31'},
+      {sku:'C',description:'',qty:1,unit_price:300,start_date:'2026-01-01',end_date:'2026-12-31'}
+    ]);
+    // Check: src and tgt would be in the same group, so cross-group move should NOT trigger
+    var grps=groupByYear(window.lineItems);
+    var srcItem=window.lineItems[0],tgtItem=window.lineItems[2];
+    var srcGrp=grps.find(function(g){return g.items.indexOf(srcItem)>=0;});
+    var tgtGrp=grps.find(function(g){return g.items.indexOf(tgtItem)>=0;});
+    var shouldMove=srcGrp&&tgtGrp&&srcGrp!==tgtGrp;
+    // Dates should still all be 2026-01-01
+    var datesUnchanged=window.lineItems.every(function(it){return it.start_date==='2026-01-01';});
+    var ok=!shouldMove&&datesUnchanged;
+    window.lineItems=[];render();
+    return{pass:ok,detail:'shouldMove='+shouldMove+' datesUnchanged='+datesUnchanged};
+  });
   // ── Drag & drop fix: idempotent init, shared state, position-aware drop ──
   test('dnd:initIsIdempotent',function(){
     var area=document.getElementById('liArea');

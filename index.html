@@ -677,8 +677,28 @@ function initDragDrop(){
     }
     if(tgtIdx===null||pos===null)return;
     if(srcIdx===tgtIdx)return;
-    // Compute final insertion index considering before/after position
-    // and the fact that removing the source first shifts subsequent indices.
+    // Item 15 extension: if source and target rows are in DIFFERENT payment groups,
+    // treat the drop as a group move (assign target's dates) instead of a reorder.
+    // This matches user intuition — dragging onto any row in Payment 2 should
+    // move the source to Payment 2.
+    var grps=groupByYear(window.lineItems);
+    if(grps&&grps.length>1){
+      var srcItem=window.lineItems[srcIdx],tgtItem=window.lineItems[tgtIdx];
+      var srcGrp=null,tgtGrp=null;
+      grps.forEach(function(g){
+        if(g.items.indexOf(srcItem)>=0)srcGrp=g;
+        if(g.items.indexOf(tgtItem)>=0)tgtGrp=g;
+      });
+      if(srcGrp&&tgtGrp&&srcGrp!==tgtGrp){
+        srcItem.start_date=tgtGrp.start||'';
+        srcItem.end_date=tgtGrp.end||'';
+        window.sortState={col:null,dir:0};
+        render();
+        return;
+      }
+    }
+    // Same-group reorder: compute final insertion index considering before/after
+    // position and the fact that removing the source first shifts subsequent indices.
     var insertAt=pos==='top'?tgtIdx:tgtIdx+1;
     if(srcIdx<insertAt)insertAt-=1; // account for splice removal shift
     if(insertAt===srcIdx)return; // would be a no-op
