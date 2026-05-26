@@ -866,6 +866,78 @@ async function runRegressionTests() {
     var btn=document.querySelector('#deleteQuoteModal .modal-cancel');
     return{pass:!!btn&&btn.textContent==='Cancel',detail:btn?btn.textContent:'not found'};
   });
+  // ── Bug fixes: × button interpolation + empty-row positioning ────────
+  test('removeRow:onclickIsInterpolatedNotLiteral',function(){
+    // Bug: a previous edit broke string concatenation so onclick="removeRow('+i+')"
+    // was literally injected into HTML (matching index 0 every time via NaN→0 splice).
+    // Verify each rendered row has a numeric onclick value matching its data-row.
+    window.loadLineItems([
+      {sku:'A',description:'',qty:1,unit_price:10},
+      {sku:'B',description:'',qty:1,unit_price:20},
+      {sku:'C',description:'',qty:1,unit_price:30}
+    ]);
+    var rows=document.querySelectorAll('#liArea tr[data-row]');
+    var fails=[];
+    rows.forEach(function(r){
+      var dataRow=r.getAttribute('data-row');
+      var del=r.querySelector('button.del[onclick^="removeRow"]');
+      if(!del){fails.push('row'+dataRow+'_noBtn');return;}
+      var onclick=del.getAttribute('onclick');
+      // Must contain the numeric index, NOT the literal '+i+' template fragment
+      if(onclick.indexOf("'+i+'")>=0||onclick.indexOf('+i+')>=0){fails.push('row'+dataRow+'_literal');return;}
+      var expected='removeRow('+dataRow+')';
+      if(onclick!==expected)fails.push('row'+dataRow+'_got='+onclick);
+    });
+    window.lineItems=[];render();
+    return{pass:fails.length===0,detail:fails.length?fails.join(','):'all 3 rows have numeric onclick'};
+  });
+  test('removeRow:resetMarginButtonAlsoInterpolated',function(){
+    // Same bug existed on the 'Reset to global margin' button (↺)
+    window.loadLineItems([
+      {sku:'A',description:'',qty:1,unit_price:10},
+      {sku:'B',description:'',qty:1,unit_price:20}
+    ]);
+    // Set a margin override on row 1 so the ↺ button renders
+    window.lineItems[1].margin=25;
+    render();
+    var resetBtn=document.querySelector('#liArea button.del[onclick*="margin=null"]');
+    if(!resetBtn){window.lineItems=[];render();return{pass:false,detail:'no reset button found'};}
+    var onclick=resetBtn.getAttribute('onclick');
+    var ok=onclick.indexOf("'+i+'")<0&&onclick.indexOf('lineItems[1].margin=null')>=0;
+    window.lineItems=[];render();
+    return{pass:ok,detail:'onclick='+onclick};
+  });
+  test('removeRow:deletingNewEmptyRowRemovesItself',function(){
+    // Setup: 3 dated rows, then add 1 empty row, then delete the empty row.
+    // Bug: × on the empty row used to delete the first dated row instead.
+    window.loadLineItems([
+      {sku:'A',description:'',qty:1,unit_price:10,start_date:'2026-01-01',end_date:'2026-12-31'},
+      {sku:'B',description:'',qty:1,unit_price:20,start_date:'2026-01-01',end_date:'2026-12-31'},
+      {sku:'C',description:'',qty:1,unit_price:30,start_date:'2026-01-01',end_date:'2026-12-31'}
+    ]);
+    addRow(); // empty row at index 3
+    // Index 3 is the empty row in window.lineItems; clicking × should remove it specifically
+    var emptyIdx=window.lineItems.findIndex(function(it){return !it.sku;});
+    var pass=emptyIdx===3;
+    removeRow(emptyIdx);
+    var remaining=window.lineItems.map(function(i){return i.sku;}).sort().join(',');
+    window.lineItems=[];render();
+    return{pass:pass&&remaining==='A,B,C',detail:'emptyIdx='+emptyIdx+' remaining='+remaining};
+  });
+  test('groupByYear:undatedRowsAppendedNotPrepended',function(){
+    // Bug: groups['__none__'].concat(groups[firstReal]) used to put empty rows FIRST.
+    // Fix: groups[firstReal].concat(groups['__none__']) puts them at the END.
+    window.loadLineItems([
+      {sku:'A',description:'',qty:1,unit_price:10,start_date:'2026-01-01',end_date:'2026-12-31'},
+      {sku:'B',description:'',qty:1,unit_price:20,start_date:'2026-01-01',end_date:'2026-12-31'}
+    ]);
+    addRow(); // empty row gets merged into Payment 1
+    var g=groupByYear(window.lineItems);
+    // Expect 1 group, and the empty row should be at the END not the start
+    var ok=g&&g.length===1&&g[0].items.length===3&&g[0].items[0].sku==='A'&&g[0].items[1].sku==='B'&&!g[0].items[2].sku;
+    window.lineItems=[];render();
+    return{pass:ok,detail:g?'group0.items=['+g[0].items.map(function(i){return i.sku||'EMPTY';}).join(',')+']':'no groups'};
+  });
   // ── Drag & drop fix: idempotent init, shared state, position-aware drop ──
   test('dnd:initIsIdempotent',function(){
     var area=document.getElementById('liArea');

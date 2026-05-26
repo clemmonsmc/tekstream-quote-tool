@@ -527,10 +527,11 @@ function groupByYear(items){
     if(!groupDates[yr].start&&it.start_date)groupDates[yr].start=it.start_date;
     if(!groupDates[yr].end&&it.end_date)groupDates[yr].end=it.end_date;
   });
-  // Move undated items into first year group
+  // Move undated items into first year group, appended at the END
+  // (so newly-added empty rows appear after existing data, where users expect them)
   if(groups['__none__']&&years.length>1){
     var firstReal=years.find(function(y){return y!=='__none__';});
-    if(firstReal){groups[firstReal]=groups['__none__'].concat(groups[firstReal]);delete groups['__none__'];years=years.filter(function(y){return y!=='__none__';});}
+    if(firstReal){groups[firstReal]=groups[firstReal].concat(groups['__none__']);delete groups['__none__'];years=years.filter(function(y){return y!=='__none__';});}
   }
   years.sort(function(a,b){return a==='__none__'?1:b==='__none__'?-1:a.localeCompare(b);});
   return years.map(function(yr,i){
@@ -652,8 +653,8 @@ function renderRow(it,i,m){
   h+='<td><input type="text" value="'+custVal+'" class="cust-price" style="text-align:right;width:100%;color:#003658;font-weight:600" placeholder="\u2014" title="Customer Ext. $ (editable)" onfocus="custExtFocus(this)" onblur="custExtBlur(this,'+i+')" autocomplete="off"></td>';
   // Col 13: Actions
   h+='<td style="white-space:nowrap;padding:4px 2px">';
-  if(hasOverride)h+='<button class="del" style="color:#5B94CB;font-size:12px" title="Reset to global margin" onclick="lineItems[\'+i+\'].margin=null;recalcAll()">↺</button>';
-  h+='<button class="del" onclick="removeRow(\'+i+\')">\u2715</button>';
+  if(hasOverride)h+='<button class="del" style="color:#5B94CB;font-size:12px" title="Reset to global margin" onclick="lineItems['+i+'].margin=null;recalcAll()">↺</button>';
+  h+='<button class="del" onclick="removeRow('+i+')">\u2715</button>';
   h+='</td></tr>';
   return h;
 }
