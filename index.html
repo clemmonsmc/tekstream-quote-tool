@@ -232,8 +232,8 @@ window.lineItems = [];
 window.logoDataUrl = null;
 window.signatureDataUrl = null;
 window.sortState = {col:null,dir:0};
-// Item 8: Margin & Commission state — servicesRev keyed by 'Payment N' label, aeMultiplier as single global %
-window.commissionState = {servicesRevByGroup:{},aeMultiplier:20};
+// Item 8: Margin & Commission state — servicesRev keyed by 'Payment N' label, aeMultiplier + contractCostPct as single global %
+window.commissionState = {servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};
 
 (function init() {
   fetch('/api/logo').then(function(r){return r.arrayBuffer();}).then(function(buf){
@@ -327,7 +327,7 @@ function loadRepSettings(){
 }
 
 function getQuoteState(){
-  return{customerName:document.getElementById('customerName').value,contactName:document.getElementById('contactName').value,contactEmail:document.getElementById('contactEmail').value,quoteNumber:document.getElementById('quoteNumber').value,quoteDate:document.getElementById('quoteDate').value,expiryDate:document.getElementById('expiryDate').value,marginPct:document.getElementById('marginPct').value,notes:document.getElementById('notes').value,terms:document.getElementById('terms').value,additionalTerms:(document.getElementById('additionalTerms')||{}).value||'',preparedByCompany:document.getElementById('preparedByCompany').value,preparedBy:document.getElementById('preparedBy').value,preparedByEmail:document.getElementById('preparedByEmail').value,shipToAddress:(document.getElementById('shipToAddress')||{}).value||'',shipToCityStateZip:(document.getElementById('shipToCityStateZip')||{}).value||'',shipToPhone:(document.getElementById('shipToPhone')||{}).value||'',vendorName:(document.getElementById('vendorName')||{}).value||'',commissionState:JSON.parse(JSON.stringify(window.commissionState||{servicesRevByGroup:{},aeMultiplier:20})),lineItems:JSON.parse(JSON.stringify(window.lineItems))};
+  return{customerName:document.getElementById('customerName').value,contactName:document.getElementById('contactName').value,contactEmail:document.getElementById('contactEmail').value,quoteNumber:document.getElementById('quoteNumber').value,quoteDate:document.getElementById('quoteDate').value,expiryDate:document.getElementById('expiryDate').value,marginPct:document.getElementById('marginPct').value,notes:document.getElementById('notes').value,terms:document.getElementById('terms').value,additionalTerms:(document.getElementById('additionalTerms')||{}).value||'',preparedByCompany:document.getElementById('preparedByCompany').value,preparedBy:document.getElementById('preparedBy').value,preparedByEmail:document.getElementById('preparedByEmail').value,shipToAddress:(document.getElementById('shipToAddress')||{}).value||'',shipToCityStateZip:(document.getElementById('shipToCityStateZip')||{}).value||'',shipToPhone:(document.getElementById('shipToPhone')||{}).value||'',vendorName:(document.getElementById('vendorName')||{}).value||'',commissionState:JSON.parse(JSON.stringify(window.commissionState||{servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0})),lineItems:JSON.parse(JSON.stringify(window.lineItems))};
 }
 function restoreQuoteState(s){
   document.getElementById('customerName').value=s.customerName||'';
@@ -354,7 +354,8 @@ function restoreQuoteState(s){
   // Item 8: Restore commission state
   window.commissionState={
     servicesRevByGroup:(s.commissionState&&s.commissionState.servicesRevByGroup)||{},
-    aeMultiplier:(s.commissionState&&typeof s.commissionState.aeMultiplier==='number')?s.commissionState.aeMultiplier:20
+    aeMultiplier:(s.commissionState&&typeof s.commissionState.aeMultiplier==='number')?s.commissionState.aeMultiplier:20,
+    contractCostPct:(s.commissionState&&typeof s.commissionState.contractCostPct==='number')?s.commissionState.contractCostPct:0
   };
   var pfEl=document.getElementById('pdfFileName');if(pfEl){pfEl.value=s.pdfFileName||'';pfEl.dataset.userEdited=s.pdfFileName?'1':'';}  
   window.lineItems=s.lineItems||[];
@@ -822,6 +823,14 @@ function updateAeMultiplier(val){
   recomputeCommissionCells();
   autoSave();
 }
+function updateContractCostPct(val){
+  var clean=String(val).replace(/[^0-9.]/g,'');
+  var parts=clean.split('.');if(parts.length>2)clean=parts[0]+'.'+parts.slice(1).join('');
+  var n=parseFloat(clean);
+  window.commissionState.contractCostPct=isNaN(n)?0:n;
+  recomputeCommissionCells();
+  autoSave();
+}
 // Surgically update dependent cells without re-rendering inputs (preserves focus)
 function recomputeCommissionCells(){
   if(!window.lineItems||!window.lineItems.length)return;
@@ -840,22 +849,27 @@ function recomputeCommissionCells(){
     });
   }
   var aeMult=(window.commissionState&&typeof window.commissionState.aeMultiplier==='number')?window.commissionState.aeMultiplier:20;
+  var contractPct=(window.commissionState&&typeof window.commissionState.contractCostPct==='number')?window.commissionState.contractCostPct:0;
   var srv=(window.commissionState&&window.commissionState.servicesRevByGroup)||{};
   rows.forEach(function(r){
     var k=commissionRowKey(r.label);
     var sv=srv[r.label]||0;
-    var tm=(r.invoiced-r.cost)-sv;
+    var contractCost=r.cost*(contractPct/100);
+    var tm=(r.invoiced-r.cost)-sv-contractCost;
     var commission=tm*(aeMult/100);
     var tmEl=document.getElementById('cm_tm_'+k);
     var coEl=document.getElementById('cm_co_'+k);
+    var ccEl=document.getElementById('cm_cc_'+k);
     if(tmEl){
       tmEl.textContent='$'+fmt(tm);
       tmEl.style.color=tm>0?'#2d7a4f':tm<0?'#c00':'#131112';
     }
     if(coEl)coEl.textContent='$'+fmt(commission);
+    if(ccEl)ccEl.textContent='$'+fmt(contractCost);
   });
   // Update read-only multiplier displays (columns 2+)
   document.querySelectorAll('[data-cm-mult-readonly]').forEach(function(el){el.textContent=aeMult+'%';});
+  document.querySelectorAll('[data-cm-contract-readonly]').forEach(function(el){el.textContent=contractPct+'%';});
 }
 function renderCommissionPanel(){
   var panel=document.getElementById('commissionPanel');
@@ -876,6 +890,7 @@ function renderCommissionPanel(){
     });
   }
   var aeMult=(window.commissionState&&typeof window.commissionState.aeMultiplier==='number')?window.commissionState.aeMultiplier:20;
+  var contractPct=(window.commissionState&&typeof window.commissionState.contractCostPct==='number')?window.commissionState.contractCostPct:0;
   var srv=(window.commissionState&&window.commissionState.servicesRevByGroup)||{};
 
   var h='<div style="margin-top:18px;border:1px solid #d0d8e0;border-radius:8px;overflow:hidden">';
@@ -913,18 +928,43 @@ function renderCommissionPanel(){
   });
   h+='</tr>';
 
-  // Row 4: Total Margin (computed, color-coded, ID'd for surgical updates)
-  h+='<tr style="background:#fafbfc"><td style="padding:7px 12px;font-weight:600;color:#131112">Total Margin</td>';
+  // Row 3.5: Contract Cost $ (computed = cost * contractPct/100), red, ID'd for surgical updates
+  h+='<tr style="background:#fafbfc"><td style="padding:7px 12px;color:#c00">Contract Cost</td>';
+  rows.forEach(function(r){
+    var cc=r.cost*(contractPct/100);
+    var k=commissionRowKey(r.label);
+    h+='<td id="cm_cc_'+k+'" style="text-align:right;padding:7px 12px;color:#c00">$'+fmt(cc)+'</td>';
+  });
+  h+='</tr>';
+
+  // Row 4: Total Margin (computed = invoiced - cost - servicesRev - contractCost, color-coded)
+  h+='<tr><td style="padding:7px 12px;font-weight:600;color:#131112">Total Margin</td>';
   rows.forEach(function(r){
     var sv=srv[r.label]||0;
-    var tm=(r.invoiced-r.cost)-sv;
+    var cc=r.cost*(contractPct/100);
+    var tm=(r.invoiced-r.cost)-sv-cc;
     var color=tm>0?'#2d7a4f':tm<0?'#c00':'#131112';
     var k=commissionRowKey(r.label);
     h+='<td id="cm_tm_'+k+'" style="text-align:right;padding:7px 12px;font-weight:600;color:'+color+'">$'+fmt(tm)+'</td>';
   });
   h+='</tr>';
 
-  // Row 5: AE Software Multiplier (single editable col 1; read-only display in 2+)
+  // Row 5: Contract Cost % (single editable col 1; read-only display in 2+)
+  h+='<tr style="background:#fafbfc"><td style="padding:7px 12px;color:#131112">Contract Cost %</td>';
+  rows.forEach(function(r,i){
+    if(i===0){
+      h+='<td style="text-align:right;padding:5px 8px;white-space:nowrap">'
+        +'<input type="text" inputmode="decimal" value="'+contractPct+'" '
+        +'style="width:60px;text-align:right;font-size:12px;border:1px solid #d0d8e0;border-radius:4px;padding:4px 6px" '
+        +'oninput="updateContractCostPct(this.value)" autocomplete="off"> %'
+        +'</td>';
+    } else {
+      h+='<td data-cm-contract-readonly style="text-align:right;padding:7px 12px;color:#717174">'+contractPct+'%</td>';
+    }
+  });
+  h+='</tr>';
+
+  // Row 6: AE Software Multiplier (single editable col 1; read-only display in 2+)
   h+='<tr><td style="padding:7px 12px;color:#131112">Current AE Software Multiplier</td>';
   rows.forEach(function(r,i){
     if(i===0){
@@ -939,11 +979,12 @@ function renderCommissionPanel(){
   });
   h+='</tr>';
 
-  // Row 6: Total Est. Commission to AE
+  // Row 7: Total Est. Commission to AE (factors in contract cost via total margin)
   h+='<tr style="background:#EBF3FB;color:#003658"><td style="padding:9px 12px;font-weight:700">Total Est. Commission to AE</td>';
   rows.forEach(function(r){
     var sv=srv[r.label]||0;
-    var tm=(r.invoiced-r.cost)-sv;
+    var cc=r.cost*(contractPct/100);
+    var tm=(r.invoiced-r.cost)-sv-cc;
     var commission=tm*(aeMult/100);
     var k=commissionRowKey(r.label);
     h+='<td id="cm_co_'+k+'" style="text-align:right;padding:9px 12px;font-weight:700">$'+fmt(commission)+'</td>';
@@ -1028,7 +1069,7 @@ function newQuote(){
   var pfEl=document.getElementById('pdfFileName');
   if(pfEl){pfEl.value='';delete pfEl.dataset.userEdited;}
   // Item 8: Reset commission state
-  window.commissionState={servicesRevByGroup:{},aeMultiplier:20};
+  window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};
   window.sortState={col:null,dir:0};
   document.getElementById('preparedByCompany').value='TekStream';
   document.getElementById('terms').value='Net 30';

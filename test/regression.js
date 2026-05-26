@@ -1074,6 +1074,95 @@ async function runRegressionTests() {
     window.lineItems=[];render();
     return{pass:ok,detail:'shouldMove='+shouldMove+' datesUnchanged='+datesUnchanged};
   });
+  // ── Contract Cost % feature ──────────────────────────────────────────
+  test('fn:updateContractCostPct',function(){return{pass:typeof window.updateContractCostPct==='function',detail:typeof window.updateContractCostPct};});
+  test('contractCost:initialStateZero',function(){
+    window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};
+    return{pass:window.commissionState.contractCostPct===0,detail:window.commissionState.contractCostPct};
+  });
+  test('contractCost:updateHandlerSanitizesInput',function(){
+    window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};
+    window.loadLineItems([{sku:'X',description:'',qty:1,unit_price:100}]);
+    updateContractCostPct('2.5');
+    var v1=window.commissionState.contractCostPct;
+    updateContractCostPct('abc');
+    var v2=window.commissionState.contractCostPct;
+    updateContractCostPct('1.2.3');
+    var v3=window.commissionState.contractCostPct;
+    window.lineItems=[];window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};render();
+    return{pass:v1===2.5&&v2===0&&v3===1.23,detail:'v1='+v1+' v2='+v2+' v3='+v3};
+  });
+  test('contractCost:reducesMargin',function(){
+    window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};
+    // VAD cost 100, 25% margin → customer ext 133.33, gross margin 33.33
+    // Set contract cost = 2% of VAD cost ($100) = $2
+    // Expected: Total Margin = 33.33 - 0 (no services) - 2 = 31.33
+    window.loadLineItems([{sku:'X',description:'',qty:1,unit_price:100}]);
+    document.getElementById('marginPct').value='25';
+    updateContractCostPct('2');
+    var tmEl=document.getElementById('cm_tm_Payment_1');
+    var marginText=tmEl?tmEl.textContent:'no cell';
+    window.lineItems=[];window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};render();
+    return{pass:marginText==='$31.33',detail:'margin='+marginText};
+  });
+  test('contractCost:reducesCommission',function(){
+    window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};
+    window.loadLineItems([{sku:'X',description:'',qty:1,unit_price:100}]);
+    document.getElementById('marginPct').value='25';
+    // Without contract cost: margin 33.33, commission @ 20% = 6.67
+    var coEl=document.getElementById('cm_co_Payment_1');
+    var commWithout=coEl.textContent;
+    updateContractCostPct('2');
+    // With 2% contract cost: margin 31.33, commission @ 20% = 6.27 (rounded)
+    var commWith=coEl.textContent;
+    window.lineItems=[];window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};render();
+    return{pass:commWithout==='$6.67'&&commWith==='$6.27',detail:'without='+commWithout+' with='+commWith};
+  });
+  test('contractCost:displayedAsDollarPerPayment',function(){
+    window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:5};
+    window.loadLineItems([
+      {sku:'A',description:'',qty:1,unit_price:100,start_date:'2026-01-01',end_date:'2026-12-31'},
+      {sku:'B',description:'',qty:1,unit_price:200,start_date:'2027-01-01',end_date:'2027-12-31'}
+    ]);
+    // 5% of 100 = $5 for P1; 5% of 200 = $10 for P2
+    var p1=document.getElementById('cm_cc_Payment_1');
+    var p2=document.getElementById('cm_cc_Payment_2');
+    var p1Text=p1?p1.textContent:'no cell';
+    var p2Text=p2?p2.textContent:'no cell';
+    window.lineItems=[];window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};render();
+    return{pass:p1Text==='$5.00'&&p2Text==='$10.00',detail:'p1='+p1Text+' p2='+p2Text};
+  });
+  test('contractCost:stateRoundtripViaGetRestore',function(){
+    window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};
+    window.loadLineItems([{sku:'X',description:'',qty:1,unit_price:100}]);
+    updateContractCostPct('3.5');
+    var s=getQuoteState();
+    window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};
+    restoreQuoteState(s);
+    var ok=window.commissionState.contractCostPct===3.5;
+    window.lineItems=[];newQuote();
+    return{pass:ok,detail:'restored='+window.commissionState.contractCostPct};
+  });
+  test('contractCost:newQuoteResetsToZero',function(){
+    window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:7};
+    newQuote();
+    return{pass:window.commissionState.contractCostPct===0,detail:window.commissionState.contractCostPct};
+  });
+  test('contractCost:legacyRestoreDefaultsToZero',function(){
+    // Legacy saved quote: commissionState has no contractCostPct
+    restoreQuoteState({customerName:'Old',quoteNumber:'TS-OLD',commissionState:{servicesRevByGroup:{},aeMultiplier:20},lineItems:[{sku:'X',description:'',qty:1,unit_price:100}]});
+    var ok=window.commissionState.contractCostPct===0;
+    window.lineItems=[];newQuote();
+    return{pass:ok,detail:'contractCostPct='+window.commissionState.contractCostPct};
+  });
+  test('contractCost:percentInputIsText',function(){
+    window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};
+    window.loadLineItems([{sku:'X',description:'',qty:1,unit_price:100}]);
+    var input=document.querySelector('input[oninput^="updateContractCostPct"]');
+    var ok=input&&input.type==='text'&&input.getAttribute('inputmode')==='decimal';
+    window.lineItems=[];render();
+    return{pass:ok,detail:input?'type='+input.type+' inputmode='+input.getAttribute('inputmode'):'no input'};
+  });
   // ── Drag & drop fix: idempotent init, shared state, position-aware drop ──
   test('dnd:initIsIdempotent',function(){
     var area=document.getElementById('liArea');
