@@ -71,6 +71,8 @@ td input.cust-price{-moz-appearance:textfield}
 tr.drag-source{opacity:.4}
 tr.drag-over-top td{box-shadow:inset 0 3px 0 0 #003658}
 tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
+.group-header{transition:box-shadow .12s, background .12s}
+.group-header.drag-over-group{box-shadow:0 0 0 3px #003658 inset; background:#003658 !important;}
 </style>
 </head>
 <body>
@@ -198,6 +200,7 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
       <div id="liArea"><div class="empty">Add line items manually or upload a VAD quote.</div></div>
       <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <button class="btn btn-sm" style="background:transparent;border:1.5px solid #003658;color:#003658" onclick="addRow()">+ Add line item</button>
+        <button class="btn btn-sm" style="background:transparent;border:1.5px solid #5B94CB;color:#5B94CB" onclick="addNewPaymentBlock()" title="Add a new payment group with placeholder dates">+ New Payment</button>
         <button class="btn btn-sm" style="background:transparent;border:1.5px solid #5B94CB;color:#5B94CB" onclick="resetSort()" title="Restore original order (as imported)">&#8634; Reset Order</button>
       </div>
     </div>
@@ -497,6 +500,38 @@ function nextOriginalIndex(){
 }
 function addRow(){window.lineItems.push({sku:'',description:'',qty:1,unit_price:0,start_date:'',end_date:'',margin:null,originalIndex:nextOriginalIndex()});window.sortState={col:null,dir:0};render();}
 function removeRow(i){window.lineItems.splice(i,1);render();}
+// Item 14: Add a new payment block with placeholder dates that don't collide with existing groups
+function addNewPaymentBlock(){
+  // Determine target dates: latest existing end_date + 1 day → + 1 year.
+  // Fall back to today → today + 1 year when no dated items exist.
+  var maxEnd='';
+  if(window.lineItems&&window.lineItems.length){
+    window.lineItems.forEach(function(it){
+      if(it.end_date&&(!maxEnd||it.end_date>maxEnd))maxEnd=it.end_date;
+    });
+  }
+  var startDate,endDate;
+  if(maxEnd){
+    var d=new Date(maxEnd+'T00:00:00');
+    d.setDate(d.getDate()+1);
+    startDate=d.toISOString().substring(0,10);
+    d.setFullYear(d.getFullYear()+1);
+    d.setDate(d.getDate()-1);
+    endDate=d.toISOString().substring(0,10);
+  } else {
+    var today=new Date();
+    startDate=today.toISOString().substring(0,10);
+    today.setFullYear(today.getFullYear()+1);
+    endDate=today.toISOString().substring(0,10);
+  }
+  window.lineItems.push({
+    sku:'',description:'',qty:1,unit_price:0,
+    start_date:startDate,end_date:endDate,
+    margin:null,originalIndex:nextOriginalIndex()
+  });
+  window.sortState={col:null,dir:0};
+  render();
+}
 
 
 function fmtDateDisplay(d){
@@ -551,10 +586,13 @@ function initDragDrop(){
   if(!area||area._dragDropInitialized)return;
   area._dragDropInitialized=true;
   // Shared state lives on the area element so all handlers see the same values
-  var state={dragIdx:null,dropIdx:null,dropPos:null};
+  var state={dragIdx:null,dropIdx:null,dropPos:null,dropGroupIdx:null};
   function clearIndicators(){
     area.querySelectorAll('tr.drag-over-top,tr.drag-over-bottom').forEach(function(r){
       r.classList.remove('drag-over-top','drag-over-bottom');
+    });
+    area.querySelectorAll('.group-header.drag-over-group').forEach(function(g){
+      g.classList.remove('drag-over-group');
     });
   }
   function clearSourceStyle(){
@@ -568,6 +606,7 @@ function initDragDrop(){
     state.dragIdx=idx;
     state.dropIdx=null;
     state.dropPos=null;
+    state.dropGroupIdx=null;
     e.dataTransfer.effectAllowed='move';
     try{e.dataTransfer.setData('text/plain',String(idx));}catch(_){/* some browsers throw on empty data */}
     // Mark the source row faded
@@ -578,10 +617,24 @@ function initDragDrop(){
     if(state.dragIdx===null)return;
     e.preventDefault();
     e.dataTransfer.dropEffect='move';
+    // Item 15: check for group-header drop target first
+    var groupHdr=e.target.closest('.group-header');
+    if(groupHdr){
+      var gi=parseInt(groupHdr.getAttribute('data-group-idx'),10);
+      if(!isNaN(gi)){
+        if(state.dropGroupIdx===gi)return; // no change
+        clearIndicators();
+        groupHdr.classList.add('drag-over-group');
+        state.dropGroupIdx=gi;
+        state.dropIdx=null;
+        state.dropPos=null;
+        return;
+      }
+    }
     var row=e.target.closest('tr[data-row]');
-    if(!row){clearIndicators();state.dropIdx=null;state.dropPos=null;return;}
+    if(!row){clearIndicators();state.dropIdx=null;state.dropPos=null;state.dropGroupIdx=null;return;}
     var idx=parseInt(row.getAttribute('data-row'),10);
-    if(isNaN(idx)||idx===state.dragIdx){clearIndicators();state.dropIdx=null;state.dropPos=null;return;}
+    if(isNaN(idx)||idx===state.dragIdx){clearIndicators();state.dropIdx=null;state.dropPos=null;state.dropGroupIdx=null;return;}
     var rect=row.getBoundingClientRect();
     var pos=(e.clientY<rect.top+rect.height/2)?'top':'bottom';
     if(state.dropIdx===idx&&state.dropPos===pos)return; // no change
@@ -589,6 +642,7 @@ function initDragDrop(){
     row.classList.add(pos==='top'?'drag-over-top':'drag-over-bottom');
     state.dropIdx=idx;
     state.dropPos=pos;
+    state.dropGroupIdx=null;
   });
   area.addEventListener('dragleave',function(e){
     // Only clear if leaving the area entirely
@@ -598,10 +652,30 @@ function initDragDrop(){
   });
   area.addEventListener('drop',function(e){
     e.preventDefault();
-    var srcIdx=state.dragIdx,tgtIdx=state.dropIdx,pos=state.dropPos;
+    var srcIdx=state.dragIdx,tgtIdx=state.dropIdx,pos=state.dropPos,tgtGroupIdx=state.dropGroupIdx;
     clearIndicators();clearSourceStyle();
-    state.dragIdx=null;state.dropIdx=null;state.dropPos=null;
-    if(srcIdx===null||tgtIdx===null||pos===null)return;
+    state.dragIdx=null;state.dropIdx=null;state.dropPos=null;state.dropGroupIdx=null;
+    if(srcIdx===null)return;
+    // Item 15: drop on a group header → reassign row's dates to that group
+    if(tgtGroupIdx!==null){
+      var groups=groupByYear(window.lineItems);
+      if(groups&&groups[tgtGroupIdx]){
+        var grp=groups[tgtGroupIdx];
+        var item=window.lineItems[srcIdx];
+        if(item){
+          // Don't bother if row is already in this group
+          var alreadyHere=grp.items.indexOf(item)>=0;
+          if(!alreadyHere){
+            item.start_date=grp.start||'';
+            item.end_date=grp.end||'';
+            window.sortState={col:null,dir:0};
+            render();
+          }
+        }
+      }
+      return;
+    }
+    if(tgtIdx===null||pos===null)return;
     if(srcIdx===tgtIdx)return;
     // Compute final insertion index considering before/after position
     // and the fact that removing the source first shifts subsequent indices.
@@ -617,7 +691,7 @@ function initDragDrop(){
   // Cancel/abort path — drop outside, Esc, etc.
   area.addEventListener('dragend',function(){
     clearIndicators();clearSourceStyle();
-    state.dragIdx=null;state.dropIdx=null;state.dropPos=null;
+    state.dragIdx=null;state.dropIdx=null;state.dropPos=null;state.dropGroupIdx=null;
   });
 }
 function renderRow(it,i,m){
@@ -882,7 +956,7 @@ function render(){
   } else {
     groups.forEach(function(grp){
       var gi=groups.indexOf(grp);
-      h+='<div style="background:#5B94CB;color:#fff;font-size:12px;padding:6px 12px;letter-spacing:.06em;border-radius:6px 6px 0 0;margin-top:8px;display:flex;align-items:center;gap:12px">';
+      h+='<div class="group-header" data-group-idx="'+gi+'" style="background:#5B94CB;color:#fff;font-size:12px;padding:6px 12px;letter-spacing:.06em;border-radius:6px 6px 0 0;margin-top:8px;display:flex;align-items:center;gap:12px" title="Drag rows here to move them into this payment">';
       h+='<span style="font-weight:700">'+grp.label+'</span>';
       h+='<span style="opacity:.7;font-size:11px">|&nbsp;&nbsp;Service Dates:</span>';
       h+="<input type='date' value='"+escH(grp.start||'')+"' style='background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;width:115px' "

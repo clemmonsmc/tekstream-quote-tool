@@ -938,6 +938,98 @@ async function runRegressionTests() {
     window.lineItems=[];render();
     return{pass:ok,detail:g?'group0.items=['+g[0].items.map(function(i){return i.sku||'EMPTY';}).join(',')+']':'no groups'};
   });
+  // ── Item 14: Add new payment block ───────────────────────────────────
+  test('fn:addNewPaymentBlock',function(){return{pass:typeof window.addNewPaymentBlock==='function',detail:typeof window.addNewPaymentBlock};});
+  test('addNewPaymentBlock:buttonExists',function(){
+    var btn=document.querySelector('button[onclick="addNewPaymentBlock()"]');
+    return{pass:!!btn&&btn.textContent.indexOf('New Payment')>=0,detail:btn?btn.textContent.trim():'not found'};
+  });
+  test('addNewPaymentBlock:datesFollowLatestExisting',function(){
+    window.loadLineItems([
+      {sku:'A',description:'',qty:1,unit_price:100,start_date:'2026-01-01',end_date:'2026-12-31'},
+      {sku:'B',description:'',qty:1,unit_price:200,start_date:'2026-01-01',end_date:'2026-12-31'}
+    ]);
+    addNewPaymentBlock();
+    var newRow=window.lineItems[window.lineItems.length-1];
+    // 2026-12-31 + 1 day = 2027-01-01; +1 year -1 day = 2027-12-31
+    var ok=newRow.start_date==='2027-01-01'&&newRow.end_date==='2027-12-31'&&!newRow.sku;
+    window.lineItems=[];render();
+    return{pass:ok,detail:'start='+newRow.start_date+' end='+newRow.end_date};
+  });
+  test('addNewPaymentBlock:fallsBackToTodayWhenNoExistingDates',function(){
+    window.lineItems=[];
+    addNewPaymentBlock();
+    var newRow=window.lineItems[0];
+    var today=new Date().toISOString().substring(0,10);
+    var year1=String(new Date().getFullYear()+1);
+    var ok=newRow.start_date===today&&newRow.end_date.substring(0,4)===year1;
+    window.lineItems=[];render();
+    return{pass:ok,detail:'start='+newRow.start_date+' end='+newRow.end_date+' today='+today};
+  });
+  test('addNewPaymentBlock:createsDistinctGroup',function(){
+    window.loadLineItems([
+      {sku:'A',description:'',qty:1,unit_price:100,start_date:'2026-01-01',end_date:'2026-12-31'}
+    ]);
+    var g0=groupByYear(window.lineItems);
+    addNewPaymentBlock();
+    var g1=groupByYear(window.lineItems);
+    var ok=g0.length===1&&g1.length===2&&g1[1].label==='Payment 2';
+    window.lineItems=[];render();
+    return{pass:ok,detail:'before='+g0.length+' after='+g1.length};
+  });
+  // ── Item 15: Drag row onto group header to reassign payment ──────────
+  test('groupHeader:hasIdentifyingClassAndDataAttr',function(){
+    window.loadLineItems([
+      {sku:'A',description:'',qty:1,unit_price:100,start_date:'2026-01-01',end_date:'2026-12-31'},
+      {sku:'B',description:'',qty:1,unit_price:200,start_date:'2027-01-01',end_date:'2027-12-31'}
+    ]);
+    var headers=document.querySelectorAll('#liArea .group-header[data-group-idx]');
+    var ok=headers.length===2&&headers[0].getAttribute('data-group-idx')==='0'&&headers[1].getAttribute('data-group-idx')==='1';
+    window.lineItems=[];render();
+    return{pass:ok,detail:'headers='+headers.length};
+  });
+  test('groupHeader:moveRowSimulation',function(){
+    // Simulate the drop-on-group-header logic (the drag-handler effect)
+    window.loadLineItems([
+      {sku:'A',description:'',qty:1,unit_price:100,start_date:'2026-01-01',end_date:'2026-12-31'},
+      {sku:'B',description:'',qty:1,unit_price:200,start_date:'2027-01-01',end_date:'2027-12-31'}
+    ]);
+    // Source: index 0 (A, in Payment 1). Target group: index 1 (Payment 2 = 2027)
+    var srcIdx=0;
+    var tgtGroupIdx=1;
+    var groups=groupByYear(window.lineItems);
+    var grp=groups[tgtGroupIdx];
+    var item=window.lineItems[srcIdx];
+    item.start_date=grp.start;
+    item.end_date=grp.end;
+    render();
+    // After: A is now in the same year as B, so they collapse to one group
+    var newGroups=groupByYear(window.lineItems);
+    var allItems=newGroups[0].items.map(function(i){return i.sku;}).sort().join(',');
+    var ok=newGroups.length===1&&allItems==='A,B'&&newGroups[0].start==='2027-01-01';
+    window.lineItems=[];render();
+    return{pass:ok,detail:'groups='+newGroups.length+' items='+allItems+' start='+newGroups[0].start};
+  });
+  test('groupHeader:moveRowAcrossYearsKeepsGroupsSeparate',function(){
+    // Three groups: 2026, 2027, 2028. Move row from 2026 to 2028.
+    window.loadLineItems([
+      {sku:'A',description:'',qty:1,unit_price:100,start_date:'2026-01-01',end_date:'2026-12-31'},
+      {sku:'B',description:'',qty:1,unit_price:200,start_date:'2027-01-01',end_date:'2027-12-31'},
+      {sku:'C',description:'',qty:1,unit_price:300,start_date:'2028-01-01',end_date:'2028-12-31'}
+    ]);
+    // Simulate moving A (idx 0) onto Payment 3 (group idx 2)
+    var groups=groupByYear(window.lineItems);
+    var grp=groups[2];
+    var item=window.lineItems[0];
+    item.start_date=grp.start;
+    item.end_date=grp.end;
+    render();
+    var after=groupByYear(window.lineItems);
+    // Expect 2 groups: 2027 (B alone), 2028 (A+C)
+    var ok=after.length===2&&after[0].items.map(function(i){return i.sku;}).join(',')==='B'&&after[1].items.map(function(i){return i.sku;}).sort().join(',')==='A,C';
+    window.lineItems=[];render();
+    return{pass:ok,detail:'groups='+after.length+' p1=['+after[0].items.map(function(i){return i.sku;}).join(',')+'] p2=['+(after[1]?after[1].items.map(function(i){return i.sku;}).join(','):'-')+']'};
+  });
   // ── Drag & drop fix: idempotent init, shared state, position-aware drop ──
   test('dnd:initIsIdempotent',function(){
     var area=document.getElementById('liArea');
