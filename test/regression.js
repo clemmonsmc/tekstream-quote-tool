@@ -1188,6 +1188,41 @@ async function runRegressionTests() {
       &&afterMargin==='$100.00'&&afterCommission==='$20.00';
     return{pass:ok,detail:'before m='+initialMargin+' c='+initialCommission+' | after m='+afterMargin+' c='+afterCommission};
   });
+  test('custExtBlur:stripsCommasBeforeParsing',function(){
+    // Bug: parseFloat('1,000') returns 1, so typing '200,000' stored 200 silently.
+    window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};
+    window.loadLineItems([
+      {sku:'A',description:'',qty:1,unit_price:50000,start_date:'2026-01-01',end_date:'2026-12-31'}
+    ]);
+    document.getElementById('marginPct').value='25';
+    render();
+    var custInput=document.querySelector('#liArea input.cust-price');
+    if(!custInput){window.lineItems=[];render();return{pass:false,detail:'no input'};}
+    custInput.value='200,000';
+    custExtBlur(custInput,0);
+    // mg = (1 - 50000/200000) * 100 = 75
+    var margin=window.lineItems[0].margin;
+    var displayed=custInput.value;
+    window.lineItems=[];window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};render();
+    return{pass:margin===75&&displayed==='200,000.00',detail:'margin='+margin+' displayed='+displayed};
+  });
+  test('custExtBlur:stripsDollarSignAndCommas',function(){
+    window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};
+    window.loadLineItems([
+      {sku:'A',description:'',qty:1,unit_price:100,start_date:'2026-01-01',end_date:'2026-12-31'}
+    ]);
+    document.getElementById('marginPct').value='25';
+    render();
+    var custInput=document.querySelector('#liArea input.cust-price');
+    if(!custInput){window.lineItems=[];render();return{pass:false,detail:'no input'};}
+    custInput.value='$1,234.56';
+    custExtBlur(custInput,0);
+    // mg = (1 - 100/1234.56) * 100 ≈ 91.901
+    var margin=window.lineItems[0].margin;
+    var ok=margin>=91.9&&margin<=91.91;
+    window.lineItems=[];window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};render();
+    return{pass:ok,detail:'margin='+margin};
+  });
   // ── Drag & drop fix: idempotent init, shared state, position-aware drop ──
   test('dnd:initIsIdempotent',function(){
     var area=document.getElementById('liArea');

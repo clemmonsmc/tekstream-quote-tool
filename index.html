@@ -792,7 +792,10 @@ function custExtFocus(el){
   else el.value=parseFloat(el.value.replace(/[^0-9.]/g,''))||'';
 }
 function custExtBlur(el,i){
-  var v=parseFloat(el.value)||0;
+  // Strip commas, dollar signs, and other formatting that parseFloat would truncate at.
+  // parseFloat("1,000") returns 1 (stops at the comma), which silently dropped 3 digits.
+  var raw=String(el.value||'').replace(/[^0-9.-]/g,'');
+  var v=parseFloat(raw)||0;
   var m=parseFloat(document.getElementById('marginPct').value)||0;
   if(!v){
     var cp2=cprice(lineItems[i].unit_price,effectiveMargin(lineItems[i],m));
@@ -802,8 +805,7 @@ function custExtBlur(el,i){
   var vad=lineItems[i].unit_price;
   if(vad){var mg=(1-vad/(v/lineItems[i].qty))*100;lineItems[i].margin=Math.round(mg*1000)/1000;}
   el.value=fmt(v);
-  // Bug fix: full re-render so per-payment subtotals + margin column + commission panel all refresh.
-  // updateTotalsOnly() only touched the grand total at the bottom, leaving subtotal rows stale.
+  // Full re-render so per-payment subtotals + margin column + commission panel all refresh.
   render();
 }
 
