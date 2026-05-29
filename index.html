@@ -288,6 +288,16 @@ function autoSave() {
     var state = getQuoteState();
     var key = state.quoteNumber || ('q' + Date.now());
     var saved = JSON.parse(localStorage.getItem('ts_saved_quotes') || '[]');
+    // Data-loss guard: never overwrite a saved quote that HAS line items with one that
+    // doesn't. The old behavior silently destroyed saved quotes when the editor went empty
+    // (e.g. user opened a saved quote, then cleared rows for any reason, then waited 2s).
+    var existing = saved.find(function(q){ return q.key === key; });
+    var hasExistingData = existing && existing.state && existing.state.lineItems && existing.state.lineItems.length > 0;
+    var hasNewData = state.lineItems && state.lineItems.length > 0;
+    if (hasExistingData && !hasNewData) {
+      // Refuse to overwrite. Quietly drop this autosave; the saved entry stays intact.
+      return;
+    }
     saved = saved.filter(function(q){ return q.key !== key; });
     saved.unshift({key: key, quoteNumber: state.quoteNumber, customerName: state.customerName, savedAt: new Date().toLocaleString(), state: state});
     if (saved.length > 20) saved = saved.slice(0, 20);
