@@ -441,8 +441,12 @@ function renderSavedQuotes(){
       openDeleteQuoteModal(i,q);
     };
     row.onclick=function(){
+      // Use stable key lookup, not positional index. renderSavedQuotes filters out empty
+      // entries before display, so the loop's `i` doesn't match localStorage's unfiltered
+      // array — same class of off-by-one bug we fixed for the delete button in Item 9.
       var sv=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
-      if(sv[i])restoreQuoteState(sv[i].state);
+      var target=q.key?sv.find(function(x){return x.key===q.key;}):sv[i];
+      if(target&&target.state)restoreQuoteState(target.state);
     };
     row.appendChild(lbl);row.appendChild(meta);row.appendChild(del);
     list.appendChild(row);

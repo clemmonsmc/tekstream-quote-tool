@@ -1245,6 +1245,23 @@ async function runRegressionTests() {
     window.lineItems=[];window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};render();
     return{pass:ok,detail:'typed=216016.85 displayed='+displayedExt+' drift='+(displayedExt-216016.85).toFixed(4)};
   });
+  test('savedQuotes:clickOpensCorrectQuoteByKeyNotPosition',function(){
+    // Bug: positional sv[i] against unfiltered localStorage array opened the wrong quote
+    // when empty entries existed earlier in the array. Fix uses stable q.key lookup.
+    var seed=[
+      {key:'k0',quoteNumber:'TS-A',customerName:'A Co',savedAt:'',state:{lineItems:[{sku:'x'}],customerName:'A Co'}},
+      {key:'kEmpty',quoteNumber:'',customerName:'',savedAt:'',state:{lineItems:[]}},
+      {key:'k2',quoteNumber:'TS-B',customerName:'B Co',savedAt:'',state:{lineItems:[{sku:'y'}],customerName:'B Co'}}
+    ];
+    localStorage.setItem('ts_saved_quotes',JSON.stringify(seed));
+    renderSavedQuotes();
+    var rows=document.querySelectorAll('.saved-item');
+    if(rows.length<2){localStorage.setItem('ts_saved_quotes','[]');renderSavedQuotes();return{pass:false,detail:'only '+rows.length+' rows rendered'};}
+    rows[1].click();
+    var loadedCustomer=document.getElementById('customerName').value;
+    localStorage.setItem('ts_saved_quotes','[]');renderSavedQuotes();newQuote();
+    return{pass:loadedCustomer==='B Co',detail:'loaded='+loadedCustomer};
+  });
   test('custExtBlur:marginDisplayedRoundedTo3DecimalsButStoredExact',function(){
     // Display: margin input shows 3-decimal rounded value
     // Storage: lineItems[i].margin keeps full precision
