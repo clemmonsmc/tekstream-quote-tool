@@ -1262,6 +1262,21 @@ async function runRegressionTests() {
     localStorage.setItem('ts_saved_quotes','[]');renderSavedQuotes();newQuote();
     return{pass:loadedCustomer==='B Co',detail:'loaded='+loadedCustomer};
   });
+  test('pdfFileName:savedInGetQuoteState',function(){
+    // Bug: getQuoteState() did not include pdfFileName, so the file-name field
+    // was never persisted through save/restore. After reload it reset to auto.
+    var pf=document.getElementById('pdfFileName');
+    if(!pf)return{pass:false,detail:'no field'};
+    pf.value='Custom-File-Name.pdf';
+    pf.dataset.userEdited='1';
+    var s=getQuoteState();
+    pf.value='';
+    delete pf.dataset.userEdited;
+    restoreQuoteState(s);
+    var ok=pf.value==='Custom-File-Name.pdf';
+    newQuote();
+    return{pass:ok,detail:'roundtrip='+pf.value};
+  });
   test('autoSave:refusesToClobberNonEmptySavedQuoteWithEmptyState',function(done){
     // Data-loss bug: clicking a saved quote loaded line items, then if the editor's
     // lineItems was cleared (any reason — newQuote, manual delete-all, etc.) while the
