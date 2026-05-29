@@ -731,7 +731,8 @@ function renderRow(it,i,m){
   // Col 8: VAD Ext. $
   h+='<td class="muted" style="text-align:right;padding-right:6px">'+(it.unit_price*it.qty>0?fmt(it.unit_price*it.qty):'\u2014')+'</td>';
   // Col 9: Margin%
-  var mval=(it.margin!==null&&it.margin!==undefined&&it.margin!=='')?it.margin:'';
+  // Storage may carry full precision (set by custExtBlur); display rounds to 3 decimals.
+  var mval=(it.margin!==null&&it.margin!==undefined&&it.margin!=='')?(typeof it.margin==='number'?+it.margin.toFixed(3):it.margin):'';
   h+='<td style="text-align:right"><input type="number" value="'+mval+'" min="0" max="99" step="0.125" placeholder="'+m+'" style="width:52px" title="Line margin override" onkeydown="if((event.key===\'ArrowUp\'||event.key===\'ArrowDown\')&&this.value===\'\'){this.value=+this.placeholder;}" oninput="lineItems['+i+'].margin=this.value===\'\'?null:+this.value;recalcAll()" autocomplete="off"></td>';
   var hasOverride=(it.margin!==null&&it.margin!==undefined&&it.margin!=='');
   // Col 10: Margin$
@@ -803,7 +804,11 @@ function custExtBlur(el,i){
     return;
   }
   var vad=lineItems[i].unit_price;
-  if(vad){var mg=(1-vad/(v/lineItems[i].qty))*100;lineItems[i].margin=Math.round(mg*1000)/1000;}
+  // Store margin at FULL precision (no rounding) so the customer-ext round-trip is exact.
+  // Earlier rounding to 3 decimal places caused visible \$ drift on large ext values
+  // (e.g. typing \$216,016.85 displayed as \$216,019.39 because margin rounded up).
+  // For display, the margin input renders a rounded version; storage stays exact.
+  if(vad){var mg=(1-vad/(v/lineItems[i].qty))*100;lineItems[i].margin=mg;}
   el.value=fmt(v);
   // Full re-render so per-payment subtotals + margin column + commission panel all refresh.
   render();

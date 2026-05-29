@@ -1219,9 +1219,53 @@ async function runRegressionTests() {
     custExtBlur(custInput,0);
     // mg = (1 - 100/1234.56) * 100 ≈ 91.901
     var margin=window.lineItems[0].margin;
-    var ok=margin>=91.9&&margin<=91.91;
+    var ok=margin>=91.89&&margin<=91.91;
     window.lineItems=[];window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};render();
     return{pass:ok,detail:'margin='+margin};
+  });
+  test('custExtBlur:precisionRoundTripExactOnLargeValues',function(){
+    // Bug: rounding margin to 3 decimals caused typed ext value to drift after re-render.
+    // E.g. typing 216016.85 against $50k VAD cost displayed as 216019.39 (margin rounded up).
+    // Fix stores margin at full precision so cprice(vad, margin) * qty === typed value.
+    window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};
+    window.loadLineItems([
+      {sku:'A',description:'',qty:1,unit_price:50000,start_date:'2026-01-01',end_date:'2026-12-31'}
+    ]);
+    document.getElementById('marginPct').value='25';
+    render();
+    var custInput=document.querySelector('#liArea input.cust-price');
+    if(!custInput){window.lineItems=[];render();return{pass:false,detail:'no input'};}
+    custInput.value='216016.85';
+    custExtBlur(custInput,0);
+    // After render, find the row's customer-ext input again (DOM was re-created) and check its value
+    var newInput=document.querySelector('#liArea input.cust-price');
+    var displayedExt=parseFloat(String(newInput.value).replace(/[^0-9.-]/g,''));
+    // Allow tiny floating-point tolerance (< 1 cent) — should be essentially exact
+    var ok=Math.abs(displayedExt-216016.85)<0.01;
+    window.lineItems=[];window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};render();
+    return{pass:ok,detail:'typed=216016.85 displayed='+displayedExt+' drift='+(displayedExt-216016.85).toFixed(4)};
+  });
+  test('custExtBlur:marginDisplayedRoundedTo3DecimalsButStoredExact',function(){
+    // Display: margin input shows 3-decimal rounded value
+    // Storage: lineItems[i].margin keeps full precision
+    window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};
+    window.loadLineItems([
+      {sku:'A',description:'',qty:1,unit_price:50000,start_date:'2026-01-01',end_date:'2026-12-31'}
+    ]);
+    document.getElementById('marginPct').value='25';
+    render();
+    var custInput=document.querySelector('#liArea input.cust-price');
+    custInput.value='216016.85';
+    custExtBlur(custInput,0);
+    var stored=window.lineItems[0].margin;
+    var marginInput=document.querySelector('#liArea input[type="number"][step="0.125"]');
+    var displayed=marginInput?parseFloat(marginInput.value):null;
+    // stored should have many decimal digits; displayed should round to 3
+    var storedStr=String(stored);
+    var hasManyDigits=storedStr.includes('.')&&storedStr.split('.')[1].length>3;
+    var displayedRounded=displayed!==null&&Math.abs(displayed-(+stored.toFixed(3)))<1e-9;
+    window.lineItems=[];window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};render();
+    return{pass:hasManyDigits&&displayedRounded,detail:'stored='+storedStr+' displayed='+displayed};
   });
   // ── Drag & drop fix: idempotent init, shared state, position-aware drop ──
   test('dnd:initIsIdempotent',function(){
