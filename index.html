@@ -802,7 +802,9 @@ function custExtBlur(el,i){
   var vad=lineItems[i].unit_price;
   if(vad){var mg=(1-vad/(v/lineItems[i].qty))*100;lineItems[i].margin=Math.round(mg*1000)/1000;}
   el.value=fmt(v);
-  updateTotalsOnly();
+  // Bug fix: full re-render so per-payment subtotals + margin column + commission panel all refresh.
+  // updateTotalsOnly() only touched the grand total at the bottom, leaving subtotal rows stale.
+  render();
 }
 
 // ── Item 8: Margin & Commission Summary ─────────────────────────────────

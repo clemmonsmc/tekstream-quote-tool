@@ -1163,6 +1163,31 @@ async function runRegressionTests() {
     window.lineItems=[];render();
     return{pass:ok,detail:input?'type='+input.type+' inputmode='+input.getAttribute('inputmode'):'no input'};
   });
+  test('custExtBlur:updatesPaymentSubtotalAndCommissionPanel',function(){
+    // Bug: editing Customer Ext. \$ only updated the grand total, not per-payment subtotals
+    // or the commission panel. Now custExtBlur calls full render().
+    window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};
+    window.loadLineItems([
+      {sku:'A',description:'',qty:1,unit_price:100,start_date:'2026-01-01',end_date:'2026-12-31'}
+    ]);
+    document.getElementById('marginPct').value='25';
+    render();
+    // Initial: customer ext = 133.33 (100/(1-.25)), commission @ 20% of 33.33 margin = 6.67
+    var custInput=document.querySelector('#liArea input.cust-price');
+    if(!custInput){window.lineItems=[];render();return{pass:false,detail:'no cust input rendered'};}
+    var initialMargin=document.getElementById('cm_tm_Payment_1').textContent;
+    var initialCommission=document.getElementById('cm_co_Payment_1').textContent;
+    // Simulate user editing to \$200
+    custInput.value='200';
+    custExtBlur(custInput,0);
+    // After: margin = 200 - 100 = 100, commission @ 20% = 20
+    var afterMargin=document.getElementById('cm_tm_Payment_1').textContent;
+    var afterCommission=document.getElementById('cm_co_Payment_1').textContent;
+    window.lineItems=[];window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};render();
+    var ok=initialMargin==='$33.33'&&initialCommission==='$6.67'
+      &&afterMargin==='$100.00'&&afterCommission==='$20.00';
+    return{pass:ok,detail:'before m='+initialMargin+' c='+initialCommission+' | after m='+afterMargin+' c='+afterCommission};
+  });
   // ── Drag & drop fix: idempotent init, shared state, position-aware drop ──
   test('dnd:initIsIdempotent',function(){
     var area=document.getElementById('liArea');
