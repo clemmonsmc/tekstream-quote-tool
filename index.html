@@ -517,6 +517,25 @@ function addRow(){window.lineItems.push({sku:'',description:'',qty:1,unit_price:
 function removeRow(i){window.lineItems.splice(i,1);render();}
 // Item 14: Add a new payment block with placeholder dates that don't collide with existing groups
 function addNewPaymentBlock(){
+  // Bug repro: when ALL existing items are undated, groupByYear puts them in '__none__',
+  // and the new payment row's dated group would absorb them via the undated→first-real
+  // merge — collapsing everything into one payment. Before computing the new dates,
+  // assign default dates (today → +1yr) to the existing items if NONE of them have dates.
+  // This makes the existing items a stable Payment 1, so the new row becomes Payment 2.
+  var hasAnyDated=window.lineItems&&window.lineItems.some(function(it){return !!it.start_date;});
+  var allUndated=window.lineItems&&window.lineItems.length>0&&!hasAnyDated;
+  if(allUndated){
+    var t=new Date();
+    var p1Start=t.toISOString().substring(0,10);
+    var d1=new Date(t);
+    d1.setFullYear(d1.getFullYear()+1);
+    d1.setDate(d1.getDate()-1);
+    var p1End=d1.toISOString().substring(0,10);
+    window.lineItems.forEach(function(it){
+      it.start_date=p1Start;
+      it.end_date=p1End;
+    });
+  }
   // Determine target dates: latest existing end_date + 1 day → + 1 year.
   // Fall back to today → today + 1 year when no dated items exist.
   var maxEnd='';

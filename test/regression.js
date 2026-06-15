@@ -940,6 +940,24 @@ async function runRegressionTests() {
   });
   // ── Item 14: Add new payment block ───────────────────────────────────
   test('fn:addNewPaymentBlock',function(){return{pass:typeof window.addNewPaymentBlock==='function',detail:typeof window.addNewPaymentBlock};});
+  test('addNewPaymentBlock:bugRepro_undatedItemsCollapseNewPayment',function(){
+    // Bug: when existing items have NO start_date (undated), clicking + New Payment
+    // creates a dated row, but groupByYear merges the undated items INTO that new
+    // dated group → result is one group with everything, not two.
+    // Repro path: VAD upload didn't capture dates, or user typed rows manually.
+    window.loadLineItems([
+      {sku:'A',description:'',qty:1,unit_price:100,start_date:'',end_date:''},
+      {sku:'B',description:'',qty:1,unit_price:200,start_date:'',end_date:''}
+    ]);
+    var beforeGroups=groupByYear(window.lineItems);
+    var beforeCount=beforeGroups?beforeGroups.length:0;
+    addNewPaymentBlock();
+    var afterGroups=groupByYear(window.lineItems);
+    var afterCount=afterGroups?afterGroups.length:0;
+    window.lineItems=[];render();
+    // After clicking + New Payment, the user expects 2 payment groups, NOT 1
+    return{pass:afterCount===2,detail:'before='+beforeCount+' after='+afterCount+' (expected 2)'};
+  });
   test('addNewPaymentBlock:buttonExists',function(){
     var btn=document.querySelector('button[onclick="addNewPaymentBlock()"]');
     return{pass:!!btn&&btn.textContent.indexOf('New Payment')>=0,detail:btn?btn.textContent.trim():'not found'};
