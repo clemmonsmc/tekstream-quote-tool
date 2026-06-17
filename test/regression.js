@@ -207,7 +207,10 @@ async function runRegressionTests() {
     return{pass:fmtDateDisplay('2026-06-21')==='Jun 21, 2026',detail:fmtDateDisplay('2026-06-21')};
   });
   test('grp:updateGroupDates',function(){
-    window.lineItems=[{sku:'A',description:'A',qty:1,unit_price:10,start_date:'2026-01-01',end_date:'2026-12-31',margin:null},{sku:'B',description:'B',qty:1,unit_price:10,start_date:'2026-02-01',end_date:'2026-12-31',margin:null}];
+    // Two items in the SAME payment group (matching start+end) — updateGroupDates(0,...)
+    // should update both. (Under the corrected groupByYear, items with different
+    // start_dates form different groups, so this test now uses matching dates.)
+    window.lineItems=[{sku:'A',description:'A',qty:1,unit_price:10,start_date:'2026-01-01',end_date:'2026-12-31',margin:null},{sku:'B',description:'B',qty:1,unit_price:10,start_date:'2026-01-01',end_date:'2026-12-31',margin:null}];
     updateGroupDates(0,'start_date','2026-03-01');
     var ok=window.lineItems[0].start_date==='2026-03-01'&&window.lineItems[1].start_date==='2026-03-01';
     window.lineItems=[];return{pass:ok};
@@ -215,7 +218,8 @@ async function runRegressionTests() {
   test('calc:cprice',function(){return{pass:Math.abs(cprice(100,20)-125)<0.01,detail:cprice(100,20)};});
   test('calc:effectiveMargin override',function(){return{pass:effectiveMargin({margin:25},15)===25};});
   test('calc:effectiveMargin fallback',function(){return{pass:effectiveMargin({margin:null},15)===15};});
-  test('calc:groupByYear single→group',function(){var g=groupByYear([{start_date:'2026-01-01'},{start_date:'2026-06-01'}]);return{pass:g!==null&&g.length===1};});
+  test('calc:groupByYear identicalDates→one group',function(){var g=groupByYear([{start_date:'2026-01-01',end_date:'2026-12-31'},{start_date:'2026-01-01',end_date:'2026-12-31'}]);return{pass:g!==null&&g.length===1,detail:g?g.length:'null'};});
+  test('calc:groupByYear differentPeriodsSameYear→two groups',function(){var g=groupByYear([{start_date:'2026-01-01',end_date:'2026-06-30'},{start_date:'2026-07-01',end_date:'2026-12-31'}]);return{pass:g!==null&&g.length===2,detail:g?g.length:'null'};});
   test('calc:groupByYear multi',function(){var g=groupByYear([{start_date:'2026-01-01'},{start_date:'2027-01-01'}]);return{pass:g!==null&&g.length===2};});
   // 6. State save/restore
   test('fileName:autoPopulates',function(){
@@ -940,6 +944,52 @@ async function runRegressionTests() {
   });
   // ── Item 14: Add new payment block ───────────────────────────────────
   test('fn:addNewPaymentBlock',function(){return{pass:typeof window.addNewPaymentBlock==='function',detail:typeof window.addNewPaymentBlock};});
+  test('fn:downloadMarginSummaryPdf',function(){return{pass:typeof window.downloadMarginSummaryPdf==='function',detail:typeof window.downloadMarginSummaryPdf};});
+  test('marginSummary:buttonExists',function(){
+    var btn=document.querySelector('button[onclick="downloadMarginSummaryPdf()"]');
+    return{pass:!!btn&&btn.textContent.indexOf('Margin Summary')>=0,detail:btn?btn.textContent.trim():'not found'};
+  });
+  test('groupByYear:sameYearDifferentPeriodsProduceDistinctGroups',function(){
+    // Bug repro: TS-2026-782 had a 2-month prorate (2026-07-17..2026-09-28) AND a
+    // 4-year subscription (2026-09-29..2030-09-28). Year-only bucketing collapsed
+    // them into one group because both start in 2026. Fix uses (start,end) tuple.
+    window.loadLineItems([
+      {sku:'PRORATE',description:'',qty:1,unit_price:100,start_date:'2026-07-17',end_date:'2026-09-28'},
+      {sku:'SUB-A',description:'',qty:1,unit_price:200,start_date:'2026-09-29',end_date:'2030-09-28'},
+      {sku:'SUB-B',description:'',qty:1,unit_price:300,start_date:'2026-09-29',end_date:'2030-09-28'}
+    ]);
+    var g=groupByYear(window.lineItems);
+    var ok=g&&g.length===2
+      &&g[0].items.length===1&&g[0].items[0].sku==='PRORATE'&&g[0].start==='2026-07-17'
+      &&g[1].items.length===2&&g[1].start==='2026-09-29';
+    window.lineItems=[];render();
+    return{pass:ok,detail:g?'groups='+g.length+' p1=['+g[0].items.map(function(x){return x.sku;}).join(',')+'@'+g[0].start+'] p2=['+(g[1]?g[1].items.map(function(x){return x.sku;}).join(',')+'@'+g[1].start:'-')+']':'no groups'};
+  });
+  test('groupByYear:identicalDatesAcrossRowsStillOneGroup',function(){
+    // Counter-check: items with the exact same (start,end) should stay in one group.
+    window.loadLineItems([
+      {sku:'A',description:'',qty:1,unit_price:100,start_date:'2026-01-01',end_date:'2026-12-31'},
+      {sku:'B',description:'',qty:1,unit_price:200,start_date:'2026-01-01',end_date:'2026-12-31'},
+      {sku:'C',description:'',qty:1,unit_price:300,start_date:'2026-01-01',end_date:'2026-12-31'}
+    ]);
+    var g=groupByYear(window.lineItems);
+    var ok=g&&g.length===1&&g[0].items.length===3;
+    window.lineItems=[];render();
+    return{pass:ok,detail:g?'groups='+g.length+' p1.items='+g[0].items.length:'no groups'};
+  });
+  test('groupByYear:chronologicalOrdering',function(){
+    // Multiple periods, supplied out of order, should sort chronologically.
+    window.loadLineItems([
+      {sku:'P3',description:'',qty:1,unit_price:100,start_date:'2028-01-01',end_date:'2028-12-31'},
+      {sku:'P1',description:'',qty:1,unit_price:200,start_date:'2026-01-01',end_date:'2026-12-31'},
+      {sku:'P2',description:'',qty:1,unit_price:300,start_date:'2027-01-01',end_date:'2027-12-31'}
+    ]);
+    var g=groupByYear(window.lineItems);
+    var labels=g?g.map(function(x){return x.items[0].sku+'@'+x.start;}).join('|'):'-';
+    var ok=labels==='P1@2026-01-01|P2@2027-01-01|P3@2028-01-01';
+    window.lineItems=[];render();
+    return{pass:ok,detail:labels};
+  });
   test('addNewPaymentBlock:bugRepro_undatedItemsCollapseNewPayment',function(){
     // Bug: when existing items have NO start_date (undated), clicking + New Payment
     // creates a dated row, but groupByYear merges the undated items INTO that new

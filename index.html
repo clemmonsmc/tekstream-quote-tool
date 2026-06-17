@@ -222,6 +222,7 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
       <button class="btn dl-btn" style="background:#5B94CB" onclick="emailQuote()">Email Quote &#9993;</button>
       <button class="btn dl-btn" style="background:#2d7a4f" id="signBtn" onclick="sendForSignature()">Send for Signature &#9998;</button>
       <button class="btn dl-btn" style="background:#8a4a9f" onclick="downloadPoPdf()" title="Generate TekStream PO for the VAD">Generate PO &#8595;</button>
+      <button class="btn dl-btn" style="background:#003658" onclick="downloadMarginSummaryPdf()" title="Download internal Margin &amp; Commission summary (not for customer)">Margin Summary &#8595;</button>
     </div>
     <p style="font-size:11px;color:#717174;margin-top:8px;text-align:center">Email Quote downloads the PDF &#8212; attach it to the Outlook email before sending.</p>
   </div>
@@ -586,26 +587,34 @@ function updateGroupDates(groupIdx,field,val){
 }
 
 function groupByYear(items){
+  // Misnomer for historical reasons — buckets by the (start_date, end_date) tuple.
+  // Year-only bucketing collapsed multiple payment periods within the same year
+  // (e.g. a 2-month prorate 2026-07-17→2026-09-28 and a 4-year subscription
+  // 2026-09-29→2030-09-28 both bucketed under 'year 2026'). Using the full
+  // tuple separates them correctly. Same-year annual contracts (all rows share
+  // identical start/end) stay in one group. Item 13 (PAYMENT N banner with
+  // identical dates) is a separate backlog item — needs an explicit field.
   if(!items||!items.length)return null;
-  var years=[],groups={},groupDates={};
+  var keys=[],groups={},groupDates={};
   items.forEach(function(it){
-    var yr=it.start_date?it.start_date.substring(0,4):'__none__';
-    if(!groups[yr]){groups[yr]=[];years.push(yr);groupDates[yr]={start:it.start_date||'',end:it.end_date||''};}
-    groups[yr].push(it);
+    var key=it.start_date?(it.start_date+'|'+(it.end_date||'')):'__none__';
+    if(!groups[key]){groups[key]=[];keys.push(key);groupDates[key]={start:it.start_date||'',end:it.end_date||''};}
+    groups[key].push(it);
     // Use first non-empty date found for the group
-    if(!groupDates[yr].start&&it.start_date)groupDates[yr].start=it.start_date;
-    if(!groupDates[yr].end&&it.end_date)groupDates[yr].end=it.end_date;
+    if(!groupDates[key].start&&it.start_date)groupDates[key].start=it.start_date;
+    if(!groupDates[key].end&&it.end_date)groupDates[key].end=it.end_date;
   });
-  // Move undated items into first year group, appended at the END
+  // Move undated items into first dated group, appended at the END
   // (so newly-added empty rows appear after existing data, where users expect them)
-  if(groups['__none__']&&years.length>1){
-    var firstReal=years.find(function(y){return y!=='__none__';});
-    if(firstReal){groups[firstReal]=groups[firstReal].concat(groups['__none__']);delete groups['__none__'];years=years.filter(function(y){return y!=='__none__';});}
+  if(groups['__none__']&&keys.length>1){
+    var firstReal=keys.find(function(k){return k!=='__none__';});
+    if(firstReal){groups[firstReal]=groups[firstReal].concat(groups['__none__']);delete groups['__none__'];keys=keys.filter(function(k){return k!=='__none__';});}
   }
-  years.sort(function(a,b){return a==='__none__'?1:b==='__none__'?-1:a.localeCompare(b);});
-  return years.map(function(yr,i){
-    var d=groupDates[yr]||{start:'',end:''};
-    return{label:'Payment '+(i+1),start:d.start,end:d.end,items:groups[yr]||[]};
+  // Sort by composite key. ISO YYYY-MM-DD format means lexicographic = chronological.
+  keys.sort(function(a,b){return a==='__none__'?1:b==='__none__'?-1:a.localeCompare(b);});
+  return keys.map(function(key,i){
+    var d=groupDates[key]||{start:'',end:''};
+    return{label:'Payment '+(i+1),start:d.start,end:d.end,items:groups[key]||[]};
   });
 }
 
@@ -2128,6 +2137,184 @@ async function downloadPoPdf(){
     setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(a.href);},100);
   }catch(e){
     alert('PO generation failed: '+e.message);
+    console.error(e);
+  }
+}
+async function downloadMarginSummaryPdf(){
+  // Internal-only PDF: mirrors the on-screen Margin & Commission Detail panel.
+  // NOT for customer distribution. Includes quote identifiers in the header and
+  // a per-payment economics breakdown plus deal totals.
+  try{
+    if(!window.lineItems||!window.lineItems.length){alert('Add line items first.');return;}
+    var jsPDF=window.jspdf.jsPDF;
+    var m=parseFloat(document.getElementById('marginPct').value)||0;
+    var cn=document.getElementById('customerName').value||'Customer';
+    var qn=document.getElementById('quoteNumber').value||'TS-QUOTE';
+    var qd=document.getElementById('quoteDate').value||'';
+    var vn=(document.getElementById('vendorName')||{}).value||'';
+    var pb=document.getElementById('preparedBy').value||'';
+    var pbe=document.getElementById('preparedByEmail').value||'';
+    var logoSrc=window.logoDataUrl||'';
+    // Build the row data mirroring renderCommissionPanel
+    var groups=groupByYear(window.lineItems);
+    var pmts=[];
+    if(!groups){
+      var vt=window.lineItems.reduce(function(s,it){return s+(it.unit_price||0)*(it.qty||0);},0);
+      var ct=window.lineItems.reduce(function(s,it){return s+itemCprice(it,m)*(it.qty||0);},0);
+      pmts.push({label:'Payment 1',start:'',end:'',invoiced:ct,cost:vt});
+    } else {
+      groups.forEach(function(grp){
+        var vt=grp.items.reduce(function(s,it){return s+(it.unit_price||0)*(it.qty||0);},0);
+        var ct=grp.items.reduce(function(s,it){return s+itemCprice(it,m)*(it.qty||0);},0);
+        pmts.push({label:grp.label,start:grp.start||'',end:grp.end||'',invoiced:ct,cost:vt});
+      });
+    }
+    var aeMult=(window.commissionState&&typeof window.commissionState.aeMultiplier==='number')?window.commissionState.aeMultiplier:20;
+    var contractPct=(window.commissionState&&typeof window.commissionState.contractCostPct==='number')?window.commissionState.contractCostPct:0;
+    var srv=(window.commissionState&&window.commissionState.servicesRevByGroup)||{};
+    // Compute derived values per payment
+    pmts.forEach(function(p){
+      p.services=srv[p.label]||0;
+      p.contractCost=p.cost*(contractPct/100);
+      p.totalMargin=(p.invoiced-p.cost)-p.services-p.contractCost;
+      p.commission=p.totalMargin*(aeMult/100);
+    });
+    // Totals row
+    var tot={invoiced:0,cost:0,services:0,contractCost:0,totalMargin:0,commission:0};
+    pmts.forEach(function(p){
+      tot.invoiced+=p.invoiced;tot.cost+=p.cost;tot.services+=p.services;
+      tot.contractCost+=p.contractCost;tot.totalMargin+=p.totalMargin;tot.commission+=p.commission;
+    });
+    // Choose layout: portrait for ≤4 payments, landscape otherwise
+    var landscape=pmts.length>4;
+    var doc=new jsPDF({unit:'pt',format:'letter',orientation:landscape?'landscape':'portrait'});
+    var W=landscape?792:612,H=landscape?612:792,L=48,R=W-48;
+    // Header bar (TekStream Dark Blue)
+    doc.setFillColor(0,54,88);
+    doc.rect(0,0,W,68,'F');
+    if(logoSrc&&logoSrc.indexOf('data:')===0){
+      try{
+        var li=new Image();
+        await new Promise(function(res,rej){li.onload=res;li.onerror=rej;li.src=logoSrc;});
+        doc.addImage(logoSrc,'PNG',L,11,li.naturalWidth*(46/li.naturalHeight),46);
+      }catch(e){
+        doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(255,255,255);doc.text('TekStream',L,36);
+      }
+    } else {
+      doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(255,255,255);doc.text('TekStream',L,36);
+    }
+    // TekStream Primary Blue accent
+    doc.setFillColor(91,148,203);
+    doc.rect(0,68,W,5,'F');
+    // Internal-use stamp top right
+    doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);
+    doc.text('INTERNAL USE ONLY',R,28,{align:'right'});
+    doc.setFont('helvetica','normal');
+    doc.text('Quote #  '+qn,R,42,{align:'right'});
+    doc.text('Date:  '+qd,R,56,{align:'right'});
+    // Title
+    doc.setFont('helvetica','bold');doc.setFontSize(20);doc.setTextColor(0,54,88);
+    doc.text('Margin & Commission Summary',L,108);
+    // Customer / Vendor / Prepared By info row
+    doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(91,148,203);
+    doc.text('CUSTOMER',L,130);
+    doc.text('VAD / VENDOR',L+(R-L)/3,130);
+    doc.text('PREPARED BY',L+2*(R-L)/3,130);
+    doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(19,17,18);
+    doc.text(cn||'—',L,146);
+    doc.text(vn||'—',L+(R-L)/3,146);
+    doc.text(pb||'—',L+2*(R-L)/3,146);
+    if(pbe){
+      doc.setFontSize(8);doc.setTextColor(113,113,116);
+      doc.text(pbe,L+2*(R-L)/3,158);
+    }
+    // Table starting position
+    var y=180;
+    // Column layout: first column is metric label, then one per payment, then Total
+    var nCols=pmts.length+1; // payments + total
+    var labelW=180;
+    var colW=(R-L-labelW)/nCols;
+    // Column headers
+    doc.setFillColor(0,54,88);
+    doc.rect(L,y,R-L,28,'F');
+    doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);
+    doc.text('Metric',L+8,y+12);
+    pmts.forEach(function(p,i){
+      var cx=L+labelW+i*colW+colW-8;
+      doc.text(p.label,cx,y+12,{align:'right'});
+      if(p.start||p.end){
+        doc.setFont('helvetica','normal');doc.setFontSize(7);
+        doc.text((p.start||'—')+' to '+(p.end||'—'),cx,y+23,{align:'right'});
+        doc.setFont('helvetica','bold');doc.setFontSize(9);
+      }
+    });
+    var totX=L+labelW+pmts.length*colW+colW-8;
+    doc.text('Total',totX,y+12,{align:'right'});
+    y+=28;
+    // Helper to draw a data row
+    function drawRow(label,values,opts){
+      opts=opts||{};
+      var rowH=opts.tall?22:18;
+      if(opts.alt){doc.setFillColor(235,243,251);doc.rect(L,y,R-L,rowH,'F');}
+      if(opts.emphasis){doc.setFillColor(0,54,88,0.06);doc.rect(L,y,R-L,rowH,'F');}
+      doc.setFont('helvetica',opts.bold?'bold':'normal');
+      doc.setFontSize(opts.bold?10:9);
+      doc.setTextColor(opts.color?opts.color[0]:19,opts.color?opts.color[1]:17,opts.color?opts.color[2]:18);
+      doc.text(label,L+8,y+rowH/2+3);
+      values.forEach(function(v,i){
+        var cx=L+labelW+i*colW+colW-8;
+        doc.text(v,cx,y+rowH/2+3,{align:'right'});
+      });
+      y+=rowH;
+    }
+    function fmtMoney(n){return '$'+fmt(n);}
+    function moneyColor(n){return n>0?[45,122,79]:n<0?[192,0,0]:[19,17,18];}
+    // Row: Invoiced
+    drawRow('Invoiced (less sales tax)',
+      pmts.map(function(p){return fmtMoney(p.invoiced);}).concat([fmtMoney(tot.invoiced)]),
+      {alt:true});
+    // Row: TekStream Cost
+    drawRow('TekStream Cost (VAD)',
+      pmts.map(function(p){return fmtMoney(p.cost);}).concat([fmtMoney(tot.cost)]));
+    // Row: Services Rev
+    drawRow('Services Rev Paid by Margin',
+      pmts.map(function(p){return p.services?fmtMoney(p.services):'—';}).concat([tot.services?fmtMoney(tot.services):'—']),
+      {alt:true,color:[192,0,0]});
+    // Row: Contract Cost
+    drawRow('Contract Cost ('+contractPct+'%)',
+      pmts.map(function(p){return p.contractCost?fmtMoney(p.contractCost):'—';}).concat([tot.contractCost?fmtMoney(tot.contractCost):'—']),
+      {color:[192,0,0]});
+    // Row: Total Margin (emphasis)
+    drawRow('Total Margin',
+      pmts.map(function(p){return fmtMoney(p.totalMargin);}).concat([fmtMoney(tot.totalMargin)]),
+      {emphasis:true,bold:true,tall:true,color:moneyColor(tot.totalMargin)});
+    // Spacer
+    y+=8;
+    // Multiplier display
+    drawRow('AE Software Multiplier',
+      pmts.map(function(){return aeMult+'%';}).concat([aeMult+'%']),
+      {alt:true});
+    // Final commission row
+    drawRow('Total Est. Commission to AE',
+      pmts.map(function(p){return fmtMoney(p.commission);}).concat([fmtMoney(tot.commission)]),
+      {emphasis:true,bold:true,tall:true,color:[0,54,88]});
+    // Footer notes
+    y+=20;
+    doc.setFont('helvetica','italic');doc.setFontSize(8);doc.setTextColor(113,113,116);
+    var notes=[
+      'Total Margin = Invoiced \u2212 TekStream Cost \u2212 Services Rev \u2212 Contract Cost.',
+      'Commission = Total Margin \u00d7 AE Multiplier. Figures are estimates based on current quote state.',
+      'For TekStream internal review only. Do not distribute externally.'
+    ];
+    notes.forEach(function(n){doc.text(n,L,y);y+=11;});
+    // Copyright per branding guidelines
+    doc.setFontSize(7);
+    doc.text('Copyright \u00a9 TekStream Solutions, LLC '+new Date().getFullYear(),L,H-30);
+    // Save
+    var fname=(qn||'margin')+' - '+(cn||'summary').replace(/[\/\\:*?"<>|]/g,'')+' - Margin Summary.pdf';
+    doc.save(fname);
+  }catch(e){
+    alert('Margin summary generation failed: '+e.message);
     console.error(e);
   }
 }
