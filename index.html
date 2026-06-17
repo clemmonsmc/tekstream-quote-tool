@@ -2256,7 +2256,10 @@ async function downloadMarginSummaryPdf(){
       opts=opts||{};
       var rowH=opts.tall?22:18;
       if(opts.alt){doc.setFillColor(235,243,251);doc.rect(L,y,R-L,rowH,'F');}
-      if(opts.emphasis){doc.setFillColor(0,54,88,0.06);doc.rect(L,y,R-L,rowH,'F');}
+      // Light blue tint matches the on-screen Total Est. Commission row.
+      // (Previously this used setFillColor(0,54,88,0.06) which jsPDF interprets
+      // as CMYK — high magenta + high yellow rendered as bright red.)
+      if(opts.emphasis){doc.setFillColor(235,243,251);doc.rect(L,y,R-L,rowH,'F');}
       doc.setFont('helvetica',opts.bold?'bold':'normal');
       doc.setFontSize(opts.bold?10:9);
       doc.setTextColor(opts.color?opts.color[0]:19,opts.color?opts.color[1]:17,opts.color?opts.color[2]:18);
