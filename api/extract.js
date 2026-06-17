@@ -200,8 +200,8 @@ module.exports = async function handler(req, res) {
       }
       let headerRow=-1;
       for(let i=0;i<rows.length;i++){if(rows[i].join('|').toUpperCase().includes('QUOTE LINE')&&rows[i].join('|').toUpperCase().includes('SKU')){headerRow=i;break;}}
-      let qtyCol=16,priceCol=18,startCol=14,endCol=15;
-      if(headerRow>=0){rows[headerRow].forEach((c,i)=>{const u=String(c||'').toUpperCase().trim();if(u==='QTY')qtyCol=i;if(u==='RESELLER PRICE')priceCol=i;if(u==='START DATE')startCol=i;if(u==='END DATE')endCol=i;});}
+      let qtyCol=16,priceCol=18,startCol=14,endCol=15,descCol=-1;
+      if(headerRow>=0){rows[headerRow].forEach((c,i)=>{const u=String(c||'').toUpperCase().trim();if(u==='QTY')qtyCol=i;if(u==='RESELLER PRICE')priceCol=i;if(u==='START DATE')startCol=i;if(u==='END DATE')endCol=i;if(u==='DESCRIPTION'&&descCol<0)descCol=i;});}
       const rawItems=[];const ds=headerRow>=0?headerRow+1:24;
       for(let i=ds;i<rows.length;i++){
         const row=rows[i];if(!row||row.every(v=>v===null))continue;
@@ -210,7 +210,19 @@ module.exports = async function handler(req, res) {
         const sku=String(row[2]||'').trim();if(!sku)continue;
         const qty=parseFloat(String(row[qtyCol]||'').replace(/,/g,''));const price=parseFloat(String(row[priceCol]||'').replace(/[$,]/g,''));
         if(isNaN(qty)&&isNaN(price))continue;
-        rawItems.push({sku,description:String(row[9]||row[7]||'').trim(),qty:isNaN(qty)?1:qty,unit_price:isNaN(price)?0:price,start_date:fmtDate(row[startCol]),end_date:fmtDate(row[endCol]),margin:null});
+        // TD Synnex's "Description" header is a merged cell across multiple columns,
+        // so only the first column in the merge has the value. Walk forward from
+        // descCol picking the first non-empty cell. Fall back to old positions if
+        // detection failed (no DESCRIPTION header found).
+        let desc='';
+        if(descCol>=0){
+          for(let dc=descCol;dc<Math.min(descCol+5,row.length);dc++){
+            const v=String(row[dc]||'').trim();
+            if(v){desc=v;break;}
+          }
+        }
+        if(!desc)desc=String(row[9]||row[8]||'').trim(); // legacy fallback (NOT row[7] — that's Vendor Name)
+        rawItems.push({sku,description:desc,qty:isNaN(qty)?1:qty,unit_price:isNaN(price)?0:price,start_date:fmtDate(row[startCol]),end_date:fmtDate(row[endCol]),margin:null});
       }
       return res.status(200).json({vad,quote_expire_date:quoteExpireDate,to:{company:toCompany,name:'',email:''},for:{company:forCompany,name:'',email:''},lineItems:applyDates(rawItems,headerStart,headerEnd,quoteExpireDate)});
     }
