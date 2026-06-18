@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TekStream Quote Generator</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;color:#13110F;font-size:14px}
@@ -76,6 +77,13 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
 </style>
 </head>
 <body>
+<div id="authGate" style="display:flex;position:fixed;inset:0;z-index:99999;background:#003658;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:10px;padding:40px;width:340px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+    <div style="font-size:20px;font-weight:700;color:#003658">TekStream Quote Generator</div>
+    <div id="authGateMsg" style="color:#717174;font-size:13px;margin:8px 0 22px">Checking sign-in...</div>
+    <button class="btn" onclick="_signIn()">Sign in with Google</button>
+  </div>
+</div>
 <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
 <div class="drawer" id="savedDrawer">
   <div class="drawer-hdr">
@@ -126,6 +134,7 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
   <span class="hdr-tag">VAD Quote Generator</span>
   <button class="btn" style="border:1.5px solid rgba(255,255,255,.4);background:transparent" onclick="openDrawer()">Saved Quotes</button>
   <button class="btn" style="border:1.5px solid rgba(255,255,255,.4);background:transparent" onclick="newQuote()">New Quote</button>
+  <button class="btn btn-sm" style="border:1.5px solid rgba(255,255,255,.4);background:transparent" onclick="_signOut()">Sign out</button>
 </div>
 <div class="wrap">
   <div class="rep-card">
@@ -236,6 +245,120 @@ window.sortState = {col:null,dir:0};
 // Item 8: Margin & Commission state — servicesRev keyed by 'Payment N' label, aeMultiplier + contractCostPct as single global %
 window.commissionState = {servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};
 
+// ── Supabase cloud persistence + auth (cloud sync of saved quotes) ──────────
+window._sb = null;
+window._sbUser = null;
+var _ALLOWED_DOMAIN = 'tekstream.com';
+
+function _readSaved(){ return JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]'); }
+
+// Write-through: localStorage stays the synchronous cache; mirror to Supabase.
+var _syncTimer = null;
+function _writeSaved(arr){
+  localStorage.setItem('ts_saved_quotes', JSON.stringify(arr));
+  if(!window._sb || !window._sbUser) return; // pre-auth: local only
+  clearTimeout(_syncTimer);
+  var snapshot = JSON.parse(JSON.stringify(arr));
+  _syncTimer = setTimeout(function(){ _syncToSupabase(snapshot); }, 600);
+}
+
+function _syncToSupabase(arr){
+  if(!window._sb || !window._sbUser) return;
+  var uid = window._sbUser.id;
+  var rows = arr.map(function(q){
+    return { owner_id:uid, key:q.key, quote_number:q.quoteNumber||null,
+             customer_name:q.customerName||null, state:q.state||{},
+             saved_at:new Date().toISOString() };
+  });
+  var present = {}; arr.forEach(function(q){ present[q.key]=1; });
+  window._sb.from('quotes').upsert(rows,{onConflict:'owner_id,key'}).then(function(res){
+    if(res.error){ console.warn('quote sync upsert failed:', res.error.message); return; }
+    // Delete remote rows that are no longer present locally.
+    window._sb.from('quotes').select('key').eq('owner_id',uid).then(function(r){
+      if(r.error) return;
+      var toDelete = (r.data||[]).map(function(x){return x.key;}).filter(function(k){return !present[k];});
+      if(toDelete.length){ window._sb.from('quotes').delete().eq('owner_id',uid).in('key',toDelete).then(function(){}); }
+    });
+  });
+}
+
+function _hydrateFromSupabase(){
+  if(!window._sb || !window._sbUser) return;
+  var uid = window._sbUser.id;
+  window._sb.from('quotes').select('*').eq('owner_id',uid)
+    .order('saved_at',{ascending:false}).then(function(res){
+    if(res.error){ console.warn('quote hydrate failed:', res.error.message); return; }
+    var remote = res.data || [];
+    if(remote.length === 0){
+      // One-time migration: push any meaningful localStorage quotes up.
+      var local = _readSaved();
+      var meaningful = local.filter(function(q){
+        return (q.customerName && q.customerName.trim()) ||
+               (q.state && q.state.lineItems && q.state.lineItems.length>0);
+      });
+      if(meaningful.length){ _syncToSupabase(local); }
+    } else {
+      var arr = remote.map(function(r){
+        return { key:r.key, quoteNumber:r.quote_number, customerName:r.customer_name,
+                 savedAt:r.saved_at?new Date(r.saved_at).toLocaleString():'', state:r.state||{} };
+      });
+      if(arr.length>20) arr=arr.slice(0,20);
+      localStorage.setItem('ts_saved_quotes', JSON.stringify(arr)); // raw, no re-sync
+    }
+    if(typeof renderSavedQuotes==='function') renderSavedQuotes();
+  });
+}
+
+function _showGate(msg){
+  var g=document.getElementById('authGate'); if(g) g.style.display='flex';
+  if(msg){ var m=document.getElementById('authGateMsg'); if(m) m.textContent=msg; }
+}
+function _hideGate(){ var g=document.getElementById('authGate'); if(g) g.style.display='none'; }
+
+function _applySession(session){
+  if(session && session.user && session.user.email &&
+     session.user.email.toLowerCase().endsWith('@'+_ALLOWED_DOMAIN)){
+    window._sbUser = session.user;
+    _hideGate();
+    _hydrateFromSupabase();
+    return true;
+  }
+  return false;
+}
+
+async function _sbInit(){
+  try{
+    var cfg = await fetch('/api/config').then(function(r){return r.json();});
+    if(!cfg || !cfg.url || !cfg.anonKey){
+      _showGate('Sign-in is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY.'); return;
+    }
+    window._sb = window.supabase.createClient(cfg.url, cfg.anonKey);
+    window._sb.auth.onAuthStateChange(function(_evt, session){
+      if(session && session.user && !_applySession(session)){
+        window._sb.auth.signOut();
+        _showGate('Sign-in is limited to @'+_ALLOWED_DOMAIN+' accounts.');
+      }
+    });
+    var sres = await window._sb.auth.getSession();
+    var session = (sres && sres.data) ? sres.data.session : null;
+    if(!_applySession(session)){
+      if(session){ await window._sb.auth.signOut(); _showGate('Sign-in is limited to @'+_ALLOWED_DOMAIN+' accounts.'); }
+      else { _showGate('Sign in to continue.'); }
+    }
+  }catch(e){ _showGate('Could not initialize sign-in. Try reloading.'); }
+}
+
+function _signIn(){
+  if(!window._sb){ return; }
+  window._sb.auth.signInWithOAuth({ provider:'google',
+    options:{ redirectTo: location.origin + location.pathname,
+              queryParams:{ hd:_ALLOWED_DOMAIN, prompt:'select_account' } } });
+}
+function _signOut(){
+  if(!window._sb){ return; }
+  window._sb.auth.signOut().then(function(){ window._sbUser=null; _showGate('Sign in to continue.'); });
+}
+
 (function init() {
   fetch('/api/logo').then(function(r){return r.arrayBuffer();}).then(function(buf){
     var b=new Uint8Array(buf),s='';b.forEach(function(x){s+=String.fromCharCode(x);});
@@ -257,6 +380,7 @@ window.commissionState = {servicesRevByGroup:{},aeMultiplier:20,contractCostPct:
   updatePdfFileName();
   // Auto-save on any form field change
   document.querySelector('.card').addEventListener('input', function(){ autoSave(); });
+  _sbInit();
 })();
 
 
@@ -302,7 +426,7 @@ function autoSave() {
     saved = saved.filter(function(q){ return q.key !== key; });
     saved.unshift({key: key, quoteNumber: state.quoteNumber, customerName: state.customerName, savedAt: new Date().toLocaleString(), state: state});
     if (saved.length > 20) saved = saved.slice(0, 20);
-    localStorage.setItem('ts_saved_quotes', JSON.stringify(saved));
+    _writeSaved(saved);
     renderSavedQuotes();
   }, 2000);
 }
@@ -385,7 +509,7 @@ function saveQuote(){
   saved=saved.filter(function(q){return q.key!==key;});
   saved.unshift({key:key,quoteNumber:state.quoteNumber,customerName:state.customerName,savedAt:new Date().toLocaleString(),state:state});
   if(saved.length>20)saved=saved.slice(0,20);
-  localStorage.setItem('ts_saved_quotes',JSON.stringify(saved));
+  _writeSaved(saved);
   renderSavedQuotes();
   var btn=event.target,orig=btn.textContent;
   btn.textContent='✓ Saved';setTimeout(function(){btn.textContent=orig;},1500);
@@ -398,7 +522,7 @@ function loadQuote(key){
 function deleteSavedQuote(key){
   var saved=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
   saved=saved.filter(function(q){return q.key!==key;});
-  localStorage.setItem('ts_saved_quotes',JSON.stringify(saved));
+  _writeSaved(saved);
   renderSavedQuotes();
 }
 // ── Item 9: Delete-confirmation modal handlers ─────────────────────────
@@ -420,7 +544,7 @@ function confirmDeleteSavedQuote(){
   if(!k){closeDeleteQuoteModal();return;}
   var sv=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
   sv=sv.filter(function(q){return q.key!==k;});
-  localStorage.setItem('ts_saved_quotes',JSON.stringify(sv));
+  _writeSaved(sv);
   closeDeleteQuoteModal();
   renderSavedQuotes();
 }
