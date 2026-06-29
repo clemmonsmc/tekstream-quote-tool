@@ -335,18 +335,15 @@ window.quoteState = function(){
 // Effective tax for a single line, given the quote-level looked-up rate (decimal).
 window.lineTax = function(it, rate){
   if(window.quoteIsExempt()) return 0;
+  if(!it.is_saas) return 0;                  // Non-SaaS (services, licenses, anything else): never taxed, any state.
   var ext = itemCprice(it, parseFloat(document.getElementById('marginPct').value)||0) * (it.qty||0);
   if(ext<=0) return 0;
-  if(it.is_saas){
-    var rule=window.taxRuleFor(window.quoteState());
-    if(!rule) return ext*rate;              // unknown state -> use looked-up rate
-    if(rule.m==='exempt'||rule.m==='notax') return 0;
-    if(rule.m==='fixed') return ext*(rule.rate||0);        // CT: fixed 1%
-    if(rule.m==='multiplier') return ext*rate*(rule.mult||1); // TX: 0.80 x rate
-    return ext*rate;                         // standard
-  }
-  // Non-SaaS: taxed at the looked-up rate when customer is taxable (services rules skipped per spec)
-  return ext*rate;
+  var rule=window.taxRuleFor(window.quoteState());
+  if(!rule) return ext*rate;                 // unknown state -> use looked-up rate
+  if(rule.m==='exempt'||rule.m==='notax') return 0;
+  if(rule.m==='fixed') return ext*(rule.rate||0);          // CT: fixed 1%
+  if(rule.m==='multiplier') return ext*rate*(rule.mult||1); // TX: 0.80 x rate
+  return ext*rate;                           // standard SaaS-taxable state
 };
 // Per-payment-group {label, subtotal, tax, total}. Mirrors groupByYear grouping.
 window.computeTaxByGroup = function(){
