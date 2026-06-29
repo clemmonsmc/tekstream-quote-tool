@@ -182,6 +182,25 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
         <div class="field" style="margin:0;grid-column:1/-1"><label>Additional terms <span style="color:#717174;font-weight:400;font-size:11px">(appended after standard T&amp;C in quote PDF)</span></label><textarea id="additionalTerms" autocomplete="off" placeholder="Optional. Custom legal language, NDA references, MSA exceptions, etc." style="min-height:60px" oninput="autoSave()"></textarea></div>
         <div class="field" style="margin:0"><label>File name</label><input id="pdfFileName" autocomplete="off" placeholder="auto" oninput="this.dataset.userEdited=this.value?'1':'';updatePdfFileName()"></div>
       </div>
+      <!-- Backlog #12: Tax (SaaS per-state + ZIP rate). Math wired in later steps. -->
+      <div style="display:grid;grid-template-columns:160px 110px 70px 130px auto;gap:10px 14px;align-items:end;margin-top:10px;padding-top:10px;border-top:1px solid #e3e9f0">
+        <div class="field" style="margin:0">
+          <label>Customer type</label>
+          <select id="customerType" onchange="onCustomerTypeChange()">
+            <option value="">Select…</option>
+            <option value="Commercial">Commercial</option>
+            <option value="Public Sector">Public Sector</option>
+            <option value="Non-Profit">Non-Profit</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0"><label>Customer ZIP</label><input id="customerZip" autocomplete="off" placeholder="30060" maxlength="5"></div>
+        <div class="field" style="margin:0"><label>State</label><input id="customerState" autocomplete="off" placeholder="GA" maxlength="2" style="text-transform:uppercase"></div>
+        <div class="field" style="margin:0"><label>Tax rate %</label><input id="taxRate" type="number" step="any" min="0" autocomplete="off" placeholder="—"></div>
+        <div class="field" style="margin:0">
+          <label style="cursor:pointer"><input type="checkbox" id="taxExempt" style="vertical-align:middle;margin-right:4px">Tax exempt (certificate on file)</label>
+          <div style="font-size:10px;color:#717174;margin-top:2px">Public Sector / Non-Profit default exempt. Rate lookup + tax math added next.</div>
+        </div>
+      </div>
       <!-- Item 7: Ship To address + Vendor (for PO generation) -->
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 160px;gap:10px 14px;align-items:start;margin-top:10px">
         <div class="field" style="margin:0"><label>Ship To address</label><input id="shipToAddress" autocomplete="off" placeholder="123 Main St" oninput="autoSave()"></div>
@@ -241,6 +260,65 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
 <script>
 // v2
 window.lineItems = [];
+
+// ── SaaS tax rules (Backlog #12) ────────────────────────────────────────────
+// Canonical source is Supabase table public.saas_tax_rules. This in-code table
+// is the offline fallback so quoting never blocks if the DB is unreachable.
+// Business-use basis. 'standard' = use looked-up rate; 'fixed'/'multiplier' =
+// specials (CT 1%, TX 0.80x); 'exempt' = no tax; 'notax' = no state sales tax.
+// Rules current as of mid-2026 — verify with finance; SaaS rules change.
+window.TAX_RULES_FALLBACK = {
+  AL:{m:'standard'},AK:{m:'notax'},AZ:{m:'standard'},AR:{m:'exempt'},CA:{m:'exempt'},
+  CO:{m:'exempt'},CT:{m:'fixed',rate:0.01},DE:{m:'notax'},DC:{m:'standard'},FL:{m:'exempt'},
+  GA:{m:'exempt'},HI:{m:'standard'},ID:{m:'exempt'},IL:{m:'exempt'},IN:{m:'exempt'},
+  IA:{m:'exempt'},KS:{m:'exempt'},KY:{m:'standard'},LA:{m:'standard'},ME:{m:'exempt'},
+  MD:{m:'exempt'},MA:{m:'standard'},MI:{m:'exempt'},MN:{m:'exempt'},MS:{m:'standard'},
+  MO:{m:'exempt'},MT:{m:'notax'},NE:{m:'standard'},NV:{m:'exempt'},NH:{m:'notax'},
+  NJ:{m:'exempt'},NM:{m:'standard'},NY:{m:'standard'},NC:{m:'exempt'},ND:{m:'exempt'},
+  OH:{m:'standard'},OK:{m:'exempt'},OR:{m:'notax'},PA:{m:'standard'},RI:{m:'standard'},
+  SC:{m:'standard'},SD:{m:'standard'},TN:{m:'standard'},TX:{m:'multiplier',mult:0.80},UT:{m:'standard'},
+  VT:{m:'standard'},VA:{m:'exempt'},WA:{m:'standard'},WV:{m:'standard'},WI:{m:'exempt'},WY:{m:'exempt'}
+};
+window._taxRules = null; // populated from Supabase on load, else fallback used
+window.taxRuleFor = function(stateCode){
+  var sc=(stateCode||'').toUpperCase();
+  if(window._taxRules && window._taxRules[sc]) return window._taxRules[sc];
+  return window.TAX_RULES_FALLBACK[sc] || null;
+};
+window.loadTaxRules = function(){
+  try{
+    if(!window._sb) return;
+    window._sb.from('saas_tax_rules').select('state,saas_taxable,saas_mode,saas_fixed_rate,saas_multiplier,has_state_sales_tax').then(function(res){
+      if(res.error || !res.data || !res.data.length) return; // keep fallback
+      var map={};
+      res.data.forEach(function(r){
+        var mode;
+        if(!r.has_state_sales_tax) mode={m:'notax'};
+        else if(!r.saas_taxable) mode={m:'exempt'};
+        else if(r.saas_mode==='fixed') mode={m:'fixed',rate:Number(r.saas_fixed_rate)};
+        else if(r.saas_mode==='multiplier') mode={m:'multiplier',mult:Number(r.saas_multiplier)};
+        else mode={m:'standard'};
+        map[r.state]=mode;
+      });
+      window._taxRules=map;
+    });
+  }catch(e){ /* keep fallback */ }
+};
+// SaaS auto-detect: SKU contains CLD, or kw in sku/description. Default non-SaaS.
+window.onCustomerTypeChange = function(){
+  var t=(document.getElementById('customerType')||{}).value||'';
+  var ex=document.getElementById('taxExempt'); if(!ex) return;
+  // Public Sector / Non-Profit default exempt; Commercial defaults taxable.
+  if(t==='Public Sector'||t==='Non-Profit') ex.checked=true;
+  else if(t==='Commercial') ex.checked=false;
+  if(typeof recalcAll==='function') recalcAll();
+};
+window.detectSaas = function(it){
+  var sku=String((it&&it.sku)||'').toUpperCase();
+  if(sku.indexOf('CLD')>=0) return true;
+  var hay=(String((it&&it.sku)||'')+' '+String((it&&it.description)||'')).toLowerCase();
+  return /\b(cloud|hosted|annual|managed service|platform)\b/.test(hay);
+};
 window.logoDataUrl = null;
 window.signatureDataUrl = null;
 window.sortState = {col:null,dir:0};
@@ -335,6 +413,7 @@ async function _sbInit(){
       _showGate('Sign-in is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY.'); return;
     }
     window._sb = window.supabase.createClient(cfg.url, cfg.anonKey);
+    try{ window.loadTaxRules(); }catch(e){}
     window._sb.auth.onAuthStateChange(function(_evt, session){
       if(session && session.user && !_applySession(session)){
         window._sb.auth.signOut();
@@ -464,7 +543,7 @@ function loadRepSettings(){
 }
 
 function getQuoteState(){
-  return{customerName:document.getElementById('customerName').value,contactName:document.getElementById('contactName').value,contactEmail:document.getElementById('contactEmail').value,quoteNumber:document.getElementById('quoteNumber').value,quoteDate:document.getElementById('quoteDate').value,expiryDate:document.getElementById('expiryDate').value,marginPct:document.getElementById('marginPct').value,notes:document.getElementById('notes').value,terms:document.getElementById('terms').value,additionalTerms:(document.getElementById('additionalTerms')||{}).value||'',preparedByCompany:document.getElementById('preparedByCompany').value,preparedBy:document.getElementById('preparedBy').value,preparedByEmail:document.getElementById('preparedByEmail').value,pdfFileName:(document.getElementById('pdfFileName')||{}).value||'',shipToAddress:(document.getElementById('shipToAddress')||{}).value||'',shipToCityStateZip:(document.getElementById('shipToCityStateZip')||{}).value||'',shipToPhone:(document.getElementById('shipToPhone')||{}).value||'',vendorName:(document.getElementById('vendorName')||{}).value||'',commissionState:JSON.parse(JSON.stringify(window.commissionState||{servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0})),lineItems:JSON.parse(JSON.stringify(window.lineItems))};
+  return{customerName:document.getElementById('customerName').value,contactName:document.getElementById('contactName').value,contactEmail:document.getElementById('contactEmail').value,quoteNumber:document.getElementById('quoteNumber').value,quoteDate:document.getElementById('quoteDate').value,expiryDate:document.getElementById('expiryDate').value,marginPct:document.getElementById('marginPct').value,notes:document.getElementById('notes').value,terms:document.getElementById('terms').value,additionalTerms:(document.getElementById('additionalTerms')||{}).value||'',preparedByCompany:document.getElementById('preparedByCompany').value,preparedBy:document.getElementById('preparedBy').value,preparedByEmail:document.getElementById('preparedByEmail').value,pdfFileName:(document.getElementById('pdfFileName')||{}).value||'',shipToAddress:(document.getElementById('shipToAddress')||{}).value||'',shipToCityStateZip:(document.getElementById('shipToCityStateZip')||{}).value||'',shipToPhone:(document.getElementById('shipToPhone')||{}).value||'',vendorName:(document.getElementById('vendorName')||{}).value||'',commissionState:JSON.parse(JSON.stringify(window.commissionState||{servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0})),customerType:(document.getElementById('customerType')||{}).value||'',customerZip:(document.getElementById('customerZip')||{}).value||'',customerState:(document.getElementById('customerState')||{}).value||'',taxRate:(document.getElementById('taxRate')||{}).value||'',taxExempt:!!(document.getElementById('taxExempt')||{}).checked,lineItems:JSON.parse(JSON.stringify(window.lineItems))};
 }
 function restoreQuoteState(s){
   document.getElementById('customerName').value=s.customerName||'';
@@ -495,9 +574,14 @@ function restoreQuoteState(s){
     contractCostPct:(s.commissionState&&typeof s.commissionState.contractCostPct==='number')?s.commissionState.contractCostPct:0
   };
   var pfEl=document.getElementById('pdfFileName');if(pfEl){pfEl.value=s.pdfFileName||'';pfEl.dataset.userEdited=s.pdfFileName?'1':'';}  
+  var ctEl=document.getElementById('customerType');if(ctEl)ctEl.value=s.customerType||'';
+  var czEl=document.getElementById('customerZip');if(czEl)czEl.value=s.customerZip||'';
+  var csEl=document.getElementById('customerState');if(csEl)csEl.value=s.customerState||'';
+  var trEl=document.getElementById('taxRate');if(trEl)trEl.value=s.taxRate||'';
+  var teEl=document.getElementById('taxExempt');if(teEl)teEl.checked=!!s.taxExempt;
   window.lineItems=s.lineItems||[];
   // Backfill originalIndex on legacy saved quotes
-  window.lineItems.forEach(function(it,idx){if(typeof it.originalIndex!=='number')it.originalIndex=idx;});
+  window.lineItems.forEach(function(it,idx){if(typeof it.originalIndex!=='number')it.originalIndex=idx;if(typeof it.is_saas!=='boolean')it.is_saas=window.detectSaas(it);});
   window.sortState={col:null,dir:0};
   render();
   updatePdfFileName();
@@ -640,7 +724,7 @@ function nextOriginalIndex(){
   var max=-1;window.lineItems.forEach(function(it){if(typeof it.originalIndex==='number'&&it.originalIndex>max)max=it.originalIndex;});
   return max+1;
 }
-function addRow(){window.lineItems.push({sku:'',description:'',qty:1,unit_price:0,start_date:'',end_date:'',margin:null,originalIndex:nextOriginalIndex()});window.sortState={col:null,dir:0};render();}
+function addRow(){window.lineItems.push({sku:'',description:'',qty:1,unit_price:0,start_date:'',end_date:'',margin:null,is_saas:false,originalIndex:nextOriginalIndex()});window.sortState={col:null,dir:0};render();}
 function removeRow(i){window.lineItems.splice(i,1);render();}
 // Item 14: Add a new payment block with placeholder dates that don't collide with existing groups
 function addNewPaymentBlock(){
@@ -889,7 +973,7 @@ function renderRow(it,i,m){
   // Col 1: drag handle
   h+='<td style="text-align:center;padding:2px"><span class="drag-handle" draggable="true" data-idx="'+i+'" title="Drag to reorder" style="cursor:grab;color:#ccc;font-size:14px;user-select:none">&#8942;</span></td>';
   // Col 2: SKU
-  h+='<td><input value="'+escH(it.sku)+'" oninput="lineItems['+i+'].sku=this.value" autocomplete="off"></td>';
+  h+='<td><input value="'+escH(it.sku)+'" oninput="lineItems['+i+'].sku=this.value" autocomplete="off">'+'<label style="display:block;font-size:10px;color:#717174;margin-top:1px;cursor:pointer" title="Tax as SaaS (per-state rules). Auto-detected from SKU/description; toggle to override.">'+'<input type="checkbox" '+(it.is_saas?'checked':'')+' style="vertical-align:middle;margin:0 2px 0 0" onchange="lineItems['+i+'].is_saas=this.checked;recalcAll()">SaaS</label></td>';
   // Col 3: Description
   h+='<td><input value="'+escH(it.description)+'" oninput="lineItems['+i+'].description=this.value" autocomplete="off"></td>';
   // Col 6: Qty
@@ -1305,7 +1389,7 @@ async function extractVAD(input){
     document.getElementById('extractStatus').textContent='\u2713 Extracted '+(parsed.lineItems&&parsed.lineItems.length||0)+' line items'+(parsed.vad?' ('+parsed.vad+')':'')+(vadAutoSet?' \u2192 VAD set to '+vadAutoSet:'');
   }catch(e){document.getElementById('extractStatus').textContent='Error: '+e.message;}
 }
-window.loadLineItems=function(items){window.lineItems=items.map(function(it,idx){return{sku:String(it.sku||''),description:String(it.description||''),qty:parseFloat(it.qty)||1,unit_price:parseFloat(String(it.unit_price||'0').replace(/[$,]/g,''))||0,start_date:String(it.start_date||''),end_date:String(it.end_date||''),margin:null,originalIndex:idx};});window.sortState={col:null,dir:0};render();};
+window.loadLineItems=function(items){window.lineItems=items.map(function(it,idx){return{sku:String(it.sku||''),description:String(it.description||''),qty:parseFloat(it.qty)||1,unit_price:parseFloat(String(it.unit_price||'0').replace(/[$,]/g,''))||0,start_date:String(it.start_date||''),end_date:String(it.end_date||''),margin:null,is_saas:window.detectSaas({sku:it.sku,description:it.description}),originalIndex:idx};});window.sortState={col:null,dir:0};render();};
 
 function openSignModal(){
   var customerEmail=document.getElementById('contactEmail').value;
