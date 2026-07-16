@@ -1046,25 +1046,25 @@ function renderRow(it,i,m){
   // Col 3: Description
   h+='<td><input value="'+escH(it.description)+'" oninput="lineItems['+i+'].description=this.value" autocomplete="off"></td>';
   // Col 6: Qty
-  h+='<td style="text-align:right"><input type="number" value="'+it.qty+'" min="1" style="width:65px" oninput="lineItems['+i+'].qty=+this.value;recalcAll()" autocomplete="off"></td>';
+  h+='<td style="text-align:right"><input type="number" value="'+it.qty+'" min="1" style="width:65px" oninput="lineItems['+i+'].qty=+this.value;recalcLive()" onchange="render()" autocomplete="off"></td>';
   // Col 7: VAD Unit $
-  h+='<td><input type="number" value="'+it.unit_price.toFixed(2)+'" step="0.01" min="0" style="width:100%" oninput="lineItems['+i+'].unit_price=+this.value;recalcAll()" autocomplete="off"></td>';
+  h+='<td><input type="number" value="'+it.unit_price.toFixed(2)+'" step="0.01" min="0" style="width:100%" oninput="lineItems['+i+'].unit_price=+this.value;recalcLive()" onchange="render()" autocomplete="off"></td>';
   // Col 8: VAD Ext. $
-  h+='<td class="muted" style="text-align:right;padding-right:6px">'+(it.unit_price*it.qty>0?fmt(it.unit_price*it.qty):'\u2014')+'</td>';
+  h+='<td class="muted" data-cell="vadext" style="text-align:right;padding-right:6px">'+(it.unit_price*it.qty>0?fmt(it.unit_price*it.qty):'\u2014')+'</td>';
   // Col 9: Margin%
   // Storage may carry full precision (set by custExtBlur); display rounds to 3 decimals.
   var mval=(it.margin!==null&&it.margin!==undefined&&it.margin!=='')?(typeof it.margin==='number'?+it.margin.toFixed(3):it.margin):'';
-  h+='<td style="text-align:right"><input type="number" value="'+mval+'" min="0" max="99" step="0.125" placeholder="'+m+'" style="width:52px" title="Line margin override" onkeydown="if((event.key===\'ArrowUp\'||event.key===\'ArrowDown\')&&this.value===\'\'){this.value=+this.placeholder;}" oninput="lineItems['+i+'].margin=this.value===\'\'?null:+this.value;recalcAll()" autocomplete="off"></td>';
+  h+='<td style="text-align:right"><input type="number" value="'+mval+'" min="0" max="99" step="0.125" placeholder="'+m+'" style="width:52px" title="Line margin override" onkeydown="if((event.key===\'ArrowUp\'||event.key===\'ArrowDown\')&&this.value===\'\'){this.value=+this.placeholder;}" oninput="lineItems['+i+'].margin=this.value===\'\'?null:+this.value;recalcLive()" onchange="render()" autocomplete="off"></td>';
   var hasOverride=(it.margin!==null&&it.margin!==undefined&&it.margin!=='');
   // Col 10: Margin$
   var marginDollarLine=(cp-it.unit_price)*it.qty;
   var marginColor=marginDollarLine>0?'#2d7a4f':marginDollarLine<0?'#c00':'#717174';
   var marginDollarStr=marginDollarLine!==0?fmt(Math.abs(marginDollarLine)):'';
   if(marginDollarLine<0)marginDollarStr='-'+marginDollarStr;
-  h+='<td class="muted" style="text-align:right;padding-right:4px;font-size:11px;color:'+marginColor+'">'+marginDollarStr+'</td>';
+  h+='<td class="muted" data-cell="margindollar" style="text-align:right;padding-right:4px;font-size:11px;color:'+marginColor+'">'+marginDollarStr+'</td>';
   // Col 11: Customer Unit $
   var custUnitVal=cp>0?fmt(cp):'\u2014';
-  h+='<td class="muted" style="text-align:right;padding-right:6px;color:#003658;font-weight:600">'+custUnitVal+'</td>';
+  h+='<td class="muted" data-cell="custunit" style="text-align:right;padding-right:6px;color:#003658;font-weight:600">'+custUnitVal+'</td>';
   // Col 12: Customer Ext. $
   var custVal=(ext>0?fmt(ext):'\u2014');
   h+='<td><input type="text" value="'+custVal+'" class="cust-price" style="text-align:right;width:100%;color:#003658;font-weight:600" placeholder="\u2014" title="Customer Ext. $ (editable)" onfocus="custExtFocus(this)" onblur="custExtBlur(this,'+i+')" autocomplete="off"></td>';
@@ -1418,6 +1418,28 @@ function render(){
 }
 function updateMarginDollar(m,c,v){var el=document.getElementById('marginDollar');if(el)el.textContent=(m>0&&c>v)?'$'+fmt(c-v):'';}
 function recalcAll(){var m=parseFloat(document.getElementById('marginPct').value)||0;document.getElementById('marginHint').textContent=m>0?m+'% margin applied':'';render();}
+// Live recalc while typing in a line-item number field: updates derived cells + totals in place
+// WITHOUT rebuilding the row inputs, so the focused input isn't destroyed mid-type. A full render()
+// (on blur via onchange) then normalizes formatting and re-sorts. Fixes focus loss on qty/VAD Unit/Margin%.
+function recalcLive(){
+  var m=parseFloat(document.getElementById('marginPct').value)||0;
+  var mh=document.getElementById('marginHint'); if(mh)mh.textContent=m>0?m+'% margin applied':'';
+  window.lineItems.forEach(function(it,i){
+    var row=document.querySelector('tr[data-row="'+i+'"]'); if(!row)return;
+    var em=effectiveMargin(it,m),cp=cprice(it.unit_price,em),ext=cp*it.qty;
+    var c=row.querySelector('[data-cell="vadext"]'); if(c)c.textContent=(it.unit_price*it.qty>0?fmt(it.unit_price*it.qty):'\u2014');
+    c=row.querySelector('[data-cell="margindollar"]');
+    if(c){var md=(cp-it.unit_price)*it.qty;var ms=md!==0?fmt(Math.abs(md)):'';if(md<0)ms='-'+ms;c.style.color=md>0?'#2d7a4f':md<0?'#c00':'#717174';c.textContent=ms;}
+    c=row.querySelector('[data-cell="custunit"]'); if(c)c.textContent=(cp>0?fmt(cp):'\u2014');
+    var ci=row.querySelector('input.cust-price'); if(ci&&document.activeElement!==ci)ci.value=(ext>0?fmt(ext):'\u2014');
+  });
+  var sub=window.lineItems.reduce(function(s,it){return s+itemCprice(it,m)*it.qty;},0);
+  var vt=window.lineItems.reduce(function(s,it){return s+it.unit_price*it.qty;},0);
+  window.renderTotalsBox(sub);
+  updateMarginDollar(m,sub,vt);
+  renderCommissionPanel();
+  autoSave();
+}
 function newQuote(){
   ['customerName','contactName','contactEmail','notes','preparedBy','preparedByEmail','shipToAddress','shipToCityStateZip','shipToPhone','additionalTerms'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   var vnEl=document.getElementById('vendorName');if(vnEl)vnEl.value='';
