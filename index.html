@@ -96,6 +96,26 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
     <div id="savedList"></div>
   </div>
 </div>
+<div class="drawer-overlay" id="vadOverlay" onclick="closeVadDrawer()"></div>
+<div class="drawer" id="vadDrawer">
+  <div class="drawer-hdr">
+    <h2>Manage VADs</h2>
+    <button class="drawer-close" onclick="closeVadDrawer()">&times;</button>
+  </div>
+  <div class="drawer-body">
+    <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #eef2f6">
+      <input type="hidden" id="vadEditId">
+      <div class="field"><label>VAD Name</label><input id="vadFormName" autocomplete="off" placeholder="Arrow ECS"></div>
+      <div class="field"><label>Address</label><input id="vadFormAddr" autocomplete="off" placeholder="123 Main St, Suite 100"></div>
+      <div class="field"><label>City, State ZIP</label><input id="vadFormCSZ" autocomplete="off" placeholder="Atlanta, GA 30338"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="saveVad()" style="flex:1;background:#5B94CB;color:#fff">Save VAD</button>
+        <button class="btn" onclick="vadFormClear()" style="border:1px solid #d0d8e0;background:#fff">Clear</button>
+      </div>
+    </div>
+    <div id="vadList"></div>
+  </div>
+</div>
 <div class="modal-overlay" id="signModal">
   <div class="modal">
     <h3>Confirm Signature Request</h3>
@@ -206,7 +226,7 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
         <div class="field" style="margin:0"><label>Ship To address</label><input id="shipToAddress" autocomplete="off" placeholder="123 Main St" oninput="autoSave()"></div>
         <div class="field" style="margin:0"><label>Ship To city/state/zip</label><input id="shipToCityStateZip" autocomplete="off" placeholder="Atlanta, GA 30303" oninput="autoSave()"></div>
         <div class="field" style="margin:0"><label>Ship To phone</label><input id="shipToPhone" autocomplete="off" placeholder="404-555-1234" oninput="autoSave()"></div>
-        <div class="field" style="margin:0"><label>VAD Name</label>
+        <div class="field" style="margin:0"><label>VAD Name <button type="button" onclick="openVadDrawer()" style="float:right;font-size:11px;color:#5B94CB;background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">Manage</button></label>
           <select id="vendorName" oninput="autoSave()" style="width:100%;padding:8px 10px;border:1px solid #d0d8e0;border-radius:6px;font-size:14px;background:#fff">
             <option value="">— Select —</option>
             <option value="Arrow ECS">Arrow ECS</option>
@@ -449,7 +469,7 @@ function _hydrateFromSupabase(){
     } else {
       var arr = remote.map(function(r){
         return { key:r.key, quoteNumber:r.quote_number, customerName:r.customer_name,
-                 savedAt:r.saved_at?new Date(r.saved_at).toLocaleString():'', state:r.state||{} };
+                 savedAt:r.saved_at?new Date(r.saved_at).toLocaleString():'', savedAtMs:r.saved_at?new Date(r.saved_at).getTime():0, state:r.state||{} };
       });
       if(arr.length>20) arr=arr.slice(0,20);
       localStorage.setItem('ts_saved_quotes', JSON.stringify(arr)); // raw, no re-sync
@@ -470,6 +490,7 @@ function _applySession(session){
     window._sbUser = session.user;
     _hideGate();
     _hydrateFromSupabase();
+    if(typeof loadVads==='function') loadVads();
     return true;
   }
   return false;
@@ -574,7 +595,7 @@ function autoSave() {
       return;
     }
     saved = saved.filter(function(q){ return q.key !== key; });
-    saved.unshift({key: key, quoteNumber: state.quoteNumber, customerName: state.customerName, savedAt: new Date().toLocaleString(), state: state});
+    saved.unshift({key: key, quoteNumber: state.quoteNumber, customerName: state.customerName, savedAt: new Date().toLocaleString(), savedAtMs: Date.now(), state: state});
     if (saved.length > 20) saved = saved.slice(0, 20);
     _writeSaved(saved);
     renderSavedQuotes();
@@ -590,6 +611,81 @@ function openDrawer(){
 function closeDrawer(){
   document.getElementById('savedDrawer').classList.remove('open');
   document.getElementById('drawerOverlay').classList.remove('open');
+}
+// ── VAD directory (shared, Supabase quote_vads): add/modify VADs + address for POs ──
+window.vads = [];
+async function loadVads(){
+  if(!window._sb || !window._sbUser) return;
+  try{
+    var res = await window._sb.from('quote_vads').select('id,name,address,city_state_zip').order('name');
+    if(res.error) throw res.error;
+    window.vads = res.data || [];
+    renderVadSelect();
+    renderVadList();
+  }catch(e){ console.warn('loadVads failed:', e.message); }
+}
+function renderVadSelect(){
+  var sel=document.getElementById('vendorName'); if(!sel) return;
+  var cur=sel.value;
+  var html='<option value="">— Select —</option>';
+  (window.vads||[]).forEach(function(v){ html+='<option value="'+escH(v.name)+'">'+escH(v.name)+'</option>'; });
+  html+='<option value="Other">Other</option>';
+  sel.innerHTML=html;
+  if(cur && Array.prototype.some.call(sel.options,function(o){return o.value===cur;})) sel.value=cur;
+}
+function renderVadList(){
+  var el=document.getElementById('vadList'); if(!el) return;
+  if(!window.vads || !window.vads.length){ el.innerHTML='<div style="color:#717174;font-size:13px;text-align:center;padding:16px">No VADs yet. Add one above.</div>'; return; }
+  el.innerHTML=window.vads.map(function(v){
+    var addr=[v.address,v.city_state_zip].filter(Boolean).join(', ');
+    return '<div class="saved-item" style="cursor:default;align-items:center"><div style="flex:1;min-width:0"><div class="saved-label">'+escH(v.name)+'</div><div class="saved-meta">'+escH(addr||'no address')+'</div></div>'
+      +'<button class="btn" style="padding:4px 10px;font-size:12px;margin-right:6px;border:1px solid #d0d8e0;background:#fff" onclick="vadEdit(\''+v.id+'\')">Edit</button>'
+      +'<button class="saved-del" title="Delete VAD" onclick="deleteVad(\''+v.id+'\')">&times;</button></div>';
+  }).join('');
+}
+function vadFormClear(){
+  document.getElementById('vadEditId').value='';
+  document.getElementById('vadFormName').value='';
+  document.getElementById('vadFormAddr').value='';
+  document.getElementById('vadFormCSZ').value='';
+}
+function vadEdit(id){
+  var v=(window.vads||[]).find(function(x){return x.id===id;}); if(!v) return;
+  document.getElementById('vadEditId').value=v.id;
+  document.getElementById('vadFormName').value=v.name||'';
+  document.getElementById('vadFormAddr').value=v.address||'';
+  document.getElementById('vadFormCSZ').value=v.city_state_zip||'';
+}
+async function saveVad(){
+  var name=(document.getElementById('vadFormName').value||'').trim();
+  if(!name){ alert('VAD name is required.'); return; }
+  if(!window._sb || !window._sbUser){ alert('Sign in required to manage VADs.'); return; }
+  var id=document.getElementById('vadEditId').value||null;
+  var rec={name:name, address:(document.getElementById('vadFormAddr').value||'').trim(), city_state_zip:(document.getElementById('vadFormCSZ').value||'').trim(), updated_at:new Date().toISOString()};
+  try{
+    var r = id ? await window._sb.from('quote_vads').update(rec).eq('id',id)
+               : await window._sb.from('quote_vads').insert(rec);
+    if(r.error) throw r.error;
+    vadFormClear();
+    await loadVads();
+  }catch(e){ alert('Save failed: '+e.message); }
+}
+async function deleteVad(id){
+  if(!confirm('Delete this VAD?')) return;
+  try{
+    var r=await window._sb.from('quote_vads').delete().eq('id',id);
+    if(r.error) throw r.error;
+    await loadVads();
+  }catch(e){ alert('Delete failed: '+e.message); }
+}
+function openVadDrawer(){
+  vadFormClear(); renderVadList();
+  document.getElementById('vadDrawer').classList.add('open');
+  document.getElementById('vadOverlay').classList.add('open');
+}
+function closeVadDrawer(){
+  document.getElementById('vadDrawer').classList.remove('open');
+  document.getElementById('vadOverlay').classList.remove('open');
 }
 function saveRepSettings(){
   var name=document.getElementById('repName').value;
@@ -709,6 +805,7 @@ function renderSavedQuotes(){
   var list=document.getElementById('savedList');
   // Filter out empty saves (no customer name and no line items)
   saved=saved.filter(function(q){return (q.customerName&&q.customerName.trim())||(q.state&&q.state.lineItems&&q.state.lineItems.length>0);});
+  saved.sort(function(a,b){return (b.savedAtMs||Date.parse(b.savedAt)||0)-(a.savedAtMs||Date.parse(a.savedAt)||0);});
   if(!saved.length){list.innerHTML='<div style="color:#717174;font-size:13px;text-align:center;padding:20px">No saved quotes yet.</div>';return;}
 
   list.innerHTML='';
@@ -2341,7 +2438,13 @@ async function generatePoPdfBlob(){
   doc.text('VAD Name:',colRX,ry);
   doc.setFont('helvetica','normal');doc.setTextColor(19,17,18);
   doc.text(vendor||'—',colRX+90,ry);ry+=14;
-  ry+=11+14+18; // align with left's Company Address(2 lines)+gap+PO# gap
+  var _vadRec=(window.vads||[]).find(function(v){return v.name===vendor;});
+  var _vlines=0;
+  if(_vadRec){
+    if(_vadRec.address){doc.text(String(_vadRec.address),colRX+90,ry);ry+=11;_vlines++;}
+    if(_vadRec.city_state_zip){doc.text(String(_vadRec.city_state_zip),colRX+90,ry);ry+=11;_vlines++;}
+  }
+  ry+=(11+14+18)-(_vlines*11); // keep Ship-to aligned regardless of VAD address lines
 
   doc.setFont('helvetica','bold');doc.setTextColor(0,54,88);
   doc.text('Ship to:',colRX,ry);
