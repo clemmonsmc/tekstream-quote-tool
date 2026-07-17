@@ -437,7 +437,7 @@ function _syncToSupabase(arr){
   var rows = arr.map(function(q){
     return { owner_id:uid, key:q.key, quote_number:q.quoteNumber||null,
              customer_name:q.customerName||null, state:q.state||{},
-             saved_at:new Date().toISOString() };
+             saved_at: q.savedAtMs ? new Date(q.savedAtMs).toISOString() : (q.savedAt ? new Date(q.savedAt).toISOString() : new Date().toISOString()) };
   });
   var present = {}; arr.forEach(function(q){ present[q.key]=1; });
   window._sb.from('quotes').upsert(rows,{onConflict:'owner_id,key'}).then(function(res){
