@@ -98,6 +98,17 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
     <div id="savedList"></div>
   </div>
 </div>
+<div class="drawer-overlay" id="custOverlay" onclick="closeCustDrawer()"></div>
+<div class="drawer" id="custDrawer">
+  <div class="drawer-hdr">
+    <h2>Saved Customers</h2>
+    <button class="drawer-close" onclick="closeCustDrawer()">&times;</button>
+  </div>
+  <div class="drawer-body">
+    <div style="font-size:11px;color:#717174;margin-bottom:10px">Contact and ship-to details are saved automatically as you quote, then filled in when a VAD quote leaves them out.</div>
+    <div id="custList"></div>
+  </div>
+</div>
 <div class="drawer-overlay" id="vadOverlay" onclick="closeVadDrawer()"></div>
 <div class="drawer" id="vadDrawer">
   <div class="drawer-hdr">
@@ -175,9 +186,9 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
     <div class="card">
       <div class="section-label" style="margin-bottom:10px">Quote Details</div>
       <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr 120px 120px 110px;gap:10px 14px;align-items:start;margin-bottom:10px">
-        <div class="field" style="margin:0"><label>Customer / company</label><input id="customerName" autocomplete="off" placeholder="ACME Corp" oninput="updatePdfFileName()"></div>
+        <div class="field" style="margin:0"><label>Customer / company</label><input id="customerName" autocomplete="off" placeholder="ACME Corp" oninput="updatePdfFileName()" onchange="onCustomerNameChange()"></div>
         <div class="field" style="margin:0"><label>Contact name</label><input id="contactName" autocomplete="off"></div>
-        <div class="field" style="margin:0"><label>Contact email</label><input id="contactEmail" autocomplete="off"></div>
+        <div class="field" style="margin:0"><label>Contact email <button type="button" onclick="openCustDrawer()" style="float:right;font-size:11px;color:#5B94CB;background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">Customers</button></label><input id="contactEmail" autocomplete="off"><div id="contactPicker" style="margin-top:3px"></div></div>
         <div class="field" style="margin:0"><label>Quote number</label><input id="quoteNumber" autocomplete="off" oninput="updatePdfFileName()"></div>
         <div class="field" style="margin:0"><label>Quote date</label><input id="quoteDate" type="date" onchange="updatePdfFileName();autoSave()"></div>
         <div class="field" style="margin:0"><label>Expiration date</label><input id="expiryDate" type="date" oninput="checkExpiry(this)"></div>
@@ -493,6 +504,7 @@ function _applySession(session){
     _hideGate();
     _hydrateFromSupabase();
     if(typeof loadVads==='function') loadVads();
+    if(typeof loadCustomers==='function') loadCustomers();
     return true;
   }
   return false;
@@ -628,6 +640,7 @@ function autoSave() {
     if (saved.length > 20) saved = saved.slice(0, 20);
     _writeSaved(saved);
     renderSavedQuotes();
+    if(typeof captureCustomer==='function') captureCustomer();
   }, 2000);
 }
 
@@ -643,6 +656,146 @@ function closeDrawer(){
 }
 // ── VAD directory (shared, Supabase quote_vads): add/modify VADs + address for POs ──
 window.vads = [];
+// ── Customer directory (shared, Supabase quote_customers) ──
+// VAD quotes often omit contact and ship-to. We keep those per customer and fill blanks
+// automatically. Extracted values always win; the directory never overwrites a filled field.
+window.customers = [];
+function _normCust(s){
+  return String(s||'').toLowerCase().replace(/^the\s+/,'').replace(/[^a-z0-9]+/g,' ').trim();
+}
+async function loadCustomers(){
+  if(!window._sb || !window._sbUser) return;
+  try{
+    var res = await window._sb.from('quote_customers')
+      .select('id,name,norm_name,aliases,contacts,ship_address,ship_city_state_zip,ship_phone,customer_type,customer_zip,customer_state,tax_rate,tax_exempt')
+      .order('name');
+    if(res.error) throw res.error;
+    window.customers = res.data || [];
+    renderCustomerList();
+  }catch(e){ console.warn('loadCustomers failed:', e.message); }
+}
+function findCustomer(name){
+  var n=_normCust(name); if(!n) return null;
+  var list=window.customers||[];
+  var hit=list.find(function(c){return c.norm_name===n;});
+  if(hit) return hit;
+  hit=list.find(function(c){return (c.aliases||[]).some(function(a){return _normCust(a)===n;});});
+  if(hit) return hit;
+  // containment both ways, so "UNC Chapel Hill" matches "UNC Chapel Hill (ITS Franklin)"
+  hit=list.find(function(c){return c.norm_name.length>=8&&(c.norm_name.indexOf(n)>=0||n.indexOf(c.norm_name)>=0);});
+  return hit||null;
+}
+function _setIfBlank(id,val){
+  var el=document.getElementById(id);
+  if(el&&val&&!String(el.value||'').trim()){ el.value=val; return true; }
+  return false;
+}
+// Fill anything the quote didn't supply from the directory. Returns what was filled.
+function applyCustomerDefaults(name){
+  var c=findCustomer(name); if(!c) return null;
+  var filled=[];
+  if(_setIfBlank('shipToAddress',c.ship_address))filled.push('ship-to');
+  _setIfBlank('shipToCityStateZip',c.ship_city_state_zip);
+  _setIfBlank('shipToPhone',c.ship_phone);
+  if(_setIfBlank('customerType',c.customer_type))filled.push('tax profile');
+  _setIfBlank('customerZip',c.customer_zip);
+  _setIfBlank('customerState',c.customer_state);
+  _setIfBlank('taxRate',c.tax_rate);
+  var teEl=document.getElementById('taxExempt');
+  if(teEl&&c.tax_exempt&&!teEl.checked)teEl.checked=true;
+  var contacts=c.contacts||[];
+  var cn=document.getElementById('contactName'), ce=document.getElementById('contactEmail');
+  var haveContact=(cn&&cn.value.trim())||(ce&&ce.value.trim());
+  if(!haveContact&&contacts.length){
+    if(cn)cn.value=contacts[0].name||'';
+    if(ce)ce.value=contacts[0].email||'';
+    filled.push('contact');
+  }
+  renderContactPicker(c);
+  if(filled.length){
+    var st=document.getElementById('extractStatus');
+    if(st)st.textContent='Filled '+filled.join(', ')+' from saved customer';
+  }
+  recalcAll();
+  return c;
+}
+function renderContactPicker(c){
+  var wrap=document.getElementById('contactPicker'); if(!wrap)return;
+  var contacts=(c&&c.contacts)||[];
+  if(contacts.length<2){ wrap.innerHTML=''; return; }
+  wrap.innerHTML='<span style="font-size:10px;color:#717174">Known contacts: </span>'+contacts.map(function(ct,i){
+    return '<a onclick="useContact('+i+')" style="font-size:10px;color:#5B94CB;cursor:pointer;margin-right:8px">'+escH(ct.name||ct.email||'?')+'</a>';
+  }).join('');
+  window._pickerContacts=contacts;
+}
+function useContact(i){
+  var ct=(window._pickerContacts||[])[i]; if(!ct)return;
+  var cn=document.getElementById('contactName'), ce=document.getElementById('contactEmail');
+  if(cn)cn.value=ct.name||''; if(ce)ce.value=ct.email||'';
+  autoSave();
+}
+// Silent capture: remember this customer's details (and contact) for next time.
+async function captureCustomer(){
+  if(!window._sb||!window._sbUser)return;
+  var name=(document.getElementById('customerName').value||'').trim();
+  if(!name)return;
+  var norm=_normCust(name); if(!norm)return;
+  var cname=(document.getElementById('contactName').value||'').trim();
+  var cemail=(document.getElementById('contactEmail').value||'').trim();
+  var ship=(document.getElementById('shipToAddress')||{}).value||'';
+  var csz=(document.getElementById('shipToCityStateZip')||{}).value||'';
+  var phone=(document.getElementById('shipToPhone')||{}).value||'';
+  if(!cname&&!cemail&&!ship.trim())return; // nothing worth remembering yet
+  var existing=findCustomer(name);
+  var contacts=(existing&&existing.contacts)?existing.contacts.slice():[];
+  if(cname||cemail){
+    var dup=contacts.some(function(c){
+      return (cemail&&String(c.email||'').toLowerCase()===cemail.toLowerCase())||(!cemail&&c.name===cname);
+    });
+    if(!dup)contacts.unshift({name:cname,email:cemail});
+  }
+  var rec={
+    name:existing?existing.name:name, norm_name:existing?existing.norm_name:norm, contacts:contacts,
+    ship_address:ship.trim()||((existing&&existing.ship_address)||null),
+    ship_city_state_zip:csz.trim()||((existing&&existing.ship_city_state_zip)||null),
+    ship_phone:phone.trim()||((existing&&existing.ship_phone)||null),
+    customer_type:((document.getElementById('customerType')||{}).value||'')||((existing&&existing.customer_type)||null),
+    customer_zip:((document.getElementById('customerZip')||{}).value||'')||((existing&&existing.customer_zip)||null),
+    customer_state:((document.getElementById('customerState')||{}).value||'')||((existing&&existing.customer_state)||null),
+    tax_rate:((document.getElementById('taxRate')||{}).value||'')||((existing&&existing.tax_rate)||null),
+    tax_exempt:!!((document.getElementById('taxExempt')||{}).checked),
+    updated_at:new Date().toISOString()
+  };
+  try{
+    if(existing) await window._sb.from('quote_customers').update(rec).eq('id',existing.id);
+    else await window._sb.from('quote_customers').insert(rec);
+    await loadCustomers();
+  }catch(e){ console.warn('captureCustomer failed:', e.message); }
+}
+function onCustomerNameChange(){
+  updatePdfFileName();
+  applyCustomerDefaults(document.getElementById('customerName').value);
+}
+function renderCustomerList(){
+  var el=document.getElementById('custList'); if(!el)return;
+  var list=window.customers||[];
+  if(!list.length){ el.innerHTML='<div style="color:#717174;font-size:13px;text-align:center;padding:16px">No saved customers yet.</div>'; return; }
+  el.innerHTML=list.map(function(c){
+    var bits=[c.ship_address,c.ship_city_state_zip].filter(Boolean).join(', ');
+    var n=(c.contacts||[]).length;
+    return '<div class="saved-item" style="cursor:default;align-items:center"><div style="flex:1;min-width:0">'
+      +'<div class="saved-label">'+escH(c.name)+'</div>'
+      +'<div class="saved-meta">'+escH(bits||'no ship-to')+' · '+n+' contact'+(n===1?'':'s')+'</div></div>'
+      +'<button class="saved-del" title="Delete customer" onclick="deleteCustomer(\''+c.id+'\')">&times;</button></div>';
+  }).join('');
+}
+async function deleteCustomer(id){
+  if(!confirm('Delete this saved customer?'))return;
+  try{ await window._sb.from('quote_customers').delete().eq('id',id); await loadCustomers(); }
+  catch(e){ alert('Delete failed: '+e.message); }
+}
+function openCustDrawer(){ renderCustomerList(); document.getElementById('custDrawer').classList.add('open'); document.getElementById('custOverlay').classList.add('open'); }
+function closeCustDrawer(){ document.getElementById('custDrawer').classList.remove('open'); document.getElementById('custOverlay').classList.remove('open'); }
 async function loadVads(){
   if(!window._sb || !window._sbUser) return;
   try{
@@ -1650,6 +1803,8 @@ async function extractVAD(file){
     }
     if(parsed.quote_expire_date){document.getElementById('expiryDate').value=parsed.quote_expire_date;document.getElementById('expiryDate').style.borderColor='';}
     else{document.getElementById('expiryDate').value='';document.getElementById('expiryDate').style.borderColor='#e53e3e';}
+    // Fill anything the VAD quote left out (contact, ship-to, tax profile) from the customer directory.
+    if(typeof applyCustomerDefaults==='function')applyCustomerDefaults(document.getElementById('customerName').value);
     if(parsed.lineItems&&parsed.lineItems.length)window.loadLineItems(parsed.lineItems);
     // Item 7: Auto-populate VAD Name dropdown from detected VAD
     var vadAutoSet='';
