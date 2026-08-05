@@ -179,7 +179,7 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
         <div class="field" style="margin:0"><label>Contact name</label><input id="contactName" autocomplete="off"></div>
         <div class="field" style="margin:0"><label>Contact email</label><input id="contactEmail" autocomplete="off"></div>
         <div class="field" style="margin:0"><label>Quote number</label><input id="quoteNumber" autocomplete="off" oninput="updatePdfFileName()"></div>
-        <div class="field" style="margin:0"><label>Quote date</label><input id="quoteDate" type="date"></div>
+        <div class="field" style="margin:0"><label>Quote date</label><input id="quoteDate" type="date" onchange="updatePdfFileName();autoSave()"></div>
         <div class="field" style="margin:0"><label>Expiration date</label><input id="expiryDate" type="date" oninput="checkExpiry(this)"></div>
         <div class="field" style="margin:0">
           <label>Margin %</label>
@@ -558,12 +558,37 @@ function _signOut(){
 })();
 
 
+// Single source of truth for OEM (software vendor) detection: used by the PDF terms block
+// and the auto file name. Keep the patterns here only, so the two can't drift apart.
+function oemDefs(){
+  return [
+  {name:'Splunk',re:/SPL[EK\-]|SPLUNK/,terms:'Splunk: Splunk General Terms at splunk.com/en_us/legal/splunk-general-terms.html.'},
+  {name:'Qualys',re:/(^|\s)Q\-|QUALYS/,terms:'Qualys: Qualys Service User Agreement at qualys.com/docs/qualys-service-user-agreement.pdf.'},
+  {name:'Cloudflare',re:/\bCF\-|CLF\-|CLOUDFLARE/,terms:'Cloudflare: Cloudflare Subscription Agreement at cloudflare.com/terms/.'},
+  {name:'SentinelOne',re:/\-S1\b|\bS1\-|SENTINELONE/,terms:'SentinelOne: SentinelOne End User Terms of Service at sentinelone.com/legal/end-user-terms-of-service/.'},
+  {name:'CrowdStrike',re:/\bCS\-|\-CS\b|CRWD|CROWDSTRIKE/,terms:'CrowdStrike: CrowdStrike Terms and Conditions at crowdstrike.com/terms-conditions/.'},
+  {name:'Rubrik',re:/\bRBK\-|RUBRIK/,terms:'Rubrik: Rubrik End User Subscription Agreement at rubrik.com/legal/agreements.'},
+  {name:'Cribl',re:/\bCRBL\-|CRIBL/,terms:'Cribl: Cribl Subscription and Master Services Agreement at cribl.io/terms-of-service/.'}
+  ];
+}
+function detectOEMs(){
+  var s=(window.lineItems||[]).map(function(it){return((it.sku||'')+' '+(it.description||'')).toUpperCase();}).join(' ');
+  return oemDefs().filter(function(o){return o.re.test(s);});
+}
 function updatePdfFileName(){
   var el=document.getElementById('pdfFileName');
   if(!el||el.dataset.userEdited==='1')return;
-  var qn=document.getElementById('quoteNumber').value||'';
-  var cn=document.getElementById('customerName').value||'';
-  el.value=(qn&&cn)?qn+' - '+cn:qn||cn||'';
+  var d=(document.getElementById('quoteDate')||{}).value||'';
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){
+    var t=new Date();
+    d=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+  }
+  var cn=(document.getElementById('customerName').value||'').trim();
+  var oems=detectOEMs().map(function(o){return o.name;});
+  var parts=['TS-'+d];
+  if(cn)parts.push(cn);
+  if(oems.length)parts.push(oems.join('-'));
+  el.value=parts.join('_').replace(/[\/\\:*?"<>|]/g,'').trim();
 }
 
 function checkExpiry(el){el.style.borderColor=el.value?"":"#e53e3e";}
@@ -1520,6 +1545,7 @@ function render(){
   if(window.lineItems.length) autoSave();
   initDragDrop();
   renderCommissionPanel();
+  updatePdfFileName();
 }
 function updateMarginDollar(m,c,v){var el=document.getElementById('marginDollar');if(el)el.textContent=(m>0&&c>v)?'$'+fmt(c-v):'';}
 function recalcAll(){var m=parseFloat(document.getElementById('marginPct').value)||0;document.getElementById('marginHint').textContent=m>0?m+'% margin applied':'';render();}
@@ -1769,16 +1795,8 @@ async function generatePdfBlob(){
       doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0,54,88);
       doc.text('Terms and Conditions',L,y);y+=14;
       doc.setDrawColor(91,148,203);doc.line(L,y,R,y);y+=10;
-      // Detect which OEMs are present based on SKUs
-      var _skus=window.lineItems.map(function(it){return((it.sku||'')+' '+(it.description||'')).toUpperCase();}).join(' ');
-      var _oemLinks=[];
-      if(/SPL[EK\-]|SPLUNK/.test(_skus))_oemLinks.push('Splunk: Splunk General Terms at splunk.com/en_us/legal/splunk-general-terms.html.');
-      if(/(^|\s)Q\-/.test(_skus)||/QUALYS/.test(_skus))_oemLinks.push('Qualys: Qualys Service User Agreement at qualys.com/docs/qualys-service-user-agreement.pdf.');
-      if(/\bCF\-|CLF\-|CLOUDFLARE/.test(_skus))_oemLinks.push('Cloudflare: Cloudflare Subscription Agreement at cloudflare.com/terms/.');
-      if(/\-S1\b|\bS1\-|SENTINELONE/.test(_skus))_oemLinks.push('SentinelOne: SentinelOne End User Terms of Service at sentinelone.com/legal/end-user-terms-of-service/.');
-      if(/\bCS\-|\-CS\b|CRWD|CROWDSTRIKE/.test(_skus))_oemLinks.push('CrowdStrike: CrowdStrike Terms and Conditions at crowdstrike.com/terms-conditions/.');
-      if(/\bRBK\-|RUBRIK/.test(_skus))_oemLinks.push('Rubrik: Rubrik End User Subscription Agreement at rubrik.com/legal/agreements.');
-      if(/\bCRBL\-|CRIBL/.test(_skus))_oemLinks.push('Cribl: Cribl Subscription and Master Services Agreement at cribl.io/terms-of-service/.');
+      // Detect which OEMs are present based on SKUs (shared table: window.OEM_DEFS)
+      var _oemLinks=detectOEMs().map(function(o){return o.terms;});
       var _oemSuffix=_oemLinks.length>0?', including, as applicable: '+_oemLinks.join(' ')+' The applicable OEM Terms shall not apply to the extent there is a separate mutually signed agreement between Customer and the applicable OEM that expressly governs the program.':'. The applicable OEM Terms shall not apply to the extent there is a separate mutually signed agreement between Customer and the applicable OEM that expressly governs the program.';
       var _s1b='Partner is an authorized reseller of the programs listed on this Ordering Document. The programs are licensed to Customer directly by the applicable manufacturer or publisher (each, an \"OEM\"). Customer\'s right to access, use, deploy, and receive support for the programs is governed exclusively by the applicable OEM\'s end user license agreement, subscription agreement, terms of service, support terms, and/or acceptable use policy, as applicable (collectively, the \"OEM Terms\"). By accepting this Ordering Document, submitting a purchase order, or using the programs, Customer consents to the applicable OEM Terms'+_oemSuffix+' Partner is not a party to the OEM Terms and has no authority to modify, waive, or supplement them. Customer is responsible for reviewing the applicable OEM Terms prior to placing an order.';
       var tcs=[
@@ -1922,16 +1940,8 @@ async function previewPdf(){
       doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0,54,88);
       doc.text('Terms and Conditions',L,y);y+=14;
       doc.setDrawColor(91,148,203);doc.line(L,y,R,y);y+=10;
-      // Detect which OEMs are present based on SKUs
-      var _skus=window.lineItems.map(function(it){return((it.sku||'')+' '+(it.description||'')).toUpperCase();}).join(' ');
-      var _oemLinks=[];
-      if(/SPL[EK\-]|SPLUNK/.test(_skus))_oemLinks.push('Splunk: Splunk General Terms at splunk.com/en_us/legal/splunk-general-terms.html.');
-      if(/(^|\s)Q\-/.test(_skus)||/QUALYS/.test(_skus))_oemLinks.push('Qualys: Qualys Service User Agreement at qualys.com/docs/qualys-service-user-agreement.pdf.');
-      if(/\bCF\-|CLF\-|CLOUDFLARE/.test(_skus))_oemLinks.push('Cloudflare: Cloudflare Subscription Agreement at cloudflare.com/terms/.');
-      if(/\-S1\b|\bS1\-|SENTINELONE/.test(_skus))_oemLinks.push('SentinelOne: SentinelOne End User Terms of Service at sentinelone.com/legal/end-user-terms-of-service/.');
-      if(/\bCS\-|\-CS\b|CRWD|CROWDSTRIKE/.test(_skus))_oemLinks.push('CrowdStrike: CrowdStrike Terms and Conditions at crowdstrike.com/terms-conditions/.');
-      if(/\bRBK\-|RUBRIK/.test(_skus))_oemLinks.push('Rubrik: Rubrik End User Subscription Agreement at rubrik.com/legal/agreements.');
-      if(/\bCRBL\-|CRIBL/.test(_skus))_oemLinks.push('Cribl: Cribl Subscription and Master Services Agreement at cribl.io/terms-of-service/.');
+      // Detect which OEMs are present based on SKUs (shared table: window.OEM_DEFS)
+      var _oemLinks=detectOEMs().map(function(o){return o.terms;});
       var _oemSuffix=_oemLinks.length>0?', including, as applicable: '+_oemLinks.join(' ')+' The applicable OEM Terms shall not apply to the extent there is a separate mutually signed agreement between Customer and the applicable OEM that expressly governs the program.':'. The applicable OEM Terms shall not apply to the extent there is a separate mutually signed agreement between Customer and the applicable OEM that expressly governs the program.';
       var _s1b='Partner is an authorized reseller of the programs listed on this Ordering Document. The programs are licensed to Customer directly by the applicable manufacturer or publisher (each, an \"OEM\"). Customer\'s right to access, use, deploy, and receive support for the programs is governed exclusively by the applicable OEM\'s end user license agreement, subscription agreement, terms of service, support terms, and/or acceptable use policy, as applicable (collectively, the \"OEM Terms\"). By accepting this Ordering Document, submitting a purchase order, or using the programs, Customer consents to the applicable OEM Terms'+_oemSuffix+' Partner is not a party to the OEM Terms and has no authority to modify, waive, or supplement them. Customer is responsible for reviewing the applicable OEM Terms prior to placing an order.';
       var tcs=[
@@ -2074,16 +2084,8 @@ async function previewPdf(){
       doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0,54,88);
       doc.text('Terms and Conditions',L,y);y+=14;
       doc.setDrawColor(91,148,203);doc.line(L,y,R,y);y+=10;
-      // Detect which OEMs are present based on SKUs
-      var _skus=window.lineItems.map(function(it){return((it.sku||'')+' '+(it.description||'')).toUpperCase();}).join(' ');
-      var _oemLinks=[];
-      if(/SPL[EK\-]|SPLUNK/.test(_skus))_oemLinks.push('Splunk: Splunk General Terms at splunk.com/en_us/legal/splunk-general-terms.html.');
-      if(/(^|\s)Q\-/.test(_skus)||/QUALYS/.test(_skus))_oemLinks.push('Qualys: Qualys Service User Agreement at qualys.com/docs/qualys-service-user-agreement.pdf.');
-      if(/\bCF\-|CLF\-|CLOUDFLARE/.test(_skus))_oemLinks.push('Cloudflare: Cloudflare Subscription Agreement at cloudflare.com/terms/.');
-      if(/\-S1\b|\bS1\-|SENTINELONE/.test(_skus))_oemLinks.push('SentinelOne: SentinelOne End User Terms of Service at sentinelone.com/legal/end-user-terms-of-service/.');
-      if(/\bCS\-|\-CS\b|CRWD|CROWDSTRIKE/.test(_skus))_oemLinks.push('CrowdStrike: CrowdStrike Terms and Conditions at crowdstrike.com/terms-conditions/.');
-      if(/\bRBK\-|RUBRIK/.test(_skus))_oemLinks.push('Rubrik: Rubrik End User Subscription Agreement at rubrik.com/legal/agreements.');
-      if(/\bCRBL\-|CRIBL/.test(_skus))_oemLinks.push('Cribl: Cribl Subscription and Master Services Agreement at cribl.io/terms-of-service/.');
+      // Detect which OEMs are present based on SKUs (shared table: window.OEM_DEFS)
+      var _oemLinks=detectOEMs().map(function(o){return o.terms;});
       var _oemSuffix=_oemLinks.length>0?', including, as applicable: '+_oemLinks.join(' ')+' The applicable OEM Terms shall not apply to the extent there is a separate mutually signed agreement between Customer and the applicable OEM that expressly governs the program.':'. The applicable OEM Terms shall not apply to the extent there is a separate mutually signed agreement between Customer and the applicable OEM that expressly governs the program.';
       var _s1b='Partner is an authorized reseller of the programs listed on this Ordering Document. The programs are licensed to Customer directly by the applicable manufacturer or publisher (each, an \"OEM\"). Customer\'s right to access, use, deploy, and receive support for the programs is governed exclusively by the applicable OEM\'s end user license agreement, subscription agreement, terms of service, support terms, and/or acceptable use policy, as applicable (collectively, the \"OEM Terms\"). By accepting this Ordering Document, submitting a purchase order, or using the programs, Customer consents to the applicable OEM Terms'+_oemSuffix+' Partner is not a party to the OEM Terms and has no authority to modify, waive, or supplement them. Customer is responsible for reviewing the applicable OEM Terms prior to placing an order.';
       var tcs=[
@@ -2237,16 +2239,8 @@ async function downloadPdf(){
       doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0,54,88);
       doc.text('Terms and Conditions',L,y);y+=14;
       doc.setDrawColor(91,148,203);doc.line(L,y,R,y);y+=10;
-      // Detect which OEMs are present based on SKUs
-      var _skus=window.lineItems.map(function(it){return((it.sku||'')+' '+(it.description||'')).toUpperCase();}).join(' ');
-      var _oemLinks=[];
-      if(/SPL[EK\-]|SPLUNK/.test(_skus))_oemLinks.push('Splunk: Splunk General Terms at splunk.com/en_us/legal/splunk-general-terms.html.');
-      if(/(^|\s)Q\-/.test(_skus)||/QUALYS/.test(_skus))_oemLinks.push('Qualys: Qualys Service User Agreement at qualys.com/docs/qualys-service-user-agreement.pdf.');
-      if(/\bCF\-|CLF\-|CLOUDFLARE/.test(_skus))_oemLinks.push('Cloudflare: Cloudflare Subscription Agreement at cloudflare.com/terms/.');
-      if(/\-S1\b|\bS1\-|SENTINELONE/.test(_skus))_oemLinks.push('SentinelOne: SentinelOne End User Terms of Service at sentinelone.com/legal/end-user-terms-of-service/.');
-      if(/\bCS\-|\-CS\b|CRWD|CROWDSTRIKE/.test(_skus))_oemLinks.push('CrowdStrike: CrowdStrike Terms and Conditions at crowdstrike.com/terms-conditions/.');
-      if(/\bRBK\-|RUBRIK/.test(_skus))_oemLinks.push('Rubrik: Rubrik End User Subscription Agreement at rubrik.com/legal/agreements.');
-      if(/\bCRBL\-|CRIBL/.test(_skus))_oemLinks.push('Cribl: Cribl Subscription and Master Services Agreement at cribl.io/terms-of-service/.');
+      // Detect which OEMs are present based on SKUs (shared table: window.OEM_DEFS)
+      var _oemLinks=detectOEMs().map(function(o){return o.terms;});
       var _oemSuffix=_oemLinks.length>0?', including, as applicable: '+_oemLinks.join(' ')+' The applicable OEM Terms shall not apply to the extent there is a separate mutually signed agreement between Customer and the applicable OEM that expressly governs the program.':'. The applicable OEM Terms shall not apply to the extent there is a separate mutually signed agreement between Customer and the applicable OEM that expressly governs the program.';
       var _s1b='Partner is an authorized reseller of the programs listed on this Ordering Document. The programs are licensed to Customer directly by the applicable manufacturer or publisher (each, an \"OEM\"). Customer\'s right to access, use, deploy, and receive support for the programs is governed exclusively by the applicable OEM\'s end user license agreement, subscription agreement, terms of service, support terms, and/or acceptable use policy, as applicable (collectively, the \"OEM Terms\"). By accepting this Ordering Document, submitting a purchase order, or using the programs, Customer consents to the applicable OEM Terms'+_oemSuffix+' Partner is not a party to the OEM Terms and has no authority to modify, waive, or supplement them. Customer is responsible for reviewing the applicable OEM Terms prior to placing an order.';
       var tcs=[
@@ -2324,16 +2318,8 @@ async function previewPdf(){
       doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(0,54,88);
       doc.text('Terms and Conditions',L,y);y+=14;
       doc.setDrawColor(91,148,203);doc.line(L,y,R,y);y+=10;
-      // Detect which OEMs are present based on SKUs
-      var _skus=window.lineItems.map(function(it){return((it.sku||'')+' '+(it.description||'')).toUpperCase();}).join(' ');
-      var _oemLinks=[];
-      if(/SPL[EK\-]|SPLUNK/.test(_skus))_oemLinks.push('Splunk: Splunk General Terms at splunk.com/en_us/legal/splunk-general-terms.html.');
-      if(/(^|\s)Q\-/.test(_skus)||/QUALYS/.test(_skus))_oemLinks.push('Qualys: Qualys Service User Agreement at qualys.com/docs/qualys-service-user-agreement.pdf.');
-      if(/\bCF\-|CLF\-|CLOUDFLARE/.test(_skus))_oemLinks.push('Cloudflare: Cloudflare Subscription Agreement at cloudflare.com/terms/.');
-      if(/\-S1\b|\bS1\-|SENTINELONE/.test(_skus))_oemLinks.push('SentinelOne: SentinelOne End User Terms of Service at sentinelone.com/legal/end-user-terms-of-service/.');
-      if(/\bCS\-|\-CS\b|CRWD|CROWDSTRIKE/.test(_skus))_oemLinks.push('CrowdStrike: CrowdStrike Terms and Conditions at crowdstrike.com/terms-conditions/.');
-      if(/\bRBK\-|RUBRIK/.test(_skus))_oemLinks.push('Rubrik: Rubrik End User Subscription Agreement at rubrik.com/legal/agreements.');
-      if(/\bCRBL\-|CRIBL/.test(_skus))_oemLinks.push('Cribl: Cribl Subscription and Master Services Agreement at cribl.io/terms-of-service/.');
+      // Detect which OEMs are present based on SKUs (shared table: window.OEM_DEFS)
+      var _oemLinks=detectOEMs().map(function(o){return o.terms;});
       var _oemSuffix=_oemLinks.length>0?', including, as applicable: '+_oemLinks.join(' ')+' The applicable OEM Terms shall not apply to the extent there is a separate mutually signed agreement between Customer and the applicable OEM that expressly governs the program.':'. The applicable OEM Terms shall not apply to the extent there is a separate mutually signed agreement between Customer and the applicable OEM that expressly governs the program.';
       var _s1b='Partner is an authorized reseller of the programs listed on this Ordering Document. The programs are licensed to Customer directly by the applicable manufacturer or publisher (each, an \"OEM\"). Customer\'s right to access, use, deploy, and receive support for the programs is governed exclusively by the applicable OEM\'s end user license agreement, subscription agreement, terms of service, support terms, and/or acceptable use policy, as applicable (collectively, the \"OEM Terms\"). By accepting this Ordering Document, submitting a purchase order, or using the programs, Customer consents to the applicable OEM Terms'+_oemSuffix+' Partner is not a party to the OEM Terms and has no authority to modify, waive, or supplement them. Customer is responsible for reviewing the applicable OEM Terms prior to placing an order.';
       var tcs=[
