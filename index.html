@@ -607,6 +607,7 @@ function itemCprice(it,globalM){return cprice(it.unit_price,effectiveMargin(it,g
 // ── Auto-save ─────────────────────────────────────────────────────────────
 var _autoSaveTimer = null;
 function autoSave() {
+  if(window._suppressAutoSave)return;
   clearTimeout(_autoSaveTimer);
   _autoSaveTimer = setTimeout(function() {
     var state = getQuoteState();
@@ -739,6 +740,7 @@ function getQuoteState(){
   return{customerName:document.getElementById('customerName').value,contactName:document.getElementById('contactName').value,contactEmail:document.getElementById('contactEmail').value,quoteNumber:document.getElementById('quoteNumber').value,quoteDate:document.getElementById('quoteDate').value,expiryDate:document.getElementById('expiryDate').value,marginPct:document.getElementById('marginPct').value,notes:document.getElementById('notes').value,terms:document.getElementById('terms').value,additionalTerms:(document.getElementById('additionalTerms')||{}).value||'',preparedByCompany:document.getElementById('preparedByCompany').value,preparedBy:document.getElementById('preparedBy').value,preparedByEmail:document.getElementById('preparedByEmail').value,pdfFileName:(document.getElementById('pdfFileName')||{}).value||'',shipToAddress:(document.getElementById('shipToAddress')||{}).value||'',shipToCityStateZip:(document.getElementById('shipToCityStateZip')||{}).value||'',shipToPhone:(document.getElementById('shipToPhone')||{}).value||'',vendorName:(document.getElementById('vendorName')||{}).value||'',commissionState:JSON.parse(JSON.stringify(window.commissionState||{servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0})),customerType:(document.getElementById('customerType')||{}).value||'',customerZip:(document.getElementById('customerZip')||{}).value||'',customerState:(document.getElementById('customerState')||{}).value||'',taxRate:(document.getElementById('taxRate')||{}).value||'',taxExempt:!!(document.getElementById('taxExempt')||{}).checked,lineItems:JSON.parse(JSON.stringify(window.lineItems))};
 }
 function restoreQuoteState(s){
+  window._suppressAutoSave=true;
   document.getElementById('customerName').value=s.customerName||'';
   document.getElementById('contactName').value=s.contactName||'';
   document.getElementById('contactEmail').value=s.contactEmail||'';
@@ -778,6 +780,11 @@ function restoreQuoteState(s){
   window.sortState={col:null,dir:0};
   render();
   updatePdfFileName();
+  // Opening a quote must not count as a save: render() calls autoSave(), which would
+  // rewrite savedAt and reorder the Saved Quotes list. Drop the pending autosave and
+  // release the guard once the restore settles.
+  clearTimeout(_autoSaveTimer);
+  setTimeout(function(){ window._suppressAutoSave=false; }, 0);
   // Always re-apply rep settings so name/email are never overwritten by saved state
   loadRepSettings();
 }
