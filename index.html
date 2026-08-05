@@ -187,9 +187,9 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
     <div class="card">
       <div class="section-label" style="margin-bottom:10px">Quote Details</div>
       <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr 120px 120px 110px;gap:10px 14px;align-items:start;margin-bottom:10px">
-        <div class="field" style="margin:0"><label>Customer / company</label><input id="customerName" autocomplete="off" placeholder="ACME Corp" oninput="updatePdfFileName()" onchange="onCustomerNameChange()"></div>
+        <div class="field" style="margin:0"><label>Customer / company <button type="button" onclick="openCustDrawer()" style="float:right;font-size:11px;color:#5B94CB;background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">Lookup</button></label><input id="customerName" autocomplete="off" placeholder="ACME Corp" oninput="updatePdfFileName()" onchange="onCustomerNameChange()"></div>
         <div class="field" style="margin:0"><label>Contact name</label><input id="contactName" autocomplete="off"></div>
-        <div class="field" style="margin:0"><label>Contact email <button type="button" onclick="openCustDrawer()" style="float:right;font-size:11px;color:#5B94CB;background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">Customers</button></label><input id="contactEmail" autocomplete="off"><div id="contactPicker" style="margin-top:3px"></div></div>
+        <div class="field" style="margin:0"><label>Contact email</label><input id="contactEmail" autocomplete="off"><div id="contactPicker" style="margin-top:3px"></div></div>
         <div class="field" style="margin:0"><label>Quote number</label><input id="quoteNumber" autocomplete="off" oninput="updatePdfFileName()"></div>
         <div class="field" style="margin:0"><label>Quote date</label><input id="quoteDate" type="date" onchange="updatePdfFileName();autoSave()"></div>
         <div class="field" style="margin:0"><label>Expiration date</label><input id="expiryDate" type="date" oninput="checkExpiry(this)"></div>
