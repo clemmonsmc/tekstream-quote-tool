@@ -1313,6 +1313,8 @@ function recomputeCommissionCells(){
     var tmEl=document.getElementById('cm_tm_'+k);
     var coEl=document.getElementById('cm_co_'+k);
     var ccEl=document.getElementById('cm_cc_'+k);
+    var tcEl=document.getElementById('cm_tc_'+k);
+    if(tcEl)tcEl.textContent='$'+fmt(r.cost+contractCost);
     if(tmEl){
       tmEl.textContent='$'+fmt(tm);
       tmEl.style.color=tm>0?'#2d7a4f':tm<0?'#c00':'#131112';
@@ -1364,8 +1366,20 @@ function renderCommissionPanel(){
   h+='</tr>';
 
   // Row 2: TekStream Cost
-  h+='<tr style="background:#fafbfc"><td style="padding:7px 12px;color:#131112">TekStream Cost</td>';
-  rows.forEach(function(r){h+='<td style="text-align:right;padding:7px 12px">$'+fmt(r.cost)+'</td>';});
+  h+='<tr style="background:#fafbfc"><td style="padding:7px 12px;color:#131112">TekStream Cost (paid to VAD)</td>';
+  rows.forEach(function(r){
+    var k=commissionRowKey(r.label);
+    h+='<td id="cm_tc_'+k+'" style="text-align:right;padding:7px 12px">$'+fmt(r.cost+r.cost*(contractPct/100))+'</td>';
+  });
+  h+='</tr>';
+
+  // Sub-line: the contract cost portion included in TekStream Cost above (display only, not subtracted again)
+  h+='<tr style="background:#fafbfc"><td style="padding:2px 12px 7px 26px;color:#717174;font-size:11px">of which contract cost</td>';
+  rows.forEach(function(r){
+    var cc=r.cost*(contractPct/100);
+    var k=commissionRowKey(r.label);
+    h+='<td id="cm_cc_'+k+'" style="text-align:right;padding:2px 12px 7px;color:#717174;font-size:11px">$'+fmt(cc)+'</td>';
+  });
   h+='</tr>';
 
   // Row 3: Services Rev Paid by Margin — text input with inputmode decimal (no spinners), no re-render on input
@@ -1381,16 +1395,7 @@ function renderCommissionPanel(){
   });
   h+='</tr>';
 
-  // Row 3.5: Contract Cost $ (computed = cost * contractPct/100), red, ID'd for surgical updates
-  h+='<tr style="background:#fafbfc"><td style="padding:7px 12px;color:#c00">Contract Cost</td>';
-  rows.forEach(function(r){
-    var cc=r.cost*(contractPct/100);
-    var k=commissionRowKey(r.label);
-    h+='<td id="cm_cc_'+k+'" style="text-align:right;padding:7px 12px;color:#c00">$'+fmt(cc)+'</td>';
-  });
-  h+='</tr>';
-
-  // Row 4: Total Margin (computed = invoiced - cost - servicesRev - contractCost, color-coded)
+  // Row 4: Total Margin (computed = invoiced - TekStream cost (incl contract cost) - servicesRev)
   h+='<tr><td style="padding:7px 12px;font-weight:600;color:#131112">Total Margin</td>';
   rows.forEach(function(r){
     var sv=srv[r.label]||0;
