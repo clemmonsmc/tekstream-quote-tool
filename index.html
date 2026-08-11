@@ -279,14 +279,14 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
         onkeydown="if(event.key==='Enter')applySetTotal()">
       <button class="btn btn-sm" style="background:#5B94CB" onclick="applySetTotal()">Apply</button>
     </div>
-    <div id="commissionPanel"></div>
+    <div id="commissionPanel" style="display:none"></div>
     <div class="btn-row">
       <button class="btn dl-btn" onclick="downloadPdf()">Download PDF quote &#8595;</button>
       <button class="btn dl-btn" style="background:#717174" onclick="previewPdf()">Preview PDF &#128269;</button>
       <button class="btn dl-btn" style="background:#5B94CB" onclick="emailQuote()">Email Quote &#9993;</button>
       <button class="btn dl-btn" style="background:#2d7a4f" id="signBtn" onclick="sendForSignature()">Send for Signature &#9998;</button>
       <button class="btn dl-btn" style="background:#8a4a9f" onclick="downloadPoPdf()" title="Generate TekStream PO for the VAD">Generate PO &#8595;</button>
-      <button class="btn dl-btn" style="background:#003658" onclick="downloadMarginSummaryPdf()" title="Download internal Margin &amp; Commission summary (not for customer)">Margin Summary &#8595;</button>
+      <button class="btn dl-btn" id="marginSummaryBtn" style="background:#003658;display:none" onclick="downloadMarginSummaryPdf()" title="Download internal Margin &amp; Commission summary (not for customer)">Margin Summary &#8595;</button>
     </div>
     <p style="font-size:11px;color:#717174;margin-top:8px;text-align:center">Email Quote downloads the PDF &#8212; attach it to the Outlook email before sending.</p>
   </div>
@@ -506,6 +506,7 @@ function _applySession(session){
     _hydrateFromSupabase();
     if(typeof loadVads==='function') loadVads();
     if(typeof loadCustomers==='function') loadCustomers();
+    if(typeof loadMarginAccess==='function') loadMarginAccess();
     return true;
   }
   return false;
@@ -657,6 +658,27 @@ function closeDrawer(){
 }
 // ── VAD directory (shared, Supabase quote_vads): add/modify VADs + address for POs ──
 window.vads = [];
+// ── Margin/commission visibility ──
+// Hidden by default; shown only for emails in the shared quote_margin_access table.
+// Note: this hides the UI, it is not a security boundary — the underlying figures are
+// still in the page for anyone determined. Real isolation is that quotes are owner-scoped.
+window._marginAccess = false;
+async function loadMarginAccess(){
+  window._marginAccess=false;
+  try{
+    var email=((window._sbUser&&window._sbUser.email)||'').toLowerCase();
+    if(email&&window._sb){
+      var res=await window._sb.from('quote_margin_access').select('email').eq('email',email).maybeSingle();
+      window._marginAccess=!!(res&&res.data);
+    }
+  }catch(e){ window._marginAccess=false; }
+  applyMarginAccess();
+}
+function applyMarginAccess(){
+  var on=!!window._marginAccess;
+  var p=document.getElementById('commissionPanel'); if(p)p.style.display=on?'':'none';
+  var b=document.getElementById('marginSummaryBtn'); if(b)b.style.display=on?'':'none';
+}
 // ── Customer directory (shared, Supabase quote_customers) ──
 // VAD quotes often omit contact and ship-to. We keep those per customer and fill blanks
 // automatically. Extracted values always win; the directory never overwrites a filled field.
@@ -1544,6 +1566,7 @@ function recomputeCommissionCells(){
   document.querySelectorAll('[data-cm-contract-readonly]').forEach(function(el){el.textContent=contractPct+'%';});
 }
 function renderCommissionPanel(){
+  if(!window._marginAccess){var _p=document.getElementById("commissionPanel");if(_p)_p.style.display="none";return;}
   var panel=document.getElementById('commissionPanel');
   if(!panel)return;
   if(!window.lineItems||!window.lineItems.length){panel.innerHTML='';return;}
@@ -2780,6 +2803,7 @@ async function downloadPoPdf(){
   }
 }
 async function downloadMarginSummaryPdf(){
+  if(!window._marginAccess)return;
   // Internal-only PDF: mirrors the on-screen Margin & Commission Detail panel.
   // NOT for customer distribution. Includes quote identifiers in the header and
   // a per-payment economics breakdown plus deal totals.
