@@ -433,6 +433,14 @@ window.commissionState = {servicesRevByGroup:{},aeMultiplier:20,contractCostPct:
 
 // ── Supabase cloud persistence + auth (cloud sync of saved quotes) ──────────
 window._sb = null;
+// /api/extract and /api/sign require a signed-in session. getSession() reads the
+// cached session and refreshes it when expired, so the token cannot go stale.
+async function _apiHeaders(){
+  var h={'Content-Type':'application/json'};
+  if(window._sb){ var r=await window._sb.auth.getSession();
+    if(r&&r.data&&r.data.session) h.Authorization='Bearer '+r.data.session.access_token; }
+  return h;
+}
 window._sbUser = null;
 var _ALLOWED_DOMAIN = 'tekstream.com';
 
@@ -1864,7 +1872,7 @@ async function extractVAD(file){
   document.getElementById('extractStatus').textContent='Extracting\u2026';
   try{
     var b64=await new Promise(function(res,rej){var r=new FileReader();r.onload=function(e){res(e.target.result.split(',')[1]);};r.onerror=rej;r.readAsDataURL(file);});
-    var resp=await fetch('/api/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileBase64:b64,fileType:file.type,fileName:file.name})});
+    var resp=await fetch('/api/extract',{method:'POST',headers:await _apiHeaders(),body:JSON.stringify({fileBase64:b64,fileType:file.type,fileName:file.name})});
     if(!resp.ok){var e=await resp.json();throw new Error(e.error||resp.status);}
     var parsed=await resp.json();
     if(parsed.to)document.getElementById('preparedByCompany').value=parsed.to.company||'';
@@ -1938,7 +1946,7 @@ async function confirmSendForSignature(){
     });
     var resp=await fetch('/api/sign',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:await _apiHeaders(),
       body:JSON.stringify({
         pdfBase64:b64,
         quoteNumber:document.getElementById('quoteNumber').value,
