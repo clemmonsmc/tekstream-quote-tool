@@ -287,7 +287,10 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
       <button class="btn dl-btn" onclick="downloadPdf()">Download PDF quote &#8595;</button>
       <button class="btn dl-btn" style="background:#717174" onclick="previewPdf()">Preview PDF &#128269;</button>
       <button class="btn dl-btn" style="background:#5B94CB" onclick="emailQuote()">Email Quote &#9993;</button>
-      <button class="btn dl-btn" style="background:#2d7a4f" id="signBtn" onclick="sendForSignature()">Send for Signature &#9998;</button>
+      <!-- Hidden until DROPBOX_SIGN_API_KEY is confirmed as a production key. api/sign.js
+           runs with test_mode 0, so a send would create a real signature request.
+           Unhide by removing the style="display:none" below. -->
+      <button class="btn dl-btn" style="background:#2d7a4f;display:none" id="signBtn" onclick="sendForSignature()">Send for Signature &#9998;</button>
       <button class="btn dl-btn" style="background:#8a4a9f" onclick="downloadPoPdf()" title="Generate TekStream PO for the VAD">Generate PO &#8595;</button>
       <button class="btn dl-btn" id="marginSummaryBtn" style="background:#003658" onclick="downloadMarginSummaryPdf()" title="Download internal Margin &amp; Commission summary (not for customer)">Margin Summary &#8595;</button>
     </div>
