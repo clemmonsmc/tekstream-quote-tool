@@ -218,11 +218,19 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
         </div>
         <div class="field" style="margin:0"><label>Personalized note</label><textarea id="notes" autocomplete="off" placeholder="Thank you for the opportunity..." style="min-height:52px"></textarea></div>
         <div class="field" style="margin:0"><label>Payment terms</label><input id="terms" autocomplete="off" value="Net 30"></div>
+        <div class="field" id="vehicleTermsWrap" style="margin:0;grid-column:1/-1;display:none"><label>Governing agreement text <span id="vehicleTermsFlag" style="color:#717174;font-weight:400;font-size:11px">(replaces standard T&amp;C 1-15)</span></label><textarea id="vehicleTerms" autocomplete="off" style="min-height:80px" oninput="onVehicleTermsInput()"></textarea><div id="vehicleBlockMsg" style="display:none;color:#A32D2D;font-size:11px;margin-top:4px"></div></div>
         <div class="field" style="margin:0;grid-column:1/-1"><label>Additional terms <span style="color:#717174;font-weight:400;font-size:11px">(appended after standard T&amp;C in quote PDF)</span></label><textarea id="additionalTerms" autocomplete="off" placeholder="Optional. Custom legal language, NDA references, MSA exceptions, etc." style="min-height:60px" oninput="autoSave()"></textarea></div>
         <div class="field" style="margin:0"><label>File name</label><input id="pdfFileName" autocomplete="off" placeholder="auto" oninput="this.dataset.userEdited=this.value?'1':'';updatePdfFileName()"></div>
       </div>
       <!-- Backlog #12: Tax (SaaS per-state + ZIP rate). Math wired in later steps. -->
       <div style="display:grid;grid-template-columns:160px 110px 70px 130px auto;gap:10px 14px;align-items:end;margin-top:10px;padding-top:10px;border-top:1px solid #e3e9f0">
+        <div class="field" style="margin:0">
+          <label>Contract vehicle</label>
+          <select id="contractVehicle" onchange="onVehicleChange()">
+            <option value="">None (standard T&amp;C)</option>
+            <option value="omnia-r240303">OMNIA Partners #R240303</option>
+          </select>
+        </div>
         <div class="field" style="margin:0">
           <label>Customer type</label>
           <select id="customerType" onchange="onCustomerTypeChange()">
@@ -637,7 +645,88 @@ function _signOut(){
 // previewPdf variants, downloadPdf); a change to one silently diverged the others.
 // OEM detection stays dynamic: detectOEMs() runs per call, so clause 1 still maps
 // SKUs to the applicable OEM terms links at generation time.
+// Contract vehicles. Selecting one replaces the standard 15 clauses with the
+// vehicle's governing language, which the rep may edit per quote. `oems` limits
+// the vehicle to the OEMs our reseller agreement actually authorises.
+window.CONTRACT_VEHICLES = {
+  'omnia-r240303': {
+    label: 'OMNIA Partners #R240303 (Carahsoft)',
+    number: 'OMNIA Partners Contract #R240303',
+    oems: ['Splunk'],
+    text: 'This software quote is governed by the pricing, terms, and conditions of OMNIA Partners Contract #R240303 and the State of North Carolina participating addendum (collectively, the "Agreement"). The subscription plans, products, quantities, and pricing set forth in this quote are agreed to by Customer and TekStream Solutions, LLC ("TekStream") and are subject to the Agreement.'
+  }
+};
+
+
+// Prefill only when the box is empty or still matches the stored wording, so a
+// rep's edit is never silently overwritten by re-selecting the vehicle.
+function onVehicleChange(){
+  var v=currentVehicle();
+  var wrap=document.getElementById('vehicleTermsWrap');
+  var ta=document.getElementById('vehicleTerms');
+  if(!v){ wrap.style.display='none'; refreshVehicleWarning(); autoSave(); return; }
+  wrap.style.display='';
+  var cur=(ta.value||'').trim();
+  if(!cur){ ta.value=v.text; }
+  else if(cur!==v.text.trim()){
+    if(confirm('Replace the edited governing text with the standard wording for '+v.label+'?')){ ta.value=v.text; }
+  }
+  onVehicleTermsInput();
+  refreshVehicleWarning();
+  autoSave();
+}
+
+function onVehicleTermsInput(){
+  var v=currentVehicle();
+  var ta=document.getElementById('vehicleTerms');
+  var flag=document.getElementById('vehicleTermsFlag');
+  if(!v||!flag||!ta) return;
+  var modified=(ta.value||'').trim()!==v.text.trim();
+  flag.textContent=modified?'(replaces standard T&C 1-15 \u00b7 MODIFIED from standard wording)':'(replaces standard T&C 1-15)';
+  flag.style.color=modified?'#A32D2D':'#717174';
+  autoSave();
+}
+
+// Warn, and fall back to standard terms, when the quote contains an OEM the
+// vehicle does not cover.
+function refreshVehicleWarning(){
+  var el=document.getElementById('vehicleBlockMsg'); if(!el) return;
+  var bad=vehicleBlockedBy();
+  var v=currentVehicle();
+  if(v && bad.length){
+    el.style.display='';
+    el.textContent='Not applied: this quote includes '+bad.join(', ')+'. The '+v.label+' reseller agreement covers '+v.oems.join(', ')+' only. Standard terms will print.';
+  } else { el.style.display='none'; }
+}
+
+function currentVehicle(){
+  var el=document.getElementById('contractVehicle');
+  var k=el?el.value:'';
+  return k && window.CONTRACT_VEHICLES[k] ? window.CONTRACT_VEHICLES[k] : null;
+}
+
+// A vehicle is only valid if every detected OEM is one it authorises. The
+// Carahsoft CRA covers Splunk offerings only, so a mixed-OEM quote must not
+// carry the OMNIA clause.
+function vehicleBlockedBy(){
+  var v=currentVehicle(); if(!v) return [];
+  return detectOEMs().map(function(o){return o.name;})
+    .filter(function(n){ return v.oems.indexOf(n)<0; });
+}
+
 function buildTermsList(){
+    // Contract vehicle selected and valid: its governing clause replaces the
+    // standard terms entirely. Additional terms still append below.
+    var _v=currentVehicle();
+    if(_v && vehicleBlockedBy().length===0){
+      var _vtEl=document.getElementById('vehicleTerms');
+      var _vt=_vtEl && _vtEl.value.trim() ? _vtEl.value.trim() : _v.text;
+      var _vtcs=[{h:'1. Governing Agreement.', b:_vt}];
+      var _vatEl=document.getElementById('additionalTerms');
+      var _vat=_vatEl ? _vatEl.value.trim() : '';
+      if(_vat){ _vtcs.push({h:'2. Additional Terms.', b:_vat}); }
+      return _vtcs;
+    }
     // Detect which OEMs are present based on SKUs (shared table: window.OEM_DEFS)
     var _oemLinks=detectOEMs().map(function(o){return o.terms;});
     var _oemSuffix=_oemLinks.length>0?', including, as applicable: '+_oemLinks.join(' ')+' The applicable OEM Terms shall not apply to the extent there is a separate mutually signed agreement between Customer and the applicable OEM that expressly governs the program.':'. The applicable OEM Terms shall not apply to the extent there is a separate mutually signed agreement between Customer and the applicable OEM that expressly governs the program.';
@@ -1036,7 +1125,7 @@ function loadRepSettings(){
 }
 
 function getQuoteState(){
-  return{customerName:document.getElementById('customerName').value,contactName:document.getElementById('contactName').value,contactEmail:document.getElementById('contactEmail').value,quoteNumber:document.getElementById('quoteNumber').value,quoteDate:document.getElementById('quoteDate').value,expiryDate:document.getElementById('expiryDate').value,marginPct:document.getElementById('marginPct').value,notes:document.getElementById('notes').value,terms:document.getElementById('terms').value,additionalTerms:(document.getElementById('additionalTerms')||{}).value||'',preparedByCompany:document.getElementById('preparedByCompany').value,preparedBy:document.getElementById('preparedBy').value,preparedByEmail:document.getElementById('preparedByEmail').value,pdfFileName:(document.getElementById('pdfFileName')||{}).value||'',shipToAddress:(document.getElementById('shipToAddress')||{}).value||'',shipToCityStateZip:(document.getElementById('shipToCityStateZip')||{}).value||'',shipToPhone:(document.getElementById('shipToPhone')||{}).value||'',vendorName:(document.getElementById('vendorName')||{}).value||'',commissionState:JSON.parse(JSON.stringify(window.commissionState||{servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0})),customerType:(document.getElementById('customerType')||{}).value||'',customerZip:(document.getElementById('customerZip')||{}).value||'',customerState:(document.getElementById('customerState')||{}).value||'',taxRate:(document.getElementById('taxRate')||{}).value||'',taxExempt:!!(document.getElementById('taxExempt')||{}).checked,lineItems:JSON.parse(JSON.stringify(window.lineItems))};
+  return{customerName:document.getElementById('customerName').value,contactName:document.getElementById('contactName').value,contactEmail:document.getElementById('contactEmail').value,quoteNumber:document.getElementById('quoteNumber').value,quoteDate:document.getElementById('quoteDate').value,expiryDate:document.getElementById('expiryDate').value,marginPct:document.getElementById('marginPct').value,notes:document.getElementById('notes').value,terms:document.getElementById('terms').value,additionalTerms:(document.getElementById('additionalTerms')||{}).value||'',contractVehicle:(document.getElementById('contractVehicle')||{}).value||'',vehicleTerms:(document.getElementById('vehicleTerms')||{}).value||'',preparedByCompany:document.getElementById('preparedByCompany').value,preparedBy:document.getElementById('preparedBy').value,preparedByEmail:document.getElementById('preparedByEmail').value,pdfFileName:(document.getElementById('pdfFileName')||{}).value||'',shipToAddress:(document.getElementById('shipToAddress')||{}).value||'',shipToCityStateZip:(document.getElementById('shipToCityStateZip')||{}).value||'',shipToPhone:(document.getElementById('shipToPhone')||{}).value||'',vendorName:(document.getElementById('vendorName')||{}).value||'',commissionState:JSON.parse(JSON.stringify(window.commissionState||{servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0})),customerType:(document.getElementById('customerType')||{}).value||'',customerZip:(document.getElementById('customerZip')||{}).value||'',customerState:(document.getElementById('customerState')||{}).value||'',taxRate:(document.getElementById('taxRate')||{}).value||'',taxExempt:!!(document.getElementById('taxExempt')||{}).checked,lineItems:JSON.parse(JSON.stringify(window.lineItems))};
 }
 function restoreQuoteState(s){
   window._suppressAutoSave=true;
@@ -1053,6 +1142,11 @@ function restoreQuoteState(s){
   document.getElementById('terms').value=s.terms||'Net 30';
   // Item 5: Additional terms
   var atEl=document.getElementById('additionalTerms');if(atEl)atEl.value=s.additionalTerms||'';
+  var cvEl=document.getElementById('contractVehicle');if(cvEl)cvEl.value=s.contractVehicle||'';
+  var vtEl=document.getElementById('vehicleTerms');if(vtEl)vtEl.value=s.vehicleTerms||'';
+  var vwEl=document.getElementById('vehicleTermsWrap');if(vwEl)vwEl.style.display=(s.contractVehicle?'':'none');
+  if(typeof onVehicleTermsInput==='function')onVehicleTermsInput();
+  if(typeof refreshVehicleWarning==='function')refreshVehicleWarning();
   document.getElementById('preparedByCompany').value=s.preparedByCompany||'TekStream';
   document.getElementById('preparedBy').value=s.preparedBy||'';
   document.getElementById('preparedByEmail').value=s.preparedByEmail||'';
