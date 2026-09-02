@@ -85,10 +85,13 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
   <div style="background:#fff;border-radius:10px;padding:40px;width:340px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
     <div style="font-size:20px;font-weight:700;color:#003658">TekStream Quote Generator</div>
     <div id="authGateMsg" style="color:#717174;font-size:13px;margin:8px 0 22px">Checking sign-in...</div>
-    <button class="btn" onclick="_signIn()">Sign in with Google</button>
     <div style="display:flex;align-items:center;gap:8px;margin:18px 0 12px;color:#bbb;font-size:10px;"><div style="flex:1;height:1px;background:#e8e8e0;"></div>OR<div style="flex:1;height:1px;background:#e8e8e0;"></div></div>
     <input id="gateEmail" type="email" autocomplete="email" placeholder="you@tekstream.com" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d0d8e0;border-radius:7px;font-size:13px;margin-bottom:8px" onkeydown="if(event.key==='Enter')_signInEmail()">
+    <input id="gatePass" type="password" autocomplete="current-password" placeholder="Password" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d0d8e0;border-radius:7px;font-size:13px;margin-bottom:8px" onkeydown="if(event.key==='Enter')_signInPassword()">
+    <button class="btn" id="gatePwBtn" onclick="_signInPassword()" style="width:100%">Sign in</button>
+    <div style="display:flex;align-items:center;gap:8px;margin:16px 0 10px;color:#bbb;font-size:10px;"><div style="flex:1;height:1px;background:#e8e8e0;"></div>OR<div style="flex:1;height:1px;background:#e8e8e0;"></div></div>
     <button class="btn" id="gateLinkBtn" onclick="_signInEmail()" style="width:100%;border:1px solid #003658;background:#fff;color:#003658">Email me a sign-in link</button>
+    <button class="btn" onclick="_signIn()" style="width:100%;margin-top:8px;border:none;background:none;color:#888;font-size:11px;text-decoration:underline">Sign in with Google</button>
   </div>
 </div>
 <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
@@ -554,6 +557,32 @@ function _signIn(){
   window._sb.auth.signInWithOAuth({ provider:'google',
     options:{ redirectTo: location.origin + location.pathname,
               queryParams:{ hd:_ALLOWED_DOMAIN, prompt:'select_account' } } });
+}
+// Password sign-in. Google federates through Entra and returns an admin error we
+// cannot fix here; magic link depends on rate-limited built-in SMTP. Password is
+// the path that always works, so it is the primary control.
+function _signInPassword(){
+  if(!window._sb){ return; }
+  var el=document.getElementById('gateEmail');
+  var pel=document.getElementById('gatePass');
+  var msg=document.getElementById('authGateMsg');
+  var email=((el&&el.value)||'').trim().toLowerCase();
+  var password=(pel&&pel.value)||'';
+  if(!email){ if(msg)msg.textContent='Enter your email address.'; return; }
+  if(email.slice(-('@'+_ALLOWED_DOMAIN).length)!=='@'+_ALLOWED_DOMAIN){
+    if(msg)msg.textContent='Use a @'+_ALLOWED_DOMAIN+' address.'; return;
+  }
+  if(!password){ if(msg)msg.textContent='Enter your password.'; return; }
+  var btn=document.getElementById('gatePwBtn');
+  if(btn){ btn.disabled=true; btn.textContent='Signing in\u2026'; }
+  window._sb.auth.signInWithPassword({ email:email, password:password })
+  .then(function(r){
+    if(r&&r.error)throw r.error;
+    if(pel)pel.value='';
+  }).catch(function(e){
+    if(msg)msg.textContent=(e&&e.message)||'Sign-in failed.';
+    if(btn){ btn.disabled=false; btn.textContent='Sign in'; }
+  });
 }
 // Magic-link sign-in: bypasses Google (and the Entra block on the federated SSO app).
 // shouldCreateUser:false so a link only signs in an account that already exists.
