@@ -91,7 +91,6 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
     <button class="btn" id="gatePwBtn" onclick="_signInPassword()" style="width:100%">Sign in</button>
     <div style="display:flex;align-items:center;gap:8px;margin:16px 0 10px;color:#bbb;font-size:10px;"><div style="flex:1;height:1px;background:#e8e8e0;"></div>OR<div style="flex:1;height:1px;background:#e8e8e0;"></div></div>
     <button class="btn" id="gateLinkBtn" onclick="_signInEmail()" style="width:100%;border:1px solid #003658;background:#fff;color:#003658">Email me a sign-in link</button>
-    <button class="btn" onclick="_signIn()" style="width:100%;margin-top:8px;border:none;background:none;color:#888;font-size:11px;text-decoration:underline">Sign in with Google</button>
   </div>
 </div>
 <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
@@ -552,12 +551,6 @@ async function _sbInit(){
   }catch(e){ _showGate('Could not initialize sign-in. Try reloading.'); }
 }
 
-function _signIn(){
-  if(!window._sb){ return; }
-  window._sb.auth.signInWithOAuth({ provider:'google',
-    options:{ redirectTo: location.origin + location.pathname,
-              queryParams:{ hd:_ALLOWED_DOMAIN, prompt:'select_account' } } });
-}
 // Password sign-in. Google federates through Entra and returns an admin error we
 // cannot fix here; magic link depends on rate-limited built-in SMTP. Password is
 // the path that always works, so it is the primary control.
