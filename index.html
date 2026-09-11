@@ -609,9 +609,14 @@ function _signInEmail(){
     if(btn){ btn.disabled=false; btn.textContent='Email me a sign-in link'; }
   });
 }
+// Sign-out lands on Hub rather than this app's own gate: the user is leaving, and
+// the front door is more useful than the login box of the thing they just closed.
 function _signOut(){
   if(!window._sb){ return; }
-  window._sb.auth.signOut().then(function(){ window._sbUser=null; _showGate('Sign in to continue.'); });
+  window._sb.auth.signOut().then(function(){
+    window._sbUser=null;
+    window.location.href='https://tekstream-hub.vercel.app';
+  });
 }
 
 (function init() {
