@@ -220,6 +220,7 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
         <div class="field" style="margin:0"><label>Payment terms</label><input id="terms" autocomplete="off" value="Net 30"></div>
         <div class="field" id="vehicleTermsWrap" style="margin:0;grid-column:1/-1;display:none"><label>Governing agreement text <span id="vehicleTermsFlag" style="color:#717174;font-weight:400;font-size:11px">(replaces standard T&amp;C 1-15)</span></label><textarea id="vehicleTerms" autocomplete="off" style="min-height:80px" oninput="onVehicleTermsInput()"></textarea><div id="vehicleBlockMsg" style="display:none;color:#A32D2D;font-size:11px;margin-top:4px"></div></div>
         <div class="field" style="margin:0;grid-column:1/-1"><label>Additional terms <span style="color:#717174;font-weight:400;font-size:11px">(appended after standard T&amp;C in quote PDF)</span></label><textarea id="additionalTerms" autocomplete="off" placeholder="Optional. Custom legal language, NDA references, MSA exceptions, etc." style="min-height:60px" oninput="autoSave()"></textarea></div>
+        <div class="field" style="margin:0"><label>Label <span style="color:#717174;font-weight:400;font-size:11px">(distinguishes quotes on one opportunity)</span></label><input id="quoteLabel" autocomplete="off" placeholder="350GB 1Year, HIPAA, Option B" oninput="updatePdfFileName();autoSave()"></div>
         <div class="field" style="margin:0"><label>File name</label><input id="pdfFileName" autocomplete="off" placeholder="auto" oninput="this.dataset.userEdited=this.value?'1':'';updatePdfFileName()"></div>
       </div>
       <!-- Backlog #12: Tax (SaaS per-state + ZIP rate). Math wired in later steps. -->
@@ -785,10 +786,34 @@ function updatePdfFileName(){
     var t=new Date();
     d=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
   }
+  var compact=d.replace(/-/g,'');
   var cn=(document.getElementById('customerName').value||'').trim();
+  var label=((document.getElementById('quoteLabel')||{}).value||'').trim();
   var oems=detectOEMs().map(function(o){return o.name;});
-  var parts=['TS-'+d];
+  // Collision guard: several quotes can share a date, customer and vendor (multiple quotes on
+  // one opportunity), so assign a sequence per date+customer. Assigned once, then persisted
+  // with the quote so it never shifts when other quotes are saved or deleted.
+  var seq=window._fileSeq;
+  if(!seq){
+    var used={};
+    try{
+      var saved=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
+      var curKey=window._currentQuoteKey||null;
+      saved.forEach(function(q){
+        if(curKey&&q.key===curKey)return;
+        var s=q.state||{};
+        if((s.quoteDate||'')===d && ((s.customerName||'').trim().toLowerCase()===cn.toLowerCase())){
+          if(s.fileSeq)used[s.fileSeq]=true;
+          else used[1]=true; // legacy quote with no sequence occupies slot 1
+        }
+      });
+    }catch(e){}
+    seq=1; while(used[seq])seq++;
+    window._fileSeq=seq;
+  }
+  var parts=['TS-'+compact+'-'+String(seq).padStart(2,'0')];
   if(cn)parts.push(cn);
+  if(label)parts.push(label);
   if(oems.length)parts.push(oems.join('-'));
   el.value=parts.join('_').replace(/[\/\\:*?"<>|]/g,'').trim();
 }
@@ -1130,7 +1155,7 @@ function loadRepSettings(){
 }
 
 function getQuoteState(){
-  return{customerName:document.getElementById('customerName').value,contactName:document.getElementById('contactName').value,contactEmail:document.getElementById('contactEmail').value,quoteNumber:document.getElementById('quoteNumber').value,quoteDate:document.getElementById('quoteDate').value,expiryDate:document.getElementById('expiryDate').value,marginPct:document.getElementById('marginPct').value,notes:document.getElementById('notes').value,terms:document.getElementById('terms').value,additionalTerms:(document.getElementById('additionalTerms')||{}).value||'',contractVehicle:(document.getElementById('contractVehicle')||{}).value||'',vehicleTerms:(document.getElementById('vehicleTerms')||{}).value||'',preparedByCompany:document.getElementById('preparedByCompany').value,preparedBy:document.getElementById('preparedBy').value,preparedByEmail:document.getElementById('preparedByEmail').value,pdfFileName:(document.getElementById('pdfFileName')||{}).value||'',shipToAddress:(document.getElementById('shipToAddress')||{}).value||'',shipToCityStateZip:(document.getElementById('shipToCityStateZip')||{}).value||'',shipToPhone:(document.getElementById('shipToPhone')||{}).value||'',vendorName:(document.getElementById('vendorName')||{}).value||'',commissionState:JSON.parse(JSON.stringify(window.commissionState||{servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0})),customerType:(document.getElementById('customerType')||{}).value||'',customerZip:(document.getElementById('customerZip')||{}).value||'',customerState:(document.getElementById('customerState')||{}).value||'',taxRate:(document.getElementById('taxRate')||{}).value||'',taxExempt:!!(document.getElementById('taxExempt')||{}).checked,lineItems:JSON.parse(JSON.stringify(window.lineItems))};
+  return{customerName:document.getElementById('customerName').value,contactName:document.getElementById('contactName').value,contactEmail:document.getElementById('contactEmail').value,quoteNumber:document.getElementById('quoteNumber').value,quoteDate:document.getElementById('quoteDate').value,expiryDate:document.getElementById('expiryDate').value,marginPct:document.getElementById('marginPct').value,notes:document.getElementById('notes').value,terms:document.getElementById('terms').value,additionalTerms:(document.getElementById('additionalTerms')||{}).value||'',contractVehicle:(document.getElementById('contractVehicle')||{}).value||'',vehicleTerms:(document.getElementById('vehicleTerms')||{}).value||'',preparedByCompany:document.getElementById('preparedByCompany').value,preparedBy:document.getElementById('preparedBy').value,preparedByEmail:document.getElementById('preparedByEmail').value,pdfFileName:(document.getElementById('pdfFileName')||{}).value||'',quoteLabel:(document.getElementById('quoteLabel')||{}).value||'',fileSeq:window._fileSeq||null,shipToAddress:(document.getElementById('shipToAddress')||{}).value||'',shipToCityStateZip:(document.getElementById('shipToCityStateZip')||{}).value||'',shipToPhone:(document.getElementById('shipToPhone')||{}).value||'',vendorName:(document.getElementById('vendorName')||{}).value||'',commissionState:JSON.parse(JSON.stringify(window.commissionState||{servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0})),customerType:(document.getElementById('customerType')||{}).value||'',customerZip:(document.getElementById('customerZip')||{}).value||'',customerState:(document.getElementById('customerState')||{}).value||'',taxRate:(document.getElementById('taxRate')||{}).value||'',taxExempt:!!(document.getElementById('taxExempt')||{}).checked,lineItems:JSON.parse(JSON.stringify(window.lineItems))};
 }
 function restoreQuoteState(s){
   window._suppressAutoSave=true;
@@ -1166,6 +1191,8 @@ function restoreQuoteState(s){
     aeMultiplier:(s.commissionState&&typeof s.commissionState.aeMultiplier==='number')?s.commissionState.aeMultiplier:20,
     contractCostPct:(s.commissionState&&typeof s.commissionState.contractCostPct==='number')?s.commissionState.contractCostPct:0
   };
+  var qlEl=document.getElementById('quoteLabel');if(qlEl)qlEl.value=s.quoteLabel||'';
+  window._fileSeq=s.fileSeq||null;
   var pfEl=document.getElementById('pdfFileName');if(pfEl){pfEl.value=s.pdfFileName||'';pfEl.dataset.userEdited=s.pdfFileName?'1':'';}  
   var ctEl=document.getElementById('customerType');if(ctEl)ctEl.value=s.customerType||'';
   var czEl=document.getElementById('customerZip');if(czEl)czEl.value=s.customerZip||'';
@@ -1201,7 +1228,7 @@ function saveQuote(){
 function loadQuote(key){
   var saved=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
   var entry=saved.find(function(q){return q.key===key;});
-  if(entry)restoreQuoteState(entry.state);
+  if(entry){ window._currentQuoteKey=key; restoreQuoteState(entry.state); }
 }
 function deleteSavedQuote(key){
   var saved=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
@@ -1982,6 +2009,9 @@ function newQuote(){
   // Item 10 fix: clear pdfFileName and its user-edited flag so auto-naming resumes for the new quote
   var pfEl=document.getElementById('pdfFileName');
   if(pfEl){pfEl.value='';delete pfEl.dataset.userEdited;}
+  // Fresh quote: clear the label and release the assigned file sequence so a new one is chosen.
+  var qlEl=document.getElementById('quoteLabel'); if(qlEl)qlEl.value='';
+  window._fileSeq=null; window._currentQuoteKey=null;
   // Item 8: Reset commission state
   window.commissionState={servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0};
   window.sortState={col:null,dir:0};
