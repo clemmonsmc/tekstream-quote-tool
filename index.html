@@ -793,24 +793,7 @@ function updatePdfFileName(){
   // Collision guard: several quotes can share a date, customer and vendor (multiple quotes on
   // one opportunity), so assign a sequence per date+customer. Assigned once, then persisted
   // with the quote so it never shifts when other quotes are saved or deleted.
-  var seq=window._fileSeq;
-  if(!seq){
-    var used={};
-    try{
-      var saved=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
-      var curKey=window._currentQuoteKey||null;
-      saved.forEach(function(q){
-        if(curKey&&q.key===curKey)return;
-        var s=q.state||{};
-        if((s.quoteDate||'')===d && ((s.customerName||'').trim().toLowerCase()===cn.toLowerCase())){
-          if(s.fileSeq)used[s.fileSeq]=true;
-          else used[1]=true; // legacy quote with no sequence occupies slot 1
-        }
-      });
-    }catch(e){}
-    seq=1; while(used[seq])seq++;
-    window._fileSeq=seq;
-  }
+  var seq=window._fileSeq||1;
   var parts=['TS-'+compact+'-'+String(seq).padStart(2,'0')];
   if(cn)parts.push(cn);
   if(label)parts.push(label);
@@ -850,6 +833,28 @@ function autoSave() {
       // Refuse to overwrite. Quietly drop this autosave; the saved entry stays intact.
       return;
     }
+    // File-name sequence: assign here, not at name-generation time. A new quote is not in the
+    // saved set until this runs, and _fileSeq persisted across quotes when New Quote was not
+    // clicked, so every quote used to land on 01. Keep an already-assigned number stable.
+    var seq = (existing && existing.state && existing.state.fileSeq) || null;
+    if(!seq){
+      var used = {};
+      saved.forEach(function(q){
+        if(q.key === key) return;
+        var s = q.state || {};
+        if((s.quoteDate||'') === (state.quoteDate||'') &&
+           (s.customerName||'').trim().toLowerCase() === (state.customerName||'').trim().toLowerCase()){
+          used[s.fileSeq || 1] = true;   // a legacy quote with no sequence occupies slot 1
+        }
+      });
+      seq = 1; while(used[seq]) seq++;
+    }
+    state.fileSeq = seq;
+    window._fileSeq = seq;
+    window._currentQuoteKey = key;
+    // Refresh the generated name now that the sequence is known (never touches a typed name).
+    var _pf = document.getElementById('pdfFileName');
+    if(_pf && _pf.dataset.userEdited !== '1'){ updatePdfFileName(); state.pdfFileName = _pf.value; }
     saved = saved.filter(function(q){ return q.key !== key; });
     saved.unshift({key: key, quoteNumber: state.quoteNumber, customerName: state.customerName, savedAt: new Date().toLocaleString(), savedAtMs: Date.now(), state: state});
     if (saved.length > 20) saved = saved.slice(0, 20);
