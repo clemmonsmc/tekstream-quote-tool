@@ -1615,6 +1615,25 @@ function initDragDrop(){
     state.dragIdx=null;state.dropIdx=null;state.dropPos=null;state.dropGroupIdx=null;
   });
 }
+// Per-line margin override. The field is empty when there is no override, and an empty
+// number input clamps to min (0) when a spinner arrow is clicked, which silently zeroed the
+// line margin. Seed from the placeholder (the effective margin) instead, for both the mouse
+// spinners and the arrow keys, while still allowing a typed 0.
+function marginKey(el,ev){
+  if((ev.key==='ArrowUp'||ev.key==='ArrowDown')&&el.value===''){el.value=+el.placeholder;}
+  el.dataset.kb='1';
+  clearTimeout(el._kbT);
+  el._kbT=setTimeout(function(){delete el.dataset.kb;},400);
+}
+function marginInput(el,i){
+  // A spinner click on an empty field arrives as value "0" with no preceding keystroke.
+  if(el.value==='0' && (el.dataset.prev||'')==='' && !el.dataset.kb && +el.placeholder>0){
+    el.value=+el.placeholder;
+  }
+  el.dataset.prev=el.value;
+  window.lineItems[i].margin = el.value===''?null:+el.value;
+  recalcLive();
+}
 function renderRow(it,i,m){
   var em=effectiveMargin(it,m);
   var cp=cprice(it.unit_price,em),ext=cp*it.qty,h='<tr data-row="'+i+'">';
@@ -1633,7 +1652,7 @@ function renderRow(it,i,m){
   // Col 9: Margin%
   // Storage may carry full precision (set by custExtBlur); display rounds to 3 decimals.
   var mval=(it.margin!==null&&it.margin!==undefined&&it.margin!=='')?(typeof it.margin==='number'?+it.margin.toFixed(3):it.margin):'';
-  h+='<td style="text-align:right"><input type="number" value="'+mval+'" min="0" max="99" step="0.125" placeholder="'+m+'" style="width:52px" title="Line margin override" onkeydown="if((event.key===\'ArrowUp\'||event.key===\'ArrowDown\')&&this.value===\'\'){this.value=+this.placeholder;}" oninput="lineItems['+i+'].margin=this.value===\'\'?null:+this.value;recalcLive()" onchange="render()" autocomplete="off"></td>';
+  h+='<td style="text-align:right"><input type="number" value="'+mval+'" data-prev="'+mval+'" min="0" max="99" step="0.125" placeholder="'+m+'" style="width:52px" title="Line margin override" onkeydown="marginKey(this,event)" oninput="marginInput(this,'+i+')" onchange="render()" autocomplete="off"></td>';
   var hasOverride=(it.margin!==null&&it.margin!==undefined&&it.margin!=='');
   // Col 10: Margin$
   var marginDollarLine=(cp-it.unit_price)*it.qty;
