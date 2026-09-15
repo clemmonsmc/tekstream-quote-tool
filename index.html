@@ -1274,7 +1274,24 @@ function renderSavedQuotes(){
     row.className='saved-item';
     var lbl=document.createElement('div');
     lbl.className='saved-label';
-    lbl.textContent=(q.quoteNumber||q.key)+(q.customerName?' — '+q.customerName:'');
+    // Show what distinguishes quotes on one opportunity. The label field is preferred, but the
+    // detail usually lives in the file name (hand-typed), so fall back to the part of the file
+    // name that is not already the date, customer or vendor.
+    var distinguisher=((q.state&&q.state.quoteLabel)||'').trim();
+    if(!distinguisher){
+      var fnm=((q.state&&q.state.pdfFileName)||'').trim();
+      var cust=(q.customerName||'').trim();
+      if(fnm){
+        var rest=fnm;
+        if(cust)rest=rest.split(cust).join('');            // drop the customer
+        rest=rest.replace(/^TS-\d{4}-?\d{2}-?\d{2}(-\d+)?/,'');  // drop the date/sequence prefix
+        rest=rest.replace(/^TS-\d{4}-\d{3}/,'');             // or a legacy quote-number prefix
+        rest=rest.split('_').join(' ').split(' - ').join(' ');
+        rest=rest.replace(/\s+/g,' ').trim();
+        if(rest)distinguisher=rest;
+      }
+    }
+    lbl.textContent=(q.quoteNumber||q.key)+(q.customerName?' — '+q.customerName:'')+(distinguisher?' — '+distinguisher:'');
     var meta=document.createElement('div');
     meta.className='saved-meta';
     meta.textContent=q.savedAt||'';
