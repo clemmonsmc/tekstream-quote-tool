@@ -1886,52 +1886,7 @@ function renderCommissionPanel(){
   });
   h+='</tr>';
 
-  // Sub-line: the contract cost portion included in TekStream Cost above (display only, not subtracted again)
-  h+='<tr style="background:#fafbfc"><td style="padding:2px 12px 7px 26px;color:#717174;font-size:11px">of which contract cost</td>';
-  rows.forEach(function(r){
-    var cc=r.cost*(contractPct/100);
-    var k=commissionRowKey(r.label);
-    h+='<td id="cm_cc_'+k+'" style="text-align:right;padding:2px 12px 7px;color:#717174;font-size:11px">$'+fmt(cc)+'</td>';
-  });
-  h+='</tr>';
-
-  // Row 3: Services Rev Paid by Margin — text input with inputmode decimal (no spinners), no re-render on input
-  h+='<tr><td style="padding:7px 12px;color:#c00">Services Rev Paid by Margin</td>';
-  rows.forEach(function(r){
-    var sv=srv[r.label]||0;
-    var label=r.label.replace(/'/g,"\\'");
-    h+='<td style="text-align:right;padding:5px 8px">'
-      +'<input type="text" inputmode="decimal" value="'+(sv?fmtPlain(sv):'')+'" placeholder="0.00" '
-      +'style="width:100%;max-width:140px;text-align:right;color:#c00;font-size:12px;border:1px solid #d0d8e0;border-radius:4px;padding:4px 6px" '
-      +'oninput="updateServicesRev(\''+label+'\',this.value)" autocomplete="off">'
-      +'</td>';
-  });
-  h+='</tr>';
-
-  // Row 4: Total Margin (computed = invoiced - TekStream cost (incl contract cost) - servicesRev)
-  h+='<tr><td style="padding:7px 12px;font-weight:600;color:#131112">Total Margin</td>';
-  rows.forEach(function(r){
-    var sv=srv[r.label]||0;
-    var cc=r.cost*(contractPct/100);
-    var tm=(r.invoiced-r.cost)-sv-cc;
-    var color=tm>0?'#2d7a4f':tm<0?'#c00':'#131112';
-    var k=commissionRowKey(r.label);
-    h+='<td id="cm_tm_'+k+'" style="text-align:right;padding:7px 12px;font-weight:600;color:'+color+'">$'+fmt(tm)+'</td>';
-  });
-  h+='</tr>';
-
-  // Row 4b: Commissionable Margin (= invoiced - TekStream cost - contract cost; Services Rev NOT deducted)
-  h+='<tr><td style="padding:7px 12px;font-weight:600;color:#131112">Commissionable Margin</td>';
-  rows.forEach(function(r){
-    var cc=r.cost*(contractPct/100);
-    var cmm=(r.invoiced-r.cost)-cc;
-    var color=cmm>0?'#2d7a4f':cmm<0?'#c00':'#131112';
-    var k=commissionRowKey(r.label);
-    h+='<td id="cm_cm_'+k+'" style="text-align:right;padding:7px 12px;font-weight:600;color:'+color+'">$'+fmt(cmm)+'</td>';
-  });
-  h+='</tr>';
-
-  // Row 5: Contract Cost % (single editable col 1; read-only display in 2+)
+  // Row 3: Contract Cost % (single editable col 1; read-only display in 2+)
   h+='<tr style="background:#fafbfc"><td style="padding:7px 12px;color:#131112">Contract Cost %</td>';
   rows.forEach(function(r,i){
     if(i===0){
@@ -1943,6 +1898,26 @@ function renderCommissionPanel(){
     } else {
       h+='<td data-cm-contract-readonly style="text-align:right;padding:7px 12px;color:#717174">'+contractPct+'%</td>';
     }
+  });
+  h+='</tr>';
+
+  // Row 4: sub-line, the contract cost portion included in TekStream Cost above (display only, not subtracted again)
+  h+='<tr style="background:#fafbfc"><td style="padding:2px 12px 7px 26px;color:#717174;font-size:11px">of which contract cost</td>';
+  rows.forEach(function(r){
+    var cc=r.cost*(contractPct/100);
+    var k=commissionRowKey(r.label);
+    h+='<td id="cm_cc_'+k+'" style="text-align:right;padding:2px 12px 7px;color:#717174;font-size:11px">$'+fmt(cc)+'</td>';
+  });
+  h+='</tr>';
+
+  // Row 5: Commissionable Margin (= Row 1 - Row 2; TekStream Cost already includes contract cost)
+  h+='<tr><td style="padding:7px 12px;font-weight:600;color:#131112">Commissionable Margin</td>';
+  rows.forEach(function(r){
+    var cc=r.cost*(contractPct/100);
+    var cmm=(r.invoiced-r.cost)-cc;
+    var color=cmm>0?'#2d7a4f':cmm<0?'#c00':'#131112';
+    var k=commissionRowKey(r.label);
+    h+='<td id="cm_cm_'+k+'" style="text-align:right;padding:7px 12px;font-weight:600;color:'+color+'">$'+fmt(cmm)+'</td>';
   });
   h+='</tr>';
 
@@ -1961,7 +1936,7 @@ function renderCommissionPanel(){
   });
   h+='</tr>';
 
-  // Row 7: Total Est. Commission to AE (on Commissionable Margin; Services Rev not deducted)
+  // Row 7: Total Est. Commission to AE (= Row 5 x Row 6)
   h+='<tr style="background:#EBF3FB;color:#003658"><td style="padding:9px 12px;font-weight:700">Total Est. Commission to AE</td>';
   rows.forEach(function(r){
     var cc=r.cost*(contractPct/100);
@@ -1969,6 +1944,31 @@ function renderCommissionPanel(){
     var commission=cmm*(aeMult/100);
     var k=commissionRowKey(r.label);
     h+='<td id="cm_co_'+k+'" style="text-align:right;padding:9px 12px;font-weight:700">$'+fmt(commission)+'</td>';
+  });
+  h+='</tr>';
+
+  // Row 8: Services Rev Paid by Margin — text input with inputmode decimal (no spinners), no re-render on input
+  h+='<tr><td style="padding:7px 12px;color:#c00">Services Rev Paid by Margin</td>';
+  rows.forEach(function(r){
+    var sv=srv[r.label]||0;
+    var label=r.label.replace(/'/g,"\\'");
+    h+='<td style="text-align:right;padding:5px 8px">'
+      +'<input type="text" inputmode="decimal" value="'+(sv?fmtPlain(sv):'')+'" placeholder="0.00" '
+      +'style="width:100%;max-width:140px;text-align:right;color:#c00;font-size:12px;border:1px solid #d0d8e0;border-radius:4px;padding:4px 6px" '
+      +'oninput="updateServicesRev(\''+label+'\',this.value)" autocomplete="off">'
+      +'</td>';
+  });
+  h+='</tr>';
+
+  // Row 9: Net Gross Margin (= Commissionable Margin - Services Rev Paid by Margin)
+  h+='<tr><td style="padding:7px 12px;font-weight:600;color:#131112">Net Gross Margin</td>';
+  rows.forEach(function(r){
+    var sv=srv[r.label]||0;
+    var cc=r.cost*(contractPct/100);
+    var tm=(r.invoiced-r.cost)-sv-cc;
+    var color=tm>0?'#2d7a4f':tm<0?'#c00':'#131112';
+    var k=commissionRowKey(r.label);
+    h+='<td id="cm_tm_'+k+'" style="text-align:right;padding:7px 12px;font-weight:600;color:'+color+'">$'+fmt(tm)+'</td>';
   });
   h+='</tr>';
 
@@ -3102,46 +3102,50 @@ async function downloadMarginSummaryPdf(){
     }
     function fmtMoney(n){return '$'+fmt(n);}
     function moneyColor(n){return n>0?[45,122,79]:n<0?[192,0,0]:[19,17,18];}
-    // Row: Invoiced
-    drawRow('Invoiced (less sales tax)',
+    // Row order matches the on-screen margin table.
+    // 1. Invoiced
+    drawRow('Invoiced to customer (less sales tax)',
       pmts.map(function(p){return fmtMoney(p.invoiced);}).concat([fmtMoney(tot.invoiced)]),
       {alt:true});
-    // Row: TekStream Cost
-    drawRow('TekStream Cost (VAD)',
-      pmts.map(function(p){return fmtMoney(p.cost);}).concat([fmtMoney(tot.cost)]));
-    // Row: Services Rev
-    drawRow('Services Rev Paid by Margin',
-      pmts.map(function(p){return p.services?fmtMoney(p.services):'—';}).concat([tot.services?fmtMoney(tot.services):'—']),
-      {alt:true,color:[192,0,0]});
-    // Row: Contract Cost
-    drawRow('Contract Cost ('+contractPct+'%)',
+    // 2. TekStream Cost, including contract cost (as on screen)
+    drawRow('TekStream Cost (paid to VAD)',
+      pmts.map(function(p){return fmtMoney(p.cost+p.contractCost);}).concat([fmtMoney(tot.cost+tot.contractCost)]));
+    // 3. Contract Cost %
+    drawRow('Contract Cost %',
+      pmts.map(function(){return contractPct+'%';}).concat([contractPct+'%']),
+      {alt:true});
+    // 4. of which contract cost (portion of row 2, not subtracted again)
+    drawRow('    of which contract cost',
       pmts.map(function(p){return p.contractCost?fmtMoney(p.contractCost):'—';}).concat([tot.contractCost?fmtMoney(tot.contractCost):'—']),
-      {color:[192,0,0]});
-    // Row: Total Margin (emphasis)
-    drawRow('Total Margin',
-      pmts.map(function(p){return fmtMoney(p.totalMargin);}).concat([fmtMoney(tot.totalMargin)]),
-      {emphasis:true,bold:true,tall:true,color:moneyColor(tot.totalMargin)});
-    // Row: Commissionable Margin (basis for AE commission)
+      {color:[113,113,116]});
+    // 5. Commissionable Margin = 1 - 2
     drawRow('Commissionable Margin',
       pmts.map(function(p){return fmtMoney(p.commissionableMargin);}).concat([fmtMoney(tot.commissionableMargin)]),
-      {bold:true,color:moneyColor(tot.commissionableMargin)});
-    // Spacer
-    y+=8;
-    // Multiplier display
-    drawRow('AE Software Multiplier',
+      {bold:true,tall:true,color:moneyColor(tot.commissionableMargin)});
+    // 6. AE multiplier
+    drawRow('Current AE Software Multiplier',
       pmts.map(function(){return aeMult+'%';}).concat([aeMult+'%']),
       {alt:true});
-    // Final commission row
+    // 7. Commission = 5 x 6
     drawRow('Total Est. Commission to AE',
       pmts.map(function(p){return fmtMoney(p.commission);}).concat([fmtMoney(tot.commission)]),
       {emphasis:true,bold:true,tall:true,color:[0,54,88]});
+    y+=8;
+    // 8. Services Rev
+    drawRow('Services Rev Paid by Margin',
+      pmts.map(function(p){return p.services?fmtMoney(p.services):'—';}).concat([tot.services?fmtMoney(tot.services):'—']),
+      {color:[192,0,0]});
+    // 9. Net Gross Margin = 5 - 8
+    drawRow('Net Gross Margin',
+      pmts.map(function(p){return fmtMoney(p.totalMargin);}).concat([fmtMoney(tot.totalMargin)]),
+      {emphasis:true,bold:true,tall:true,color:moneyColor(tot.totalMargin)});
     // Footer notes
     y+=20;
     doc.setFont('helvetica','italic');doc.setFontSize(8);doc.setTextColor(113,113,116);
     var notes=[
-      'Total Margin = Invoiced \u2212 TekStream Cost \u2212 Services Rev \u2212 Contract Cost.',
-      'Commissionable Margin = Invoiced \u2212 TekStream Cost \u2212 Contract Cost (Services Rev not deducted).',
-      'Commission = Commissionable Margin \u00d7 AE Multiplier. Figures are estimates based on current quote state.',
+      'TekStream Cost includes contract cost. Commissionable Margin = Invoiced - TekStream Cost.',
+      'Commission = Commissionable Margin × AE Multiplier.',
+      'Net Gross Margin = Commissionable Margin - Services Rev Paid by Margin. Figures are estimates based on current quote state.',
       'For TekStream internal review only. Do not distribute externally.'
     ];
     notes.forEach(function(n){doc.text(n,L,y);y+=11;});
