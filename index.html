@@ -1434,12 +1434,19 @@ function fmtDateDisplay(d){
   return months[parseInt(parts[1],10)-1]+' '+parseInt(parts[2],10)+', '+parts[0];
 }
 function updateGroupDates(groupIdx,field,val){
-  // Update all line items in the group with new date
-  var groups=groupByYear(window.lineItems);
-  if(!groups||!groups[groupIdx])return;
-  groups[groupIdx].items.forEach(function(it){
-    var idx=window.lineItems.indexOf(it);
-    if(idx>=0)window.lineItems[idx][field]=val;
+  // Membership comes from the snapshot taken when the header was drawn, NOT from
+  // re-grouping. Grouping is keyed on the dates being edited, so re-deriving it
+  // mid-edit split the group: an undated row shown under Payment 1 got a start
+  // date but no end, stopped matching its neighbours, sorted first, and every
+  // later keystroke landed on it alone while the imported rows became Payment 2.
+  // Writing BOTH dates to every member keeps them on one key throughout.
+  var snap=window._renderGroups;
+  var grp=snap&&snap[groupIdx];
+  if(!grp)return;
+  if(field==='start_date')grp.start=val; else grp.end=val;
+  grp.items.forEach(function(it){
+    it.start_date=grp.start||'';
+    it.end_date=grp.end||'';
   });
   autoSave();
 }
@@ -1971,6 +1978,7 @@ function render(){
     +'<th style="text-align:right;cursor:pointer;user-select:none" onclick="cycleSort(\'cust\')" title="Click to sort">Customer Ext. $'+sortIndicator('cust')+'</th>'
     +'<th></th></tr></thead><tbody>';
   var h='',groups=groupByYear(window.lineItems);
+  window._renderGroups=groups; // stable membership for the header date inputs
   if(!groups){
     h+=tbl;applySort(window.lineItems).forEach(function(it){var i=window.lineItems.indexOf(it);h+=renderRow(it,i,m);});h+='</tbody></table>';
   } else {
