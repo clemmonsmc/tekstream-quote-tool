@@ -4,7 +4,8 @@
 // signature requests through Dropbox Sign, /api/extract bills the Anthropic
 // account. Neither may be callable without a signed-in TekStream user.
 //
-// Verifies the bearer token against Supabase's auth endpoint with plain fetch,
+// Verifies the bearer token against Supabase's auth endpoint, then checks the
+// caller's "quotes" grant, both with plain fetch,
 // so this file needs no dependencies. Returns true when the caller is allowed;
 // otherwise it has already written the response and the caller must return.
 
@@ -28,6 +29,22 @@ module.exports = async function requireUser(req, res) {
     const user = await r.json();
     const email = ((user && user.email) || '').toLowerCase();
     if (!email.endsWith(TS_DOMAIN)) {
+      res.status(403).json({ error: 'Forbidden' });
+      return false;
+    }
+    // A TekStream address is not enough: the caller also needs a "quotes" grant,
+    // the same grant the Quote page checks. Single sign-on means anyone signed in
+    // to any of the apps now holds a session that reaches this endpoint.
+    const g = await fetch(process.env.SUPABASE_URL + '/rest/v1/rpc/has_app_access', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + token,
+        apikey: process.env.SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ p_app: 'quotes' })
+    });
+    if (!g.ok || (await g.json()) !== true) {
       res.status(403).json({ error: 'Forbidden' });
       return false;
     }
