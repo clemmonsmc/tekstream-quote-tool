@@ -5,7 +5,42 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TekStream Quote Generator</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Shared sign-in. The same block sits in Hub, Quote and Pipeline; MAP and Expense
+     use the same library from npm with the same cookie settings. The Supabase session
+     lives in one cookie on .quotejockey.com, so a sign-in at the Hub is seen by every
+     app. Hub is the only sign-in page; the other apps send people there. -->
+<script type="module">
+import { createBrowserClient } from 'https://cdn.jsdelivr.net/npm/@supabase/ssr@0.5.2/+esm';
+const HUB = 'https://hub.quotejockey.com';
+const onSuite = /(^|\.)quotejockey\.com$/.test(location.hostname);
+const cookieOptions = onSuite
+  ? { domain: '.quotejockey.com', path: '/', sameSite: 'lax', secure: true }
+  : { path: '/', sameSite: 'lax', secure: location.protocol === 'https:' };
+// Sessions used to be kept per app in localStorage. Drop that stale copy.
+try { Object.keys(localStorage).forEach(k => { if (/^sb-.+-auth-token/.test(k)) localStorage.removeItem(k); }); } catch (e) {}
+window.TSAuth = {
+  HUB,
+  createClient: (url, key) => createBrowserClient(url, key, { cookieOptions }),
+  // Send the user to the Hub sign-in; the Hub returns them to this exact page.
+  toHub: () => location.replace(HUB + '/?next=' + encodeURIComponent(location.href)),
+};
+window.dispatchEvent(new Event('tsauth-ready'));
+</script>
+<script>
+// Classic scripts run before the module above, so app code waits on this.
+function _whenAuthReady(cb, onFail){
+  if (window.TSAuth) { cb(); return; }
+  var done = false;
+  window.addEventListener('tsauth-ready', function(){ if(!done){ done = true; cb(); } }, { once: true });
+  setTimeout(function(){ if(!done && !window.TSAuth){ done = true; if(onFail) onFail(); } }, 15000);
+}
+// Old vercel.app production addresses forward to the quotejockey.com address, where
+// the shared sign-in works. Preview deployments (other vercel.app names) are left alone.
+(function(){
+  var m = { 'tekstream-hub.vercel.app':'hub', 'tekstream-quotes.vercel.app':'quotes', 'tekstream-commission.vercel.app':'pipeline' }[location.hostname];
+  if (m) location.replace('https://' + m + '.quotejockey.com' + location.pathname + location.search + location.hash);
+})();
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;color:#13110F;font-size:14px}
@@ -85,12 +120,7 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
   <div style="background:#fff;border-radius:10px;padding:40px;width:340px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
     <div style="font-size:20px;font-weight:700;color:#003658">TekStream Quote Generator</div>
     <div id="authGateMsg" style="color:#717174;font-size:13px;margin:8px 0 22px">Checking sign-in...</div>
-    <div style="display:flex;align-items:center;gap:8px;margin:18px 0 12px;color:#bbb;font-size:10px;"><div style="flex:1;height:1px;background:#e8e8e0;"></div>OR<div style="flex:1;height:1px;background:#e8e8e0;"></div></div>
-    <input id="gateEmail" type="email" autocomplete="email" placeholder="you@tekstream.com" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d0d8e0;border-radius:7px;font-size:13px;margin-bottom:8px" onkeydown="if(event.key==='Enter')_signInEmail()">
-    <input id="gatePass" type="password" autocomplete="current-password" placeholder="Password" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d0d8e0;border-radius:7px;font-size:13px;margin-bottom:8px" onkeydown="if(event.key==='Enter')_signInPassword()">
-    <button class="btn" id="gatePwBtn" onclick="_signInPassword()" style="width:100%">Sign in</button>
-    <div style="display:flex;align-items:center;gap:8px;margin:16px 0 10px;color:#bbb;font-size:10px;"><div style="flex:1;height:1px;background:#e8e8e0;"></div>OR<div style="flex:1;height:1px;background:#e8e8e0;"></div></div>
-    <button class="btn" id="gateLinkBtn" onclick="_signInEmail()" style="width:100%;border:1px solid #003658;background:#fff;color:#003658">Email me a sign-in link</button>
+    <a id="authGateHub" href="https://hub.quotejockey.com" style="display:none;color:#5B94CB;font-size:13px">Back to TekStream Tools</a>
   </div>
 </div>
 <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
@@ -537,79 +567,38 @@ function _applySession(session){
   return false;
 }
 
+// Sign-in happens on the Hub only. With no session, go there; it sends the user
+// back here. A session without a "quotes" grant gets a no-access screen.
+function _noAccess(msg){
+  _showGate(msg);
+  var a=document.getElementById('authGateHub'); if(a) a.style.display='';
+}
 async function _sbInit(){
   try{
     var cfg = await fetch('/api/config').then(function(r){return r.json();});
     if(!cfg || !cfg.url || !cfg.anonKey){
       _showGate('Sign-in is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY.'); return;
     }
-    window._sb = window.supabase.createClient(cfg.url, cfg.anonKey);
+    window._sb = window.TSAuth.createClient(cfg.url, cfg.anonKey);
     try{ window.loadTaxRules(); }catch(e){}
-    window._sb.auth.onAuthStateChange(function(_evt, session){
-      if(session && session.user && !_applySession(session)){
-        window._sb.auth.signOut();
-        _showGate('Sign-in is limited to @'+_ALLOWED_DOMAIN+' accounts.');
-      }
+    window._sb.auth.onAuthStateChange(function(evt){
+      if(evt==='SIGNED_OUT'){ window._sbUser=null; window.TSAuth.toHub(); }
     });
     var sres = await window._sb.auth.getSession();
     var session = (sres && sres.data) ? sres.data.session : null;
-    if(!_applySession(session)){
-      if(session){ await window._sb.auth.signOut(); _showGate('Sign-in is limited to @'+_ALLOWED_DOMAIN+' accounts.'); }
-      else { _showGate('Sign in to continue.'); }
+    if(!session){ window.TSAuth.toHub(); return; }
+    var email=(session.user && session.user.email || '').toLowerCase();
+    if(!email.endsWith('@'+_ALLOWED_DOMAIN)){
+      await window._sb.auth.signOut(); window.TSAuth.toHub(); return;
     }
+    var g = await window._sb.rpc('has_app_access', { p_app:'quotes' });
+    if(!g || g.error || g.data!==true){
+      _noAccess('Your account ('+email+') does not have access to the Quote Generator. Ask Matt for access.'); return;
+    }
+    _applySession(session);
   }catch(e){ _showGate('Could not initialize sign-in. Try reloading.'); }
 }
 
-// Password sign-in. Google federates through Entra and returns an admin error we
-// cannot fix here; magic link depends on rate-limited built-in SMTP. Password is
-// the path that always works, so it is the primary control.
-function _signInPassword(){
-  if(!window._sb){ return; }
-  var el=document.getElementById('gateEmail');
-  var pel=document.getElementById('gatePass');
-  var msg=document.getElementById('authGateMsg');
-  var email=((el&&el.value)||'').trim().toLowerCase();
-  var password=(pel&&pel.value)||'';
-  if(!email){ if(msg)msg.textContent='Enter your email address.'; return; }
-  if(email.slice(-('@'+_ALLOWED_DOMAIN).length)!=='@'+_ALLOWED_DOMAIN){
-    if(msg)msg.textContent='Use a @'+_ALLOWED_DOMAIN+' address.'; return;
-  }
-  if(!password){ if(msg)msg.textContent='Enter your password.'; return; }
-  var btn=document.getElementById('gatePwBtn');
-  if(btn){ btn.disabled=true; btn.textContent='Signing in\u2026'; }
-  window._sb.auth.signInWithPassword({ email:email, password:password })
-  .then(function(r){
-    if(r&&r.error)throw r.error;
-    if(pel)pel.value='';
-  }).catch(function(e){
-    if(msg)msg.textContent=(e&&e.message)||'Sign-in failed.';
-    if(btn){ btn.disabled=false; btn.textContent='Sign in'; }
-  });
-}
-// Magic-link sign-in: bypasses Google (and the Entra block on the federated SSO app).
-// shouldCreateUser:false so a link only signs in an account that already exists.
-function _signInEmail(){
-  if(!window._sb){ return; }
-  var el=document.getElementById('gateEmail');
-  var email=((el&&el.value)||'').trim().toLowerCase();
-  var msg=document.getElementById('authGateMsg');
-  if(!email){ if(msg)msg.textContent='Enter your email address.'; return; }
-  if(email.slice(-('@'+_ALLOWED_DOMAIN).length)!=='@'+_ALLOWED_DOMAIN){
-    if(msg)msg.textContent='Use a @'+_ALLOWED_DOMAIN+' address.'; return;
-  }
-  var btn=document.getElementById('gateLinkBtn');
-  if(btn){ btn.disabled=true; btn.textContent='Sending\u2026'; }
-  window._sb.auth.signInWithOtp({ email:email,
-    options:{ emailRedirectTo: location.origin + location.pathname, shouldCreateUser:false } })
-  .then(function(r){
-    if(r&&r.error)throw r.error;
-    if(msg)msg.textContent='Check your email for the sign-in link. It can take a minute.';
-    if(btn)btn.textContent='Link sent';
-  }).catch(function(e){
-    if(msg)msg.textContent=(e&&e.message)||'Could not send the link.';
-    if(btn){ btn.disabled=false; btn.textContent='Email me a sign-in link'; }
-  });
-}
 // Sign-out lands on Hub rather than this app's own gate: the user is leaving, and
 // the front door is more useful than the login box of the thing they just closed.
 function _signOut(){
@@ -642,7 +631,7 @@ function _signOut(){
   // Auto-save on any form field change
   document.querySelector('.card').addEventListener('input', function(){ autoSave(); });
   initVadDrop();
-  _sbInit();
+  _whenAuthReady(_sbInit, function(){ _showGate('Could not load sign-in. Check your connection and reload.'); });
 })();
 
 
