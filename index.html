@@ -205,6 +205,7 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
   <span class="hdr-tag">VAD Quote Generator</span>
   <button class="btn" style="border:1.5px solid rgba(255,255,255,.4);background:transparent" onclick="openDrawer()">Saved Quotes</button>
   <button class="btn" style="border:1.5px solid rgba(255,255,255,.4);background:transparent" onclick="newQuote()">New Quote</button>
+  <button class="btn" style="border:1.5px solid rgba(255,255,255,.4);background:transparent" onclick="copyAsNewQuote()" title="Copy this quote under a new quote number">Copy as New</button>
   <button class="btn btn-sm" style="border:1.5px solid rgba(255,255,255,.4);background:transparent" onclick="_signOut()">Sign out</button>
 </div>
 <div class="wrap">
@@ -834,6 +835,33 @@ function ensureQuoteNumber(){
   }, function(e){ _qnPending = null; throw e; });
   return _qnPending;
 }
+// Run a pending autosave now instead of waiting out its delay.
+function flushAutoSave(){
+  var fn = window._autoSaveFn;
+  if(fn){ clearTimeout(_autoSaveTimer); fn(); }
+}
+
+// Copy as New: keep everything on the current quote, save the original as it stands,
+// then give the copy the next number and today's dates. The original is untouched.
+function copyAsNewQuote(){
+  if(_quoteIsBlank()){ alert('There is nothing to copy yet.'); return; }
+  flushAutoSave();
+  var from = document.getElementById('quoteNumber').value || 'this quote';
+  document.getElementById('quoteNumber').value = '';
+  window._fileSeq = null; window._currentQuoteKey = null;
+  var pf = document.getElementById('pdfFileName'); if(pf){ pf.value=''; delete pf.dataset.userEdited; }
+  var t = new Date().toISOString().split('T')[0], e = new Date(Date.now()+30*864e5).toISOString().split('T')[0];
+  document.getElementById('quoteDate').value = t;
+  document.getElementById('expiryDate').value = e;
+  document.getElementById('expiryDate').style.borderColor = '';
+  ensureQuoteNumber().then(function(n){
+    autoSave();
+    alert('Copied '+from+' as new quote '+n+'.');
+  }).catch(function(err){
+    alert('Could not assign a quote number: '+((err&&err.message)||'unknown error'));
+  });
+}
+
 function _quoteIsBlank(){
   var cn = (document.getElementById('customerName').value || '').trim();
   return !cn && !(window.lineItems && window.lineItems.length);
@@ -842,7 +870,8 @@ function _quoteIsBlank(){
 function autoSave() {
   if(window._suppressAutoSave)return;
   clearTimeout(_autoSaveTimer);
-  _autoSaveTimer = setTimeout(function() {
+  _autoSaveTimer = setTimeout(window._autoSaveFn = function() {
+    window._autoSaveFn = null;
     if(!document.getElementById('quoteNumber').value){
       // Nothing entered yet: do not save, and do not take a number.
       if(_quoteIsBlank()) return;
