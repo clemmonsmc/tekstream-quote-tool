@@ -225,7 +225,7 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
         <div class="field" style="margin:0"><label>Customer / company <button type="button" onclick="openCustDrawer()" style="float:right;font-size:11px;color:#5B94CB;background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">Lookup</button></label><input id="customerName" autocomplete="off" placeholder="ACME Corp" oninput="updatePdfFileName()" onchange="onCustomerNameChange()"></div>
         <div class="field" style="margin:0"><label>Contact name</label><input id="contactName" autocomplete="off"></div>
         <div class="field" style="margin:0"><label>Contact email</label><input id="contactEmail" autocomplete="off"><div id="contactPicker" style="margin-top:3px"></div></div>
-        <div class="field" style="margin:0"><label>Quote number</label><input id="quoteNumber" autocomplete="off" oninput="updatePdfFileName()"></div>
+        <div class="field" style="margin:0"><label>Quote number</label><input id="quoteNumber" autocomplete="off" readonly tabindex="-1" placeholder="Assigned on save" title="Assigned automatically from the team-wide sequence" style="background:#f0f2f5;color:#13110F;cursor:default"></div>
         <div class="field" style="margin:0"><label>Quote date</label><input id="quoteDate" type="date" onchange="updatePdfFileName();autoSave()"></div>
         <div class="field" style="margin:0"><label>Expiration date</label><input id="expiryDate" type="date" oninput="checkExpiry(this)"></div>
         <div class="field" style="margin:0">
@@ -609,6 +609,17 @@ function _signOut(){
   });
 }
 
+// Exports print the quote number, so make sure one is assigned first.
+['downloadPdf','previewPdf','generatePdfBlob','generatePoPdfBlob','downloadPoPdf','downloadMarginSummaryPdf','openSignModal','confirmSendForSignature']
+.forEach(function(name){
+  var orig = window[name]; if(typeof orig !== 'function') return;
+  window[name] = async function(){
+    try{ await ensureQuoteNumber(); }
+    catch(e){ alert('Could not assign a quote number: '+((e&&e.message)||'unknown error')); return; }
+    return orig.apply(this, arguments);
+  };
+});
+
 (function init() {
   fetch('/api/logo').then(function(r){return r.arrayBuffer();}).then(function(buf){
     var b=new Uint8Array(buf),s='';b.forEach(function(x){s+=String.fromCharCode(x);});
@@ -624,7 +635,7 @@ function _signOut(){
   var exp=new Date(Date.now()+30*864e5).toISOString().split('T')[0];
   document.getElementById('quoteDate').value=today;
   document.getElementById('expiryDate').value=exp;
-  document.getElementById('quoteNumber').value='TS-'+new Date().getFullYear()+'-'+(Math.floor(Math.random()*900)+100);
+  document.getElementById('quoteNumber').value=''; // assigned from the sequence on first save or export
   loadRepSettings();
   renderSavedQuotes();
   updatePdfFileName();
@@ -805,10 +816,40 @@ function itemCprice(it,globalM){return cprice(it.unit_price,effectiveMargin(it,g
 
 // ── Auto-save ─────────────────────────────────────────────────────────────
 var _autoSaveTimer = null;
+// Quote numbers come from one team-wide sequence in the database (next_quote_number),
+// so two people can never issue the same number. A number is taken the first time a
+// quote is saved or exported, not when the page opens, so abandoned blank quotes do not
+// use one up. The field is read-only; saved quotes keep the number they were given.
+var _qnPending = null;
+function ensureQuoteNumber(){
+  var el = document.getElementById('quoteNumber');
+  if(el.value) return Promise.resolve(el.value);
+  if(_qnPending) return _qnPending;
+  if(!window._sb) return Promise.reject(new Error('Not signed in.'));
+  _qnPending = window._sb.rpc('next_quote_number').then(function(r){
+    _qnPending = null;
+    if(!r || r.error || !r.data) throw new Error((r && r.error && r.error.message) || 'No quote number was returned.');
+    if(!el.value){ el.value = r.data; updatePdfFileName(); }
+    return el.value;
+  }, function(e){ _qnPending = null; throw e; });
+  return _qnPending;
+}
+function _quoteIsBlank(){
+  var cn = (document.getElementById('customerName').value || '').trim();
+  return !cn && !(window.lineItems && window.lineItems.length);
+}
+
 function autoSave() {
   if(window._suppressAutoSave)return;
   clearTimeout(_autoSaveTimer);
   _autoSaveTimer = setTimeout(function() {
+    if(!document.getElementById('quoteNumber').value){
+      // Nothing entered yet: do not save, and do not take a number.
+      if(_quoteIsBlank()) return;
+      ensureQuoteNumber().then(function(){ autoSave(); })
+        .catch(function(e){ console.warn('Quote number not assigned:', e && e.message); });
+      return;
+    }
     var state = getQuoteState();
     var key = state.quoteNumber || ('q' + Date.now());
     var saved = JSON.parse(localStorage.getItem('ts_saved_quotes') || '[]');
@@ -1208,6 +1249,15 @@ function restoreQuoteState(s){
   loadRepSettings();
 }
 function saveQuote(){
+  var btn=(window.event&&window.event.target)||null;
+  if(!document.getElementById('quoteNumber').value){
+    ensureQuoteNumber().then(function(){ _saveQuoteNow(btn); })
+      .catch(function(e){ alert('Could not assign a quote number: '+((e&&e.message)||'unknown error')); });
+    return;
+  }
+  _saveQuoteNow(btn);
+}
+function _saveQuoteNow(btn){
   var state=getQuoteState();
   var key=state.quoteNumber||('q'+Date.now());
   var saved=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
@@ -1216,8 +1266,8 @@ function saveQuote(){
   if(saved.length>20)saved=saved.slice(0,20);
   _writeSaved(saved);
   renderSavedQuotes();
-  var btn=event.target,orig=btn.textContent;
-  btn.textContent='✓ Saved';setTimeout(function(){btn.textContent=orig;},1500);
+  if(btn){ var orig=btn.textContent;
+    btn.textContent='✓ Saved';setTimeout(function(){btn.textContent=orig;},1500); }
 }
 function loadQuote(key){
   var saved=JSON.parse(localStorage.getItem('ts_saved_quotes')||'[]');
@@ -2073,7 +2123,7 @@ function newQuote(){
   document.getElementById('marginPct').value='15';
   document.getElementById('marginHint').textContent='15% margin applied';
   document.getElementById('marginDollar').textContent='';
-  document.getElementById('quoteNumber').value='TS-'+new Date().getFullYear()+'-'+(Math.floor(Math.random()*900)+100);
+  document.getElementById('quoteNumber').value=''; // assigned from the sequence on first save or export
   var t=new Date().toISOString().split('T')[0],e=new Date(Date.now()+30*864e5).toISOString().split('T')[0];
   document.getElementById('quoteDate').value=t;document.getElementById('expiryDate').value=e;
   document.getElementById('expiryDate').style.borderColor='';
