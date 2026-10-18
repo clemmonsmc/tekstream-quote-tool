@@ -274,7 +274,7 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
         </div>
         <div class="field" style="margin:0"><label>Customer ZIP</label><div style="display:flex;gap:4px;align-items:center"><input id="customerZip" autocomplete="off" placeholder="30060" maxlength="5" style="width:72px"><button type="button" class="btn" style="padding:4px 8px;font-size:12px" onclick="lookupTaxRate()">Look up</button></div><div id="taxLookupStatus" style="font-size:10px;color:#717174;margin-top:2px"></div></div>
         <div class="field" style="margin:0"><label>State</label><input id="customerState" autocomplete="off" placeholder="GA" maxlength="2" style="text-transform:uppercase" oninput="recalcAll()"></div>
-        <div class="field" style="margin:0"><label>Tax rate %</label><input id="taxRate" type="number" step="any" min="0" autocomplete="off" placeholder="—" oninput="recalcAll()"></div>
+        <div class="field" style="margin:0"><label>Tax rate %</label><input id="taxRate" type="number" step="any" min="0" autocomplete="off" placeholder="—" oninput="recalcAll()"><div id="taxRateNote" style="font-size:10px;color:#2d7a4f;margin-top:2px"></div></div>
         <div class="field" style="margin:0">
           <label style="cursor:pointer"><input type="checkbox" id="taxExempt" style="vertical-align:middle;margin-right:4px" onchange="recalcAll()">Tax exempt (certificate on file)</label>
           <div style="font-size:10px;color:#717174;margin-top:2px">Public Sector / Non-Profit default exempt. Rate lookup + tax math added next.</div>
@@ -427,6 +427,44 @@ window.lineTax = function(it, rate){
   if(rule.m==='multiplier') return ext*rate*(rule.mult||1); // TX: 0.80 x rate
   return ext*rate;                           // standard SaaS-taxable state
 };
+// Rate actually applied to SaaS lines once the state rule is taken into account
+// (CT fixed 1%, TX 80% of the looked-up rate, exempt states 0). Shown on screen and
+// on PDFs so the customer sees the rate behind the tax figure, not the base rate.
+window.effectiveSaasRate = function(){
+  if(window.quoteIsExempt()) return null;
+  var base=window.quoteTaxRate();
+  var st=window.quoteState();
+  var rule=window.taxRuleFor(st);
+  if(!rule) return {rate:base, note:''};
+  if(rule.m==='exempt') return {rate:0, note:'SaaS not taxed in '+st};
+  if(rule.m==='notax') return {rate:0, note:st+' has no state sales tax'};
+  if(rule.m==='fixed') return {rate:rule.rate||0, note:st+' fixed rate for business use'};
+  if(rule.m==='multiplier') return {rate:base*(rule.mult||1), note:Math.round((rule.mult||1)*100)+'% of '+_pct(base)};
+  return {rate:base, note:''};
+};
+// Two decimals minimum, three when the rate needs it (8.875%), so rate x amount matches the tax.
+function _pct(r){ var v=(Math.round(r*100000)/1000).toFixed(3); if(v.slice(-1)==='0') v=v.slice(0,-1); return v+'%'; }
+// Tax line label for a set of items. Adds "on $X" only when part of the items is
+// untaxed, so the rate times the amount shown always equals the tax printed.
+window.taxLabel = function(items){
+  if(window.quoteIsExempt()) return 'Sales Tax (exempt)';
+  var eff=window.effectiveSaasRate(); var rate=window.quoteTaxRate();
+  var m=parseFloat(document.getElementById('marginPct').value)||0;
+  var sub=0, taxable=0, tax=0;
+  (items||[]).forEach(function(it){
+    var ext=itemCprice(it,m)*(it.qty||0); sub+=ext;
+    var t=window.lineTax(it,rate); if(t>0){ taxable+=ext; tax+=t; }
+  });
+  if(!eff || tax<=0) return 'Sales Tax';
+  var label='Sales Tax ('+_pct(eff.rate);
+  if(Math.abs(taxable-sub)>0.005) label+=' on $'+fmt(taxable);
+  return label+')';
+};
+window.updateTaxRateNote = function(){
+  var el=document.getElementById('taxRateNote'); if(!el) return;
+  var eff=window.effectiveSaasRate();
+  el.textContent=(eff && eff.note) ? ('Applied to SaaS: '+_pct(eff.rate)+' ('+eff.note+')') : '';
+};
 // Per-payment-group {label, subtotal, tax, total}. Mirrors groupByYear grouping.
 window.computeTaxByGroup = function(){
   var m=parseFloat(document.getElementById('marginPct').value)||0;
@@ -435,7 +473,7 @@ window.computeTaxByGroup = function(){
   function rowFor(label, items){
     var sub=0, tax=0;
     items.forEach(function(it){ sub+=itemCprice(it,m)*(it.qty||0); tax+=window.lineTax(it,rate); });
-    return {label:label, subtotal:sub, tax:tax, total:sub+tax};
+    return {label:label, items:items, subtotal:sub, tax:tax, total:sub+tax};
   }
   if(!groups){ return [rowFor('Total', window.lineItems)]; }
   return groups.map(function(g){ return rowFor(g.label, g.items); });
@@ -1774,6 +1812,7 @@ function applySetTotal(){
 }
 
 window.renderTotalsBox = function(sub){
+  if(window.updateTaxRateNote) window.updateTaxRateNote();
   var el=document.getElementById('totals'); if(!el) return;
   var rate=window.quoteTaxRate(), exempt=window.quoteIsExempt();
   // No tax context yet (no rate and not explicitly exempt) -> plain total, unchanged behavior.
@@ -1790,7 +1829,7 @@ window.renderTotalsBox = function(sub){
       html+='<div class="trow" style="font-weight:600;color:#003658;margin-top:4px"><span>'+g.label+'</span><span></span></div>';
     }
     html+='<div class="trow"><span style="color:#717174">Subtotal</span><span>$'+fmt(g.subtotal)+'</span></div>';
-    html+='<div class="trow"><span style="color:#717174">Sales tax'+(exempt?' (exempt)':'')+'</span><span>$'+fmt(g.tax)+'</span></div>';
+    html+='<div class="trow"><span style="color:#717174">'+escH(window.taxLabel(g.items||[]))+'</span><span>$'+fmt(g.tax)+'</span></div>';
     html+='<div class="trow"><span>'+(multi?g.label+' total':'Total')+'</span><span>$'+fmt(g.total)+'</span></div>';
   });
   if(multi){
@@ -2348,7 +2387,7 @@ async function generatePdfBlob(){
   newPageIfNeeded(80);
   y+=6;doc.setDrawColor(91,148,203);doc.setLineWidth(0.5);doc.line(R-190,y,R,y);y+=14;
   doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);
-  if(window.quoteHasTaxContext()){var _tt=0;window.lineItems.forEach(function(it){_tt+=window.lineTax(it,window.quoteTaxRate());});doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(60,60,60);doc.text('Subtotal',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});y+=14;doc.text('Sales Tax'+(window.quoteIsExempt()?' (exempt)':''),R-186,y);doc.text('$'+fmt(_tt),R-4,y,{align:'right'});y+=15;doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal+_tt),R-4,y,{align:'right'});}else{doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});}
+  if(window.quoteHasTaxContext()){var _tt=0;window.lineItems.forEach(function(it){_tt+=window.lineTax(it,window.quoteTaxRate());});doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(60,60,60);doc.text('Subtotal',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});y+=14;(function(){var _tl=window.taxLabel(window.lineItems);doc.text(_tl,_tl.length>18?R-280:R-186,y);})();doc.text('$'+fmt(_tt),R-4,y,{align:'right'});y+=15;doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal+_tt),R-4,y,{align:'right'});}else{doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});}
   y+=28;doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(113,113,116);
   doc.text('Payment terms: '+tm+(pdfGroups?'  |  Invoiced annually':''),L,y);y+=12;
   doc.text('This quote is valid through the expiration date above. All prices are in USD.',L,y);y+=12;
@@ -2469,7 +2508,7 @@ async function previewPdf(){
   newPageIfNeeded(80);
   y+=6;doc.setDrawColor(91,148,203);doc.setLineWidth(0.5);doc.line(R-190,y,R,y);y+=14;
   doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);
-  if(window.quoteHasTaxContext()){var _tt=0;window.lineItems.forEach(function(it){_tt+=window.lineTax(it,window.quoteTaxRate());});doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(60,60,60);doc.text('Subtotal',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});y+=14;doc.text('Sales Tax'+(window.quoteIsExempt()?' (exempt)':''),R-186,y);doc.text('$'+fmt(_tt),R-4,y,{align:'right'});y+=15;doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal+_tt),R-4,y,{align:'right'});}else{doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});}
+  if(window.quoteHasTaxContext()){var _tt=0;window.lineItems.forEach(function(it){_tt+=window.lineTax(it,window.quoteTaxRate());});doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(60,60,60);doc.text('Subtotal',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});y+=14;(function(){var _tl=window.taxLabel(window.lineItems);doc.text(_tl,_tl.length>18?R-280:R-186,y);})();doc.text('$'+fmt(_tt),R-4,y,{align:'right'});y+=15;doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal+_tt),R-4,y,{align:'right'});}else{doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});}
   y+=28;doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(113,113,116);
   doc.text('Payment terms: '+tm+(pdfGroups?'  |  Invoiced annually':''),L,y);y+=12;
   doc.text('This quote is valid through the expiration date above. All prices are in USD.',L,y);y+=12;
@@ -2588,7 +2627,7 @@ async function previewPdf(){
   newPageIfNeeded(80);
   y+=6;doc.setDrawColor(91,148,203);doc.setLineWidth(0.5);doc.line(R-190,y,R,y);y+=14;
   doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);
-  if(window.quoteHasTaxContext()){var _tt=0;window.lineItems.forEach(function(it){_tt+=window.lineTax(it,window.quoteTaxRate());});doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(60,60,60);doc.text('Subtotal',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});y+=14;doc.text('Sales Tax'+(window.quoteIsExempt()?' (exempt)':''),R-186,y);doc.text('$'+fmt(_tt),R-4,y,{align:'right'});y+=15;doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal+_tt),R-4,y,{align:'right'});}else{doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});}
+  if(window.quoteHasTaxContext()){var _tt=0;window.lineItems.forEach(function(it){_tt+=window.lineTax(it,window.quoteTaxRate());});doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(60,60,60);doc.text('Subtotal',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});y+=14;(function(){var _tl=window.taxLabel(window.lineItems);doc.text(_tl,_tl.length>18?R-280:R-186,y);})();doc.text('$'+fmt(_tt),R-4,y,{align:'right'});y+=15;doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal+_tt),R-4,y,{align:'right'});}else{doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});}
   y+=28;doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(113,113,116);
   doc.text('Payment terms: '+tm+(pdfGroups?'  |  Invoiced annually':''),L,y);y+=12;
   doc.text('This quote is valid through the expiration date above. All prices are in USD.',L,y);y+=12;
@@ -2720,7 +2759,7 @@ async function downloadPdf(){
   newPageIfNeeded(80);
   y+=6;doc.setDrawColor(91,148,203);doc.setLineWidth(0.5);doc.line(R-190,y,R,y);y+=14;
   doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);
-  if(window.quoteHasTaxContext()){var _tt=0;window.lineItems.forEach(function(it){_tt+=window.lineTax(it,window.quoteTaxRate());});doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(60,60,60);doc.text('Subtotal',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});y+=14;doc.text('Sales Tax'+(window.quoteIsExempt()?' (exempt)':''),R-186,y);doc.text('$'+fmt(_tt),R-4,y,{align:'right'});y+=15;doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal+_tt),R-4,y,{align:'right'});}else{doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});}
+  if(window.quoteHasTaxContext()){var _tt=0;window.lineItems.forEach(function(it){_tt+=window.lineTax(it,window.quoteTaxRate());});doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(60,60,60);doc.text('Subtotal',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});y+=14;(function(){var _tl=window.taxLabel(window.lineItems);doc.text(_tl,_tl.length>18?R-280:R-186,y);})();doc.text('$'+fmt(_tt),R-4,y,{align:'right'});y+=15;doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal+_tt),R-4,y,{align:'right'});}else{doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});}
   y+=28;doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(113,113,116);
   doc.text('Payment terms: '+tm+(pdfGroups?'  |  Invoiced annually':''),L,y);y+=12;
   doc.text('This quote is valid through the expiration date above. All prices are in USD.',L,y);y+=12;
@@ -2781,7 +2820,7 @@ async function previewPdf(){
   var pdfGroups=groupByYear(window.lineItems);var jsPDF=window.jspdf.jsPDF;var m=parseFloat(document.getElementById('marginPct').value)||0;var cn=document.getElementById('customerName').value||'Customer';var co=document.getElementById('contactName').value||'';var ce=document.getElementById('contactEmail').value||'';var qn=document.getElementById('quoteNumber').value||'TS-QUOTE';var qd=document.getElementById('quoteDate').value;var ed=document.getElementById('expiryDate').value;var nt=document.getElementById('notes').value;var tm=document.getElementById('terms').value||'Net 30';var pb=document.getElementById('preparedBy').value||'';var pbc=document.getElementById('preparedByCompany').value||'TekStream';var pbe=document.getElementById('preparedByEmail').value||'';var logoSrc=window.logoDataUrl||'';var doc=new jsPDF({unit:'pt',format:'letter'});var W=612,L=48,R=564;doc.setFillColor(0,54,88);doc.rect(0,0,W,68,'F');if(logoSrc&&logoSrc.startsWith('data:')){try{var li=new Image();await new Promise(function(res,rej){li.onload=res;li.onerror=rej;li.src=logoSrc;});doc.addImage(logoSrc,'PNG',L,11,li.naturalWidth*(46/li.naturalHeight),46);}catch(e){doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(255,255,255);doc.text('TekStream',L,36);}}doc.setFillColor(91,148,203);doc.rect(0,68,W,5,'F');doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);doc.text('Quote #  '+qn,R,28,{align:'right'});doc.setFont('helvetica','normal');doc.text('Date:  '+qd,R,42,{align:'right'});doc.text('Expires:  '+ed,R,56,{align:'right'});doc.setFont('helvetica','bold');doc.setFontSize(22);doc.setTextColor(0,54,88);doc.text('Quote',L,108);doc.setFillColor(235,243,251);doc.roundedRect(L,118,210,70,3,3,'F');doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(91,148,203);doc.text('PREPARED FOR',L+10,133);doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(0,54,88);doc.text(cn,L+10,149);doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(113,113,116);if(co)doc.text(co,L+10,161);if(ce)doc.text(ce,L+10,173);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(91,148,203);doc.text('PREPARED BY',R-200,133);doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(0,54,88);doc.text(pbc,R-200,149);doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(113,113,116);if(pb)doc.text(pb,R-200,161);if(pbe)doc.text(pbe,R-200,173);var y=210;if(nt){doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(60,60,60);var lines=doc.splitTextToSize(nt,R-L);doc.text(lines,L,y);y+=lines.length*13+14;}var skuW=(R-L)*0.13,dateW=50,qtyW=30,priceW=62,extW=70,descW=(R-L)-skuW-qtyW-priceW-extW-10,colSku=L+4,colDesc=L+skuW+4,colQty=colDesc+descW+2,colPr=colQty+qtyW+4,colEx=R-4;function newPageIfNeeded(n){if(y+n>692){doc.addPage();y=48;}}function drawColHeaders(){doc.setFillColor(0,54,88);doc.rect(L,y,R-L,20,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(255,255,255);doc.text('SKU',colSku,y+14);doc.text('Description',colDesc,y+14);doc.text('Qty',colQty+qtyW,y+14,{align:'right'});doc.text('Unit Price',colPr+priceW,y+14,{align:'right'});doc.text('Extended',colEx,y+14,{align:'right'});y+=20;}var subtotal=0;function renderPdfRow(it,idx,alt){var cp=itemCprice(it,m),ext=cp*it.qty;subtotal+=ext;var skuL=doc.splitTextToSize(it.sku||'',skuW-4),descL=doc.splitTextToSize(it.description||'',descW-4),nL=Math.max(skuL.length,descL.length,1),rowH=nL*11+10;newPageIfNeeded(rowH);if(alt){doc.setFillColor(235,243,251);doc.rect(L,y,R-L,rowH,'F');}doc.setFont('helvetica','normal');doc.setTextColor(19,17,18);doc.setFontSize(8.5);doc.text(skuL,colSku,y+9);doc.text(descL,colDesc,y+9);var mid=y+rowH/2+3;doc.text(it.qty.toLocaleString(),colQty+qtyW,mid,{align:'right'});doc.text(cp>0?'$'+fmt(cp):'—',colPr+priceW,mid,{align:'right'});doc.text(ext>0?'$'+fmt(ext):'—',colEx,mid,{align:'right'});y+=rowH;}if(!pdfGroups){drawColHeaders();window.lineItems.forEach(function(it,i){renderPdfRow(it,i,i%2===1);});}else{pdfGroups.forEach(function(grp){newPageIfNeeded(36);doc.setFillColor(91,148,203);doc.rect(L,y,R-L,16,'F');
       doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);
       var pdfGrpLabel=grp.label+(grp.start||grp.end?'  |  Service Dates: '+fmtDateDisplay(grp.start)+(grp.end?' \u2013 '+fmtDateDisplay(grp.end):''):'');
-      doc.text(pdfGrpLabel,L+6,y+11);y+=16;drawColHeaders();var prev=subtotal;grp.items.forEach(function(it,i){renderPdfRow(it,i,i%2===1);});var gs=subtotal-prev;newPageIfNeeded(20);doc.setFillColor(235,243,251);doc.rect(L,y,R-L,14,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(0,54,88);doc.text(grp.label+' Subtotal',colPr+priceW,y+10,{align:'right'});doc.text('$'+fmt(gs),colEx,y+10,{align:'right'});y+=18;if(window.quoteHasTaxContext()){var _gt=window.pdfGroupTax(grp.items);newPageIfNeeded(28);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(60,60,60);doc.text('Sales Tax'+(window.quoteIsExempt()?' (exempt)':''),colPr+priceW,y+9,{align:'right'});doc.text('$'+fmt(_gt),colEx,y+9,{align:'right'});y+=13;doc.setFont('helvetica','bold');doc.setTextColor(0,54,88);doc.text(grp.label+' Total',colPr+priceW,y+9,{align:'right'});doc.text('$'+fmt(gs+_gt),colEx,y+9,{align:'right'});y+=16;}});}newPageIfNeeded(80);y+=6;doc.setDrawColor(91,148,203);doc.setLineWidth(0.5);doc.line(R-190,y,R,y);y+=14;doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);if(window.quoteHasTaxContext()){var _tt=0;window.lineItems.forEach(function(it){_tt+=window.lineTax(it,window.quoteTaxRate());});doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(60,60,60);doc.text('Subtotal',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});y+=14;doc.text('Sales Tax'+(window.quoteIsExempt()?' (exempt)':''),R-186,y);doc.text('$'+fmt(_tt),R-4,y,{align:'right'});y+=15;doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal+_tt),R-4,y,{align:'right'});}else{doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});}y+=28;doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(113,113,116);doc.text('Payment terms: '+tm+(pdfGroups?'  |  Invoiced annually':''),L,y);y+=12;doc.text('This quote is valid through the expiration date above. All prices are in USD.',L,y);y+=12;doc.text('Quote subject to change without notice.',L,y);doc.setFillColor(0,54,88);doc.rect(0,748,W,6,'F');doc.setFillColor(91,148,203);doc.rect(0,754,W,14,'F');doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(255,255,255);doc.text('Copyright © TekStream Solutions, LLC 2026 | tekstream.com | Confidential',W/2,763,{align:'center'});
+      doc.text(pdfGrpLabel,L+6,y+11);y+=16;drawColHeaders();var prev=subtotal;grp.items.forEach(function(it,i){renderPdfRow(it,i,i%2===1);});var gs=subtotal-prev;newPageIfNeeded(20);doc.setFillColor(235,243,251);doc.rect(L,y,R-L,14,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(0,54,88);doc.text(grp.label+' Subtotal',colPr+priceW,y+10,{align:'right'});doc.text('$'+fmt(gs),colEx,y+10,{align:'right'});y+=18;if(window.quoteHasTaxContext()){var _gt=window.pdfGroupTax(grp.items);newPageIfNeeded(28);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(60,60,60);doc.text('Sales Tax'+(window.quoteIsExempt()?' (exempt)':''),colPr+priceW,y+9,{align:'right'});doc.text('$'+fmt(_gt),colEx,y+9,{align:'right'});y+=13;doc.setFont('helvetica','bold');doc.setTextColor(0,54,88);doc.text(grp.label+' Total',colPr+priceW,y+9,{align:'right'});doc.text('$'+fmt(gs+_gt),colEx,y+9,{align:'right'});y+=16;}});}newPageIfNeeded(80);y+=6;doc.setDrawColor(91,148,203);doc.setLineWidth(0.5);doc.line(R-190,y,R,y);y+=14;doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);if(window.quoteHasTaxContext()){var _tt=0;window.lineItems.forEach(function(it){_tt+=window.lineTax(it,window.quoteTaxRate());});doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(60,60,60);doc.text('Subtotal',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});y+=14;(function(){var _tl=window.taxLabel(window.lineItems);doc.text(_tl,_tl.length>18?R-280:R-186,y);})();doc.text('$'+fmt(_tt),R-4,y,{align:'right'});y+=15;doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(0,54,88);doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal+_tt),R-4,y,{align:'right'});}else{doc.text('Total (USD)',R-186,y);doc.text('$'+fmt(subtotal),R-4,y,{align:'right'});}y+=28;doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(113,113,116);doc.text('Payment terms: '+tm+(pdfGroups?'  |  Invoiced annually':''),L,y);y+=12;doc.text('This quote is valid through the expiration date above. All prices are in USD.',L,y);y+=12;doc.text('Quote subject to change without notice.',L,y);doc.setFillColor(0,54,88);doc.rect(0,748,W,6,'F');doc.setFillColor(91,148,203);doc.rect(0,754,W,14,'F');doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(255,255,255);doc.text('Copyright © TekStream Solutions, LLC 2026 | tekstream.com | Confidential',W/2,763,{align:'center'});
   // Open in new tab instead of downloading
 
   
