@@ -2232,8 +2232,9 @@ async function extractVAD(file){
   try{
     var b64=await new Promise(function(res,rej){var r=new FileReader();r.onload=function(e){res(e.target.result.split(',')[1]);};r.onerror=rej;r.readAsDataURL(file);});
     var resp=await fetch('/api/extract',{method:'POST',headers:await _apiHeaders(),body:JSON.stringify({fileBase64:b64,fileType:file.type,fileName:file.name})});
-    if(!resp.ok){var e=await resp.json();throw new Error(e.error||resp.status);}
-    var parsed=await resp.json();
+    var raw=await resp.text(),parsed;
+    try{parsed=JSON.parse(raw);}catch(_){throw new Error(resp.ok?'Unreadable reply from the server':('Server error '+resp.status+': '+raw.slice(0,120)));}
+    if(!resp.ok)throw new Error(parsed.error||resp.status);
     if(parsed.to)document.getElementById('preparedByCompany').value=parsed.to.company||'';
     if(parsed.for){document.getElementById('customerName').value=parsed.for.company||'';document.getElementById('contactName').value=parsed.for.name||'';document.getElementById('contactEmail').value=parsed.for.email||'';}
     // Item 11: Populate Ship To fields if the extractor returned them

@@ -165,6 +165,15 @@ function parseQualys(text) {
 const requireUser = require('./_auth');
 
 module.exports = async function handler(req, res) {
+  try {
+    return await handle(req, res);
+  } catch (e) {
+    console.error('extract failed:', e);
+    if (!res.headersSent) return res.status(500).json({ error: 'Extraction failed: ' + (e && e.message ? e.message : String(e)) });
+  }
+};
+
+async function handle(req, res) {
   res.setHeader('Access-Control-Allow-Origin', 'null');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -233,71 +242,66 @@ module.exports = async function handler(req, res) {
     return extractViaAI(res,null,txt,vad);
   }
 
-  // PDF path — check for Qualys before sending to AI
-  return extractViaAI(res,data,null,'',true);
+  // PDF path: read the text here (free) and send text, not the PDF, to the AI.
+  // A PDF sent as a document costs page images plus text; text alone is a fraction.
+  let pdfText = '';
+  try { pdfText = await pdfToText(data); } catch (e) { console.warn('PDF text read failed, sending PDF:', e.message); }
+  const usable = pdfText.replace(/\s+/g, '').length >= 200;   // scanned PDFs have little or no text
+
+  if (usable && /qualys/i.test(pdfText)) return extractQualys(res, data);
+  if (usable) return extractViaAI(res, null, pdfText, '');
+  return extractViaAI(res, data, null, '');
 }
 
-async function extractViaAI(res,pdf,txt,vad,checkQualys=false){
-  const key=process.env.ANTHROPIC_API_KEY;
-  if(!key)return res.status(500).json({error:'No API key'});
+async function pdfToText(base64) {
+  const { extractText, getDocumentProxy } = await import('unpdf');
+  const pdf = await getDocumentProxy(new Uint8Array(Buffer.from(base64, 'base64')));
+  const { text } = await extractText(pdf, { mergePages: false });
+  return (Array.isArray(text) ? text : [text]).map((t, i) => `--- Page ${i + 1} ---\n${t}`).join('\n');
+}
 
-  // For Qualys PDFs, extract text first and route to structured parser
-  if(checkQualys&&pdf){
-    // Use AI to extract raw text, detect Qualys, then parse structurally
-    const detectRes=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
-      body:JSON.stringify({
-        model:'claude-opus-4-6',max_tokens:100,
-        system:'Detect if this is a Qualys quote. Reply with only "QUALYS" or "OTHER".',
-        messages:[{role:'user',content:[
-          {type:'document',source:{type:'base64',media_type:'application/pdf',data:pdf}},
-          {type:'text',text:'Is this a Qualys Inc quotation? Reply QUALYS or OTHER only.'}
-        ]}]
-      })
-    });
-    const detectData=await detectRes.json();
-    const detectText=(detectData.content||[]).map(c=>c.text||'').join('').trim().toUpperCase();
+async function callClaude(body) {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) { const e = new Error('No API key'); e.status = 500; throw e; }
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify(body),
+  });
+  const d = await r.json().catch(() => ({ error: { message: 'AI returned a non-JSON reply (HTTP ' + r.status + ')' } }));
+  if (d.error) throw new Error(d.error.message || 'AI error');
+  if (d.stop_reason === 'max_tokens') throw new Error('Quote too large to extract in one pass (the AI reply was cut off).');
+  return (d.content || []).map(c => c.text || '').join('');
+}
 
-    if(detectText.includes('QUALYS')){
-      // Extract full text then parse structurally
-      const textRes=await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
-        body:JSON.stringify({
-          model:'claude-opus-4-6',max_tokens:4000,
-          system:'Extract all text from this PDF exactly as it appears, preserving line breaks and structure. Include all numbers, labels, and values.',
-          messages:[{role:'user',content:[
-            {type:'document',source:{type:'base64',media_type:'application/pdf',data:pdf}},
-            {type:'text',text:'Extract all text content preserving structure and line breaks.'}
-          ]}]
-        })
-      });
-      const textData=await textRes.json();
-      const extractedText=(textData.content||[]).map(c=>c.text||'').join('');
-      const result=parseQualys(extractedText);
-      if(result.lineItems&&result.lineItems.length>0){
-        return res.status(200).json(result);
-      }
-      // Fall through to AI if structural parse got nothing
-    }
-  }
+// Qualys quotes need the PDF's line layout for the structural parser, so these
+// still go to the AI as a PDF (one call; detection is done from the text above).
+async function extractQualys(res, pdf) {
+  const extractedText = await callClaude({
+    model: 'claude-opus-4-6', max_tokens: 16000,
+    system: 'Extract all text from this PDF exactly as it appears, preserving line breaks and structure. Include all numbers, labels, and values.',
+    messages: [{ role: 'user', content: [
+      { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdf } },
+      { type: 'text', text: 'Extract all text content preserving structure and line breaks.' },
+    ] }],
+  });
+  const result = parseQualys(extractedText);
+  if (result.lineItems && result.lineItems.length > 0) return res.status(200).json(result);
+  // Structural parse found nothing: fall back to normal extraction on the text.
+  return extractViaAI(res, null, extractedText, 'Qualys');
+}
 
+async function extractViaAI(res,pdf,txt,vad){
   const instr='Return ONLY this JSON (no commentary):\n{"vad":"","quote_expire_date":"","to":{"company":"","name":"","email":""},"for":{"company":"","name":"","email":""},"ship_to":{"address":"","city_state_zip":"","phone":""},"header_start_date":"","header_end_date":"","lineItems":[{"sku":"","description":"","qty":1,"unit_price":0,"start_date":"","end_date":""}]}\nRules:\n- to=reseller/TekStream, for=end customer\n- ship_to=end customer\'s shipping address from the quote. Often labeled "Ship To", "Ship-To", "Sold To", "End User", "End Customer", "Bill To" (if different from TekStream), or appears in the customer contact block. address=street address only (one line), city_state_zip="City, ST ZIP" combined, phone=primary phone if shown. Leave each field empty string if not present. Do NOT confuse with TekStream\'s address.\n- vad=name of the distributor/VAD issuing this quote. One of: "Arrow", "TD Synnex", "Carahsoft", or "" if not clearly one of those three. Look for company name, logo references, "Quote from", letterhead, or footer text.\n- unit_price=distributor/net price per UNIT (divide total by qty)\n- All dates YYYY-MM-DD\n- quote_expire_date=quote validity/expiry from header if present else ""\n- header_start_date/header_end_date=document-level start/end dates else ""\n- Exclude discount lines\n- Line item dates: use line-level if present, else header dates, else leave ""';
   const content=pdf
     ?[{type:'document',source:{type:'base64',media_type:'application/pdf',data:pdf}},{type:'text',text:instr}]
     :[{type:'text',text:instr+'\n\n'+txt}];
-  const r=await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
-    body:JSON.stringify({model:'claude-opus-4-6',max_tokens:2000,system:'Extract VAD distributor quote data. Return ONLY valid JSON, no commentary.',messages:[{role:'user',content}]})
-  });
-  const d=await r.json();
-  if(d.error)return res.status(500).json({error:d.error.message});
-  const t=(d.content||[]).map(c=>c.text||'').join('');
+  const t=await callClaude({model:'claude-opus-4-6',max_tokens:16000,system:'Extract VAD distributor quote data. Return ONLY valid JSON, no commentary.',messages:[{role:'user',content}]});
   const s=t.indexOf('{'),e=t.lastIndexOf('}');
   if(s===-1)return res.status(500).json({error:'No JSON in response'});
-  const result=JSON.parse(t.slice(s,e+1));
+  let result;
+  try { result=JSON.parse(t.slice(s,e+1)); }
+  catch(err){ return res.status(500).json({error:'The AI reply was not valid JSON. Try again.'}); }
   // Use upstream vad (from text scan) if present, else trust AI's detection
   if(vad)result.vad=vad;
   else if(result.vad){
