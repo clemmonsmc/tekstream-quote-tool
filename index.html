@@ -108,6 +108,16 @@ td input.cust-price{-moz-appearance:textfield}
 .modal-row label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5B94CB}
 .modal-row span{font-size:14px;color:#13110F;font-weight:500}
 .modal-row span.sub{font-size:12px;color:#717174;font-weight:400}
+.modal.sfdc-modal{max-width:1120px}
+.sfdc-grid{display:grid;grid-template-columns:1.3fr 1fr 1.2fr;gap:12px}
+.sfdc-table{width:100%;border-collapse:collapse;font-size:12px}
+.sfdc-table th{background:#EBF3FB;color:#003658;text-align:left;padding:6px 8px;font-weight:700;white-space:nowrap}
+.sfdc-table td{padding:5px 8px;border-bottom:1px solid #e6ecf2;white-space:nowrap;vertical-align:middle}
+.sfdc-table td.num{text-align:right}
+.sfdc-table input{width:100%;font-size:12px;padding:4px 6px;border:1px solid #d0d8e0;border-radius:4px}
+.sfdc-table td.name{white-space:normal;min-width:300px}
+.sfdc-pill{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.04em}
+.sfdc-pill.created{background:#e3f4e9;color:#2d7a4f}.sfdc-pill.pending{background:#fff4de;color:#9a6200}.sfdc-pill.new{background:#EBF3FB;color:#0079C2}
 .modal-btns{display:flex;gap:10px;margin-top:24px}
 .modal-btns button{flex:1;padding:11px;border-radius:7px;font-size:14px;font-weight:600;cursor:pointer;border:none}
 .modal-cancel{background:#f0f2f5;color:#717174}.modal-cancel:hover{background:#e2e8f0}
@@ -204,6 +214,40 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
     <div class="modal-btns">
       <button class="modal-cancel" onclick="closeDeleteQuoteModal()">Cancel</button>
       <button class="modal-confirm" style="background:#c33;" onmouseover="this.style.background='#a02525'" onmouseout="this.style.background='#c33'" id="deleteQuoteConfirmBtn" onclick="confirmDeleteSavedQuote()">Delete</button>
+    </div>
+  </div>
+</div>
+<!-- Push to Salesforce: one opportunity per payment group. The app computes and stages the
+     rows in quote_sfdc_opps (status pending); a Claude session with the sf-opps skill does the
+     Salesforce Classic data entry and writes the opportunity IDs back. -->
+<div class="modal-overlay" id="sfdcModal">
+  <div class="modal sfdc-modal">
+    <h3>Push to Salesforce</h3>
+    <p>One opportunity per payment. Review, confirm, then finish in Claude.</p>
+    <div class="sfdc-grid">
+      <div class="modal-row" style="margin:0">
+        <label>Salesforce Account ID <span id="sfdcAcctHint" class="sub"></span></label>
+        <input id="sfdcAccountId" placeholder="001... (15 or 18 chars)" autocomplete="off" style="font-size:13px;padding:6px 8px;border:1px solid #d0d8e0;border-radius:5px">
+        <span class="sub" id="sfdcAcctCust"></span>
+      </div>
+      <div class="modal-row" style="margin:0">
+        <label>Stage (Payment 1; later payments inherit)</label>
+        <input id="sfdcStage" list="sfdcStageList" placeholder="exact Salesforce stage name" autocomplete="off" style="font-size:13px;padding:6px 8px;border:1px solid #d0d8e0;border-radius:5px">
+        <datalist id="sfdcStageList"></datalist>
+      </div>
+      <div class="modal-row" style="margin:0">
+        <label>Amount basis</label>
+        <select id="sfdcAmountBasis" onchange="renderSfdcRows()" style="font-size:13px;padding:6px 8px;border:1px solid #d0d8e0;border-radius:5px">
+          <option value="gross">Gross margin (invoiced minus VAD cost)</option>
+          <option value="cmm">Commissionable margin (also less contract cost)</option>
+        </select>
+      </div>
+    </div>
+    <div style="overflow-x:auto;margin-top:14px"><table class="sfdc-table" id="sfdcTable"></table></div>
+    <p id="sfdcStatus" style="margin:12px 0 0;font-size:12px;color:#717174"></p>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeSfdcModal()">Cancel</button>
+      <button class="modal-confirm" style="background:#0079C2" id="sfdcConfirmBtn" onclick="confirmSfdcPush()">Stage &amp; open Claude</button>
     </div>
   </div>
 </div>
@@ -342,6 +386,7 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
       <button class="btn dl-btn" style="background:#2d7a4f;display:none" id="signBtn" onclick="sendForSignature()">Send for Signature &#9998;</button>
       <button class="btn dl-btn" style="background:#8a4a9f" onclick="downloadPoPdf()" title="Generate TekStream PO for the VAD">Generate PO &#8595;</button>
       <button class="btn dl-btn" id="marginSummaryBtn" style="background:#003658" onclick="downloadMarginSummaryPdf()" title="Download internal Margin &amp; Commission summary (not for customer)">Margin Summary &#8595;</button>
+      <button class="btn dl-btn" id="sfdcBtn" style="background:#0079C2" onclick="openSfdcModal()" title="Stage one Salesforce opportunity per payment, then hand off to Claude to create them">Push to Salesforce &#8594;</button>
     </div>
     <p style="font-size:11px;color:#717174;margin-top:8px;text-align:center">Email Quote downloads the PDF &#8212; attach it to the Outlook email before sending.</p>
   </div>
@@ -1013,7 +1058,7 @@ async function loadCustomers(){
   if(!window._sb || !window._sbUser) return;
   try{
     var res = await window._sb.from('quote_customers')
-      .select('id,name,norm_name,aliases,contacts,ship_address,ship_city_state_zip,ship_phone,customer_type,customer_zip,customer_state,tax_rate,tax_exempt')
+      .select('id,name,norm_name,aliases,contacts,ship_address,ship_city_state_zip,ship_phone,customer_type,customer_zip,customer_state,tax_rate,tax_exempt,sfdc_account_id')
       .order('name');
     if(res.error) throw res.error;
     window.customers = res.data || [];
@@ -2309,6 +2354,149 @@ async function extractVAD(file){
   }catch(e){document.getElementById('extractStatus').textContent='Error: '+e.message;}
 }
 window.loadLineItems=function(items){window.lineItems=items.map(function(it,idx){return{sku:String(it.sku||''),description:String(it.description||''),qty:parseFloat(it.qty)||1,unit_price:parseFloat(String(it.unit_price||'0').replace(/[$,]/g,''))||0,start_date:String(it.start_date||''),end_date:String(it.end_date||''),margin:null,is_saas:window.detectSaas({sku:it.sku,description:it.description}),originalIndex:idx};});window.sortState={col:null,dir:0};render();};
+
+// ── Push to Salesforce ───────────────────────────────────────────────────
+// Rules (Matt, Nov 2026): one opp per payment group (same grouping as the PDF and the
+// Margin & Commission panel). Close date = quote expiry for Payment 1, service start for
+// later payments. Stage = Payment 1 stage for every payment. Amount = TekStream margin.
+// Original Start Date and Original End Date both = service start. Type = new vendor for
+// Payment 1, existing vendor for the rest. Undated lines fold into Payment 1 (groupByYear).
+var SFDC_PAYMENT_KEY_NONE='__none__';
+var SFDC_SKILL_PROMPT='Push quote {Q} to Salesforce using the sf-opps skill.';
+window._sfdcExisting={};
+function sfdcBuildPayments(){
+  var m=parseFloat(document.getElementById('marginPct').value)||0;
+  var contractPct=(window.commissionState&&typeof window.commissionState.contractCostPct==='number')?window.commissionState.contractCostPct:0;
+  var groups=groupByYear(window.lineItems)||[];
+  var expiry=document.getElementById('expiryDate').value||'';
+  var cust=(document.getElementById('customerName').value||'').trim();
+  var vendor=(document.getElementById('vendorName')||{}).value||'';
+  var label=((document.getElementById('quoteLabel')||{}).value||'').trim();
+  var n=groups.length;
+  return groups.map(function(grp,i){
+    var gross=grp.items.reduce(function(s,it){return s+itemCprice(it,m)*(it.qty||0);},0);
+    var cost=grp.items.reduce(function(s,it){return s+(it.unit_price||0)*(it.qty||0);},0);
+    var gm=gross-cost, cmm=gm-cost*(contractPct/100);
+    var key=grp.start?(grp.start+'|'+(grp.end||'')):SFDC_PAYMENT_KEY_NONE;
+    // Name: the quote label is what distinguishes quotes on one opportunity; fall back to
+    // the first dated line's description so the name still says what was sold.
+    var subject=label||((grp.items[0]&&grp.items[0].description)||vendor||'').replace(/\s+/g,' ').trim().slice(0,60);
+    var name=[cust,subject].filter(Boolean).join(' - ')+' - Payment '+(i+1)+' of '+n;
+    return {key:key,no:i+1,count:n,start:grp.start||'',end:grp.end||'',
+      close:i===0?expiry:(grp.start||expiry),gross:gross,gm:gm,cmm:cmm,
+      type:i===0?'New Vendor':'Existing Vendor',name:name};
+  });
+}
+function openSfdcModal(){
+  if(!window.lineItems||!window.lineItems.length){alert('Add line items first.');return;}
+  var qn=document.getElementById('quoteNumber').value;
+  if(!qn){alert('Save the quote first so it has a quote number.');return;}
+  if(!window._sb||!window._sbUser){alert('Sign in first.');return;}
+  var cust=(document.getElementById('customerName').value||'').trim();
+  var c=findCustomer(cust);
+  document.getElementById('sfdcAccountId').value=(c&&c.sfdc_account_id)||'';
+  document.getElementById('sfdcAcctCust').textContent=cust||'(no customer name)';
+  document.getElementById('sfdcAcctHint').textContent=(c&&c.sfdc_account_id)?'from customer directory':'not mapped yet; saved to the directory on confirm';
+  document.getElementById('sfdcStage').value=localStorage.getItem('ts_sfdc_last_stage')||'';
+  var dl=document.getElementById('sfdcStageList'); dl.innerHTML='';
+  JSON.parse(localStorage.getItem('ts_sfdc_stages')||'[]').forEach(function(st){var o=document.createElement('option');o.value=st;dl.appendChild(o);});
+  document.getElementById('sfdcStatus').textContent='';
+  window._sfdcPayments=sfdcBuildPayments();
+  window._sfdcExisting={};
+  renderSfdcRows();
+  document.getElementById('sfdcModal').classList.add('open');
+  window._sb.from('quote_sfdc_opps').select('*').eq('quote_number',qn).then(function(r){
+    if(r.error){console.warn('sfdc rows load failed:',r.error.message);return;}
+    (r.data||[]).forEach(function(row){window._sfdcExisting[row.payment_key]=row;});
+    var anyStage=(r.data||[]).find(function(x){return x.stage;});
+    if(anyStage&&!document.getElementById('sfdcStage').value)document.getElementById('sfdcStage').value=anyStage.stage;
+    renderSfdcRows();
+  });
+}
+function closeSfdcModal(){document.getElementById('sfdcModal').classList.remove('open');}
+function sfdcAmount(p){return document.getElementById('sfdcAmountBasis').value==='cmm'?p.cmm:p.gm;}
+function sfdcNameEdit(i,v){if(window._sfdcPayments&&window._sfdcPayments[i])window._sfdcPayments[i].name=v;}
+function sfdcCloseEdit(i,v){if(window._sfdcPayments&&window._sfdcPayments[i])window._sfdcPayments[i].close=v;}
+function renderSfdcRows(){
+  var ps=window._sfdcPayments||[]; var t=document.getElementById('sfdcTable');
+  var h='<thead><tr><th>#</th><th>Opportunity name</th><th>Close date</th><th>Service start</th><th>Service end</th><th style="text-align:right">Invoiced</th><th style="text-align:right">Amount</th><th>Type</th><th>Status</th></tr></thead><tbody>';
+  ps.forEach(function(p,i){
+    var ex=window._sfdcExisting[p.key];
+    var pill=ex?(ex.status==='created'||ex.status==='updated'?'<span class="sfdc-pill created">in SF</span>':'<span class="sfdc-pill pending">'+escH(ex.status)+'</span>'):'<span class="sfdc-pill new">new</span>';
+    if(ex&&ex.sfdc_opp_id)pill+=' <a href="https://tekstream.my.salesforce.com/'+escH(ex.sfdc_opp_id)+'" target="_blank" style="font-size:11px">open</a>';
+    h+='<tr><td>'+p.no+'</td>'
+      +'<td class="name"><input value="'+escH(p.name)+'" oninput="sfdcNameEdit('+i+',this.value)"></td>'
+      +'<td><input type="date" value="'+escH(p.close)+'" oninput="sfdcCloseEdit('+i+',this.value)" style="width:140px"></td>'
+      +'<td>'+escH(p.start||'—')+'</td><td>'+escH(p.end||'—')+'</td>'
+      +'<td class="num">$'+fmt(p.gross)+'</td><td class="num" style="font-weight:700">$'+fmt(sfdcAmount(p))+'</td>'
+      +'<td>'+escH(p.type)+'</td><td>'+pill+'</td></tr>';
+  });
+  var tot=ps.reduce(function(s,p){return s+sfdcAmount(p);},0), gtot=ps.reduce(function(s,p){return s+p.gross;},0);
+  h+='</tbody><tfoot><tr><td></td><td style="font-weight:700">Total</td><td></td><td></td><td></td><td class="num" style="font-weight:700">$'+fmt(gtot)+'</td><td class="num" style="font-weight:700">$'+fmt(tot)+'</td><td></td><td></td></tr></tfoot>';
+  t.innerHTML=h;
+}
+async function confirmSfdcPush(){
+  var btn=document.getElementById('sfdcConfirmBtn'), st=document.getElementById('sfdcStatus');
+  var qn=document.getElementById('quoteNumber').value;
+  var acct=(document.getElementById('sfdcAccountId').value||'').trim();
+  var stage=(document.getElementById('sfdcStage').value||'').trim();
+  var ps=window._sfdcPayments||[];
+  if(!/^001[A-Za-z0-9]{12}([A-Za-z0-9]{3})?$/.test(acct)){st.textContent='Enter a valid Salesforce Account ID (starts with 001).';return;}
+  if(!stage){st.textContent='Enter the Payment 1 stage.';return;}
+  if(ps.some(function(p){return !p.close;})){st.textContent='Every payment needs a close date (set the quote expiration date).';return;}
+  if(ps.some(function(p){return !p.name.trim();})){st.textContent='Every payment needs an opportunity name.';return;}
+  btn.disabled=true; st.textContent='Staging…';
+  try{
+    // Remember stage choices for next time
+    localStorage.setItem('ts_sfdc_last_stage',stage);
+    var stages=JSON.parse(localStorage.getItem('ts_sfdc_stages')||'[]'); if(stages.indexOf(stage)<0){stages.push(stage);localStorage.setItem('ts_sfdc_stages',JSON.stringify(stages));}
+    // Persist the account mapping to the customer directory
+    var custName=(document.getElementById('customerName').value||'').trim();
+    var c=findCustomer(custName);
+    if(c&&c.sfdc_account_id!==acct){
+      var up=await window._sb.from('quote_customers').update({sfdc_account_id:acct}).eq('id',c.id);
+      if(up.error)throw new Error('customer directory: '+up.error.message);
+      c.sfdc_account_id=acct;
+    }else if(!c&&custName){
+      var ins=await window._sb.from('quote_customers').insert({name:custName,norm_name:_normCust(custName),sfdc_account_id:acct});
+      if(ins.error)throw new Error('customer directory: '+ins.error.message);
+      loadCustomers();
+    }
+    // Resolve the Supabase quote id (optional; rows are keyed on quote_number)
+    var qid=null;
+    try{var qr=await window._sb.from('quotes').select('id').eq('owner_id',window._sbUser.id).eq('key',window._currentQuoteKey||qn).maybeSingle(); qid=(qr.data&&qr.data.id)||null;}catch(e){}
+    var vendor=(document.getElementById('vendorName')||{}).value||'';
+    var rows=[], skipped=0;
+    ps.forEach(function(p){
+      var ex=window._sfdcExisting[p.key], amt=Math.round(sfdcAmount(p)*100)/100;
+      var same=ex&&(ex.status==='created'||ex.status==='updated')&&ex.sfdc_opp_id
+        &&Number(ex.amount)===amt&&ex.close_date===p.close&&ex.stage===stage&&ex.opp_name===p.name&&ex.sfdc_account_id===acct;
+      if(same){skipped++;return;}
+      rows.push({quote_id:qid,quote_number:qn,payment_key:p.key,payment_no:p.no,payment_count:p.count,
+        opp_name:p.name,sfdc_account_id:acct,close_date:p.close,service_start:p.start||null,service_end:p.end||null,
+        amount:amt,gross:Math.round(p.gross*100)/100,gross_margin:Math.round(p.gm*100)/100,stage:stage,opp_type:p.type,
+        customer_name:custName,vendor_name:vendor,status:'pending',error:null,
+        sfdc_opp_id:(ex&&ex.sfdc_opp_id)||null,requested_by:window._sbUser.id,requested_at:new Date().toISOString()});
+    });
+    if(rows.length){
+      var res=await window._sb.from('quote_sfdc_opps').upsert(rows,{onConflict:'quote_number,payment_key'});
+      if(res.error)throw new Error(res.error.message);
+    }
+    // Remove staged rows for payment groups that no longer exist on the quote
+    var liveKeys=ps.map(function(p){return p.key;});
+    var stale=Object.keys(window._sfdcExisting).filter(function(k){return liveKeys.indexOf(k)<0&&window._sfdcExisting[k].status==='pending';});
+    if(stale.length)await window._sb.from('quote_sfdc_opps').delete().eq('quote_number',qn).in('payment_key',stale);
+    var prompt=SFDC_SKILL_PROMPT.replace('{Q}',qn);
+    try{await navigator.clipboard.writeText(prompt);}catch(e){}
+    st.textContent=rows.length+' payment'+(rows.length===1?'':'s')+' staged'+(skipped?', '+skipped+' already in Salesforce and unchanged':'')+'. Prompt copied to clipboard; paste it into a chat in the TekStream Admin project if the Claude tab does not pick it up.';
+    window.open('https://claude.ai/new?q='+encodeURIComponent(prompt),'_blank');
+    btn.textContent='Staged ✓';
+  }catch(e){
+    st.textContent='Failed: '+((e&&e.message)||'unknown error');
+  }finally{
+    btn.disabled=false; setTimeout(function(){btn.textContent='Stage & open Claude';},2500);
+  }
+}
 
 function openSignModal(){
   var customerEmail=document.getElementById('contactEmail').value;
