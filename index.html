@@ -66,6 +66,13 @@ table{width:100%;border-collapse:collapse;font-size:12px}
 th{background:#003658;color:#fff;padding:9px 8px;text-align:left;font-weight:600;font-size:11px}
 td{padding:5px 3px;border-bottom:1px solid #f0f2f5;vertical-align:middle}
 tr:nth-child(even) td{background:#EBF3FB}
+/* Payment footer rows: fixed colors so they never blend with the alternating line-item rows */
+tr.pay-sub td{background:#CFE0F1;border-top:2px solid #5B94CB}
+tr.pay-tax td{background:#fff;color:#717174;font-size:11px}
+tr.pay-total td{background:#fff;border-top:2px solid #5B94CB;color:#003658;font-weight:700;font-size:13px}
+.totals-panel{background:#003658;color:#fff;border-radius:8px;padding:10px 16px;margin:6px 0 0 auto;width:fit-content;min-width:320px}
+.totals-panel .trow.grand{color:#fff}
+.totals-panel .trow.sub{color:#B9D3EC;font-size:11px}
 td input{border:1.5px solid #e2e8f0;border-radius:4px;padding:4px 5px;font-size:12px;width:100%;background:#fff}
 td input:focus{border-color:#5B94CB;outline:none}td input[type=date]{font-size:11px}td input[type=number]{text-align:right}
 td input.cust-price::-webkit-inner-spin-button,td input.cust-price::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
@@ -1831,8 +1838,8 @@ window.renderTotalsBox = function(sub){
     html+='<div class="trow"><span>'+(multi?g.label+' total':'Total')+'</span><span>$'+fmt(g.total)+'</span></div>';
   });
   if(multi){
-    html+='<div class="trow grand" style="margin-top:6px;padding-top:4px"><span>All payments (USD)</span><span>$'+fmt(totSub+totTax)+'</span></div>';
-    html+='<div class="trow" style="font-size:11px;color:#717174"><span>incl. sales tax</span><span>$'+fmt(totTax)+'</span></div>';
+    html+='<div class="totals-panel"><div class="trow grand"><span>All payments (USD)</span><span>$'+fmt(totSub+totTax)+'</span></div>';
+    html+='<div class="trow sub"><span>incl. sales tax</span><span>$'+fmt(totTax)+'</span></div></div>';
   }
   el.innerHTML=html;
 };
@@ -1986,7 +1993,7 @@ function renderCommissionPanel(){
 
   var showTot=rows.length>1, nCols=rows.length+(showTot?1:0);
   var T=commissionTotals(rows,srv,contractPct,aeMult);
-  var TS='background:#EBF3FB;border-left:1px solid #d0d8e0;';
+  var TS='font-weight:700;';
   function totCell(id,text,style){return showTot?'<td id="'+id+'" style="'+TS+'text-align:right;padding:7px 12px;'+(style||'')+'">'+text+'</td>':'';}
   var h='<div style="margin-top:18px;border:1px solid #d0d8e0;border-radius:8px;overflow:hidden">';
   h+='<div style="background:#003658;color:#fff;padding:10px 14px;font-size:13px;font-weight:700;letter-spacing:.04em">Margin &amp; Commission Detail</div>';
@@ -1998,13 +2005,13 @@ function renderCommissionPanel(){
   h+='<thead><tr style="background:#EBF3FB;color:#003658">';
   h+='<th style="text-align:left;padding:7px 12px;font-weight:700">Metric</th>';
   rows.forEach(function(r){h+='<th style="text-align:right;padding:7px 12px;font-weight:700">'+escH(r.label)+'</th>';});
-  if(showTot)h+='<th style="text-align:right;padding:7px 12px;font-weight:700;border-left:1px solid #d0d8e0">Total</th>';
+  if(showTot)h+='<th style="text-align:right;padding:7px 12px;font-weight:700">Total</th>';
   h+='</tr></thead><tbody>';
 
   // Row 1: Invoiced
   h+='<tr><td style="padding:7px 12px;color:#131112">Invoiced to customer (less sales tax)</td>';
   rows.forEach(function(r){h+='<td style="text-align:right;padding:7px 12px">$'+fmt(r.invoiced)+'</td>';});
-  h+=totCell('cm_inv_total','$'+fmt(T.invoiced),'font-weight:600')+'</tr>';
+  h+=totCell('cm_inv_total','$'+fmt(T.invoiced))+'</tr>';
 
   // Row 2: TekStream Cost
   h+='<tr style="background:#fafbfc"><td style="padding:7px 12px;color:#131112">TekStream Cost (paid to VAD)</td>';
@@ -2012,7 +2019,7 @@ function renderCommissionPanel(){
     var k=commissionRowKey(r.label);
     h+='<td id="cm_tc_'+k+'" style="text-align:right;padding:7px 12px">$'+fmt(r.cost+r.cost*(contractPct/100))+'</td>';
   });
-  h+=totCell('cm_tc_total','$'+fmt(T.tekCost),'font-weight:600')+'</tr>';
+  h+=totCell('cm_tc_total','$'+fmt(T.tekCost))+'</tr>';
 
   // Row 3: Contract Cost % (single editable col 1; read-only display in 2+)
   h+='<tr style="background:#fafbfc"><td style="padding:7px 12px;color:#131112">Contract Cost %</td>';
@@ -2075,7 +2082,7 @@ function renderCommissionPanel(){
     var k=commissionRowKey(r.label);
     h+='<td id="cm_co_'+k+'" style="text-align:right;padding:9px 12px;font-weight:700">$'+fmt(commission)+'</td>';
   });
-  h+=totCell('cm_co_total','$'+fmt(T.commission),'padding:9px 12px;font-weight:700;background:#d6e6f5')+'</tr>';
+  h+=totCell('cm_co_total','$'+fmt(T.commission),'padding:9px 12px')+'</tr>';
 
   // Row 8: Services Rev Paid by Margin — text input with inputmode decimal (no spinners), no re-render on input
   h+='<tr><td style="padding:7px 12px;color:#c00">Services Rev Paid by Margin</td>';
@@ -2150,7 +2157,7 @@ function render(){
       });
       var mColor=marginTotal>0?'#2d7a4f':marginTotal<0?'#c00':'#717174';
       var mStr=marginTotal!==0?(marginTotal<0?'-':'')+fmt(Math.abs(marginTotal)):'';
-      h+='<tr style="background:#EBF3FB">';
+      h+='<tr class="pay-sub">';
       h+='<td colspan="3" style="padding-left:8px;font-size:12px;font-weight:700;color:#003658">Subtotals</td>';
       h+='<td></td>';
       h+='<td></td>';
@@ -2163,10 +2170,10 @@ function render(){
       // Each payment's sales tax and total sit under its own table (multi-payment quotes).
       if(groups.length>1 && window.quoteHasTaxContext()){
         var gTax=window.pdfGroupTax(grp.items);
-        h+='<tr style="background:#EBF3FB"><td colspan="9" style="font-size:12px;color:#717174;padding:4px 8px;text-align:right">'+escH(window.taxLabel(grp.items))+'</td>'
-          +'<td style="font-size:12px;color:#003658;padding:4px 4px;text-align:right">'+fmt(gTax)+'</td><td></td></tr>';
-        h+='<tr style="background:#EBF3FB"><td colspan="9" style="font-size:12px;font-weight:700;color:#003658;padding:4px 8px;text-align:right">'+escH(grp.label)+' total</td>'
-          +'<td style="font-size:12px;font-weight:700;color:#003658;padding:4px 4px;text-align:right">'+fmt(gt+gTax)+'</td><td></td></tr>';
+        h+='<tr class="pay-tax"><td colspan="9" style="padding:4px 8px;text-align:right">'+escH(window.taxLabel(grp.items))+'</td>'
+          +'<td style="padding:4px 4px;text-align:right">'+fmt(gTax)+'</td><td></td></tr>';
+        h+='<tr class="pay-total"><td colspan="9" style="padding:6px 8px;text-align:right">'+escH(grp.label)+' total</td>'
+          +'<td style="padding:6px 4px;text-align:right">'+fmt(gt+gTax)+'</td><td></td></tr>';
       }
       h+='</tbody></table>';
     });
