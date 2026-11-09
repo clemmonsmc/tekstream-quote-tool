@@ -300,8 +300,9 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
         </div>
         <div class="field" style="margin:0"><label>Personalized note</label><textarea id="notes" autocomplete="off" placeholder="Thank you for the opportunity..." style="min-height:52px"></textarea></div>
         <div class="field" style="margin:0"><label>Payment terms</label><input id="terms" autocomplete="off" value="Net 30"></div>
-        <div class="field" id="vehicleTermsWrap" style="margin:0;grid-column:1/-1;display:none"><label>Governing agreement text <span id="vehicleTermsFlag" style="color:#717174;font-weight:400;font-size:11px">(replaces standard T&amp;C 1-15)</span></label><textarea id="vehicleTerms" autocomplete="off" style="min-height:80px" oninput="onVehicleTermsInput()"></textarea><div id="vehicleBlockMsg" style="display:none;color:#A32D2D;font-size:11px;margin-top:4px"></div></div>
+        <div class="field" id="vehicleTermsWrap" style="margin:0;grid-column:1/-1;display:none"><label>Governing agreement text <span id="vehicleTermsFlag" style="color:#717174;font-weight:400;font-size:11px">(replaces standard T&amp;C 1-15)</span></label><textarea id="vehicleTerms" autocomplete="off" style="min-height:80px" oninput="onVehicleTermsInput()"></textarea><div id="vehicleBlockMsg" style="display:none;color:#A32D2D;font-size:11px;margin-top:4px"></div><label id="vehicleAwsWrap" style="display:none;margin-top:6px;font-size:12px;font-weight:400;color:#131112"><input type="checkbox" id="vehicleAws" onchange="autoSave()" style="width:auto;margin-right:6px">Transacted through AWS Marketplace <span style="color:#717174;font-size:11px">(adds the AWS Marketplace section and AWS wording; off = sections renumber)</span></label><div id="vehicleVerifyMsg" style="display:none;color:#8a5a00;font-size:11px;margin-top:4px"></div></div>
         <div class="field" style="margin:0;grid-column:1/-1"><label>Additional terms <span style="color:#717174;font-weight:400;font-size:11px">(appended after standard T&amp;C in quote PDF)</span></label><textarea id="additionalTerms" autocomplete="off" placeholder="Optional. Custom legal language, NDA references, MSA exceptions, etc." style="min-height:60px" oninput="autoSave()"></textarea></div>
+        <div class="field" style="margin:0"><label>Order / CPPO Routing <span style="color:#717174;font-weight:400;font-size:11px">(internal only; not on the PDF)</span></label><input id="orderRouting" autocomplete="off" placeholder="Who receives the CPPO / order" oninput="autoSave()"></div>
         <div class="field" style="margin:0"><label>Label <span style="color:#717174;font-weight:400;font-size:11px">(distinguishes quotes on one opportunity)</span></label><input id="quoteLabel" autocomplete="off" placeholder="350GB 1Year, HIPAA, Option B" oninput="updatePdfFileName();autoSave()"></div>
         <div class="field" style="margin:0"><label>File name</label><input id="pdfFileName" autocomplete="off" placeholder="auto" oninput="this.dataset.userEdited=this.value?'1':'';updatePdfFileName()"></div>
       </div>
@@ -312,6 +313,7 @@ tr.drag-over-bottom td{box-shadow:inset 0 -3px 0 0 #003658}
           <select id="contractVehicle" onchange="onVehicleChange()" style="width:100%">
             <option value="">None (standard T&amp;C)</option>
             <option value="omnia-r240303">OMNIA Partners #R240303</option>
+            <option value="i2-netplus-splunk">Internet2 NET+ Splunk, I201-SPLK (UNC System Office)</option>
           </select>
         </div>
         <div class="field" style="margin:0">
@@ -742,6 +744,27 @@ function _signOut(){
 // previewPdf variants, downloadPdf); a change to one silently diverged the others.
 // OEM detection stays dynamic: detectOEMs() runs per call, so clause 1 still maps
 // SKUs to the applicable OEM terms links at generation time.
+// Sections 2-15 of the NET+ baseline. `aws` = the quote's AWS Marketplace attribute.
+// {AWS}, {LOL} and {CONF} are replaced with the section numbers after renumbering.
+function NETPLUS_CLAUSES(aws){
+  var c=[];
+  c.push({t:'Ordering Document.',b:'This Ordering Document establishes the transaction-specific commercial terms between Customer and Partner, including the products and SKUs, quantities and capacity, subscription and service periods, pricing, and payment and other transaction-specific commercial terms. Customer\'s substantive rights and obligations relating to the Splunk products and services are governed by the Governing Agreement. Nothing in this Ordering Document replaces, amends, or waives the Governing Agreement.'});
+  if(aws)c.push({k:'AWS',t:'AWS Marketplace Transaction.',b:'This transaction will be processed through AWS Marketplace as a private offer. AWS Marketplace is the transaction and payment mechanism for this transaction. It does not replace the Governing Agreement, and the AWS Marketplace terms are not the license agreement governing Customer\'s use of the Splunk products and services. AWS Marketplace does not assume Splunk\'s delivery or service obligations, which remain as provided in the Governing Agreement. Customer\'s payment obligations for the offerings purchased under this Ordering Document will be fulfilled through AWS Marketplace rather than directly to Splunk. Failure to pay amounts due through AWS Marketplace may constitute a breach of Customer\'s applicable agreement with Splunk. Fees paid are non-refundable to the extent required by the applicable Splunk and AWS Marketplace transaction terms. Splunk retains any enforcement rights provided by the Governing Agreement and the applicable AWS Marketplace transaction documentation. Terms separately agreed between Customer and AWS Marketplace, or between Customer and Partner, do not modify Splunk\'s obligations or the Governing Agreement unless expressly agreed by the applicable parties.'});
+  c.push({t:'Purchase Orders.',b:'Customer purchase orders are accepted by Partner for administrative purposes to evidence the applicable order, quantities, pricing, and related transaction information. Any additional or conflicting terms contained in or referenced by a Customer purchase order will not modify this Ordering Document or the Governing Agreement unless expressly agreed to in writing by the applicable parties.'});
+  c.push({t:'Quote Validity; Order Acceptance.',b:'This quote is valid for the period stated above. All orders are subject to acceptance by Partner and confirmation of pricing and availability by Splunk. Partner reserves the right to correct pricing errors or decline orders prior to fulfillment.'});
+  c.push({t:'Fees, Taxes, and Payment.',b:'All fees on this Ordering Document are in U.S. Dollars and exclusive of applicable taxes, if any, which are the responsibility of Customer (other than taxes on Partner\'s net income)'+(aws?', except to the extent taxes are calculated and collected through AWS Marketplace. Amounts for offerings purchased through AWS Marketplace are payable through AWS Marketplace as described in Section {AWS}.':'.')+' Any amounts invoiced directly by Partner under this Ordering Document shall be paid in full per the terms defined above. If not paid within that time, interest shall accrue on any unpaid balance invoiced by Partner, from the date of the invoice, at 1.5% per month or the maximum rate allowed by applicable law, whichever is less.'+(aws?' Interest under this Section does not apply to amounts payable through AWS Marketplace.':'')});
+  c.push({t:'Cancellation and Refunds.',b:'Customer\'s rights, if any, to cancel an order or receive a refund are as provided in the Governing Agreement'+(aws?' and, for transactions processed through AWS Marketplace, the applicable AWS Marketplace transaction terms':'')+'. This Ordering Document does not expand or restrict those rights.'});
+  c.push({t:'Support.',b:'Support, maintenance, and service level commitments for the Splunk products and services are provided by Splunk pursuant to the Governing Agreement. Partner has no obligation to provide technical support for the Splunk products and services under this Ordering Document.'});
+  c.push({t:'Partner Warranties and Indemnities.',b:'PARTNER MAKES NO WARRANTIES, EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, WITH RESPECT TO THE SPLUNK PRODUCTS AND SERVICES, AND SPECIFICALLY DISCLAIMS ALL IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. Partner provides no indemnification with respect to the Splunk products and services. Any warranties and indemnification applicable to the Splunk products and services are as provided in the Governing Agreement.'});
+  c.push({k:'LOL',t:'Limitation of Liability.',b:'IN NO EVENT SHALL PARTNER BE LIABLE FOR ANY INDIRECT, INCIDENTAL, CONSEQUENTIAL, SPECIAL, EXEMPLARY, OR PUNITIVE DAMAGES, INCLUDING WITHOUT LIMITATION LOST PROFITS, LOST REVENUE, LOST DATA, BUSINESS INTERRUPTION, OR COST OF SUBSTITUTE PRODUCTS, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.'});
+  c.push({k:'CONF',t:'Confidentiality.',b:'To the extent permitted by applicable law, Customer will protect Partner\'s non-public pricing, discount levels, and other commercial terms of this Ordering Document and will not disclose them to any third party without Partner\'s prior written consent. Nothing in this Ordering Document restricts Customer\'s obligations under applicable public-records laws, court orders, or other legally binding disclosure requirements.'});
+  c.push({t:'Order of Precedence.',b:'In the event of a conflict among the applicable documents, the Governing Agreement will govern with respect to Customer\'s access to and use of the Splunk products and services. This Ordering Document will govern the products, quantities, subscription periods, pricing, payment, and other transaction-specific commercial terms between Customer and Partner.'+(aws?' Applicable AWS Marketplace transaction terms will govern the processing of the transaction and payment through AWS Marketplace.':'')+' Terms contained in or referenced by a Customer purchase order do not override the Governing Agreement or this Ordering Document.'});
+  c.push({t:'Assignment.',b:'Customer may not assign or transfer this Ordering Document or any rights hereunder without Partner\'s prior written consent. Partner may assign this Ordering Document to an affiliate or successor in interest.'});
+  c.push({t:'Entire Agreement.',b:'This Ordering Document constitutes the agreement between Customer and Partner with respect to the transaction-specific matters addressed herein and is subject to the Governing Agreement'+(aws?' and, for transactions processed through AWS Marketplace, the applicable AWS Marketplace transaction terms':'')+'. Nothing in this Ordering Document is intended to amend or supersede the Governing Agreement except to the extent expressly agreed in writing by the parties authorized to amend such agreement.'});
+  c.push({t:'Amendment; Severability; Waiver; Survival.',b:'Any modification of this Ordering Document shall be in writing and signed by Customer and Partner. If any provision is held unenforceable, the remaining provisions shall remain in full force and effect. No waiver shall be effective unless in writing. Provisions that by their nature are intended to survive termination or expiration of this Ordering Document will survive, including accrued payment obligations, Section {CONF} (Confidentiality) to the extent permitted by applicable law, Section {LOL} (Limitation of Liability), and provisions governing interpretation and enforcement of this Ordering Document.'});
+  return c;
+}
+
 // Contract vehicles. Selecting one replaces the standard 15 clauses with the
 // vehicle's governing language, which the rep may edit per quote. `oems` limits
 // the vehicle to the OEMs our reseller agreement actually authorises.
@@ -751,8 +774,31 @@ window.CONTRACT_VEHICLES = {
     number: 'OMNIA Partners Contract #R240303',
     oems: ['Splunk'],
     text: 'This software quote is governed by the pricing, terms, and conditions of OMNIA Partners Contract #R240303 and the State of North Carolina participating addendum (collectively, the "Agreement"). The subscription plans, products, quantities, and pricing set forth in this quote are agreed to by Customer and TekStream Solutions, LLC ("TekStream") and are subject to the Agreement.'
+  },
+  // UNC System / Internet2 NET+ Splunk baseline (approved 2026-11-09). The governing-agreement
+  // attributes are configuration, not hard-coded text: change them here and Section 1 follows.
+  // `verify` lists values not yet checked against the source agreement; the app shows a reminder.
+  'i2-netplus-splunk': {
+    label: 'Internet2 NET+ Splunk (UNC System Office)',
+    oems: ['Splunk'],
+    agreement: {
+      title: 'Splunk General Terms for the Internet2 NET+ Program',
+      numberLabel: 'Internet2 NET+ Splunk Program Contract No.',
+      number: 'I201-SPLK',
+      date: 'December 20, 2023',
+      entity: 'Splunk',
+      counterparty: 'the University of North Carolina System Office'
+    },
+    verify: ['contract number I201-SPLK', 'Splunk legal entity name'],
+    aws: true,                         // offers the "Transacted through AWS Marketplace" attribute
+    routingDefault: 'Allen Lakomiak',  // Order / CPPO Routing default (internal; independent of AWS)
+    clauses: NETPLUS_CLAUSES
   }
 };
+(function(){
+  var v=window.CONTRACT_VEHICLES['i2-netplus-splunk'], a=v.agreement;
+  v.text='All purchases of Splunk products, services, and subscriptions under this Ordering Document are subject to and governed by the '+a.title+' ('+a.numberLabel+' '+a.number+') executed between '+a.entity+' and '+a.counterparty+' on '+a.date+' (the "Governing Agreement"). The subscription plans, products, quantities, pricing, and service periods set forth in this Ordering Document are agreed to by Customer and TekStream Solutions, LLC ("Partner") and are subject to the Governing Agreement.';
+})();
 
 
 // Prefill only when the box is empty or still matches the stored wording, so a
@@ -763,6 +809,9 @@ function onVehicleChange(){
   var ta=document.getElementById('vehicleTerms');
   if(!v){ wrap.style.display='none'; refreshVehicleWarning(); autoSave(); return; }
   wrap.style.display='';
+  // Order / CPPO Routing: administrative default for the vehicle, never overwrites a value.
+  var rt=document.getElementById('orderRouting');
+  if(rt && v.routingDefault && !rt.value.trim()) rt.value=v.routingDefault;
   var cur=(ta.value||'').trim();
   if(!cur){ ta.value=v.text; }
   else if(cur!==v.text.trim()){
@@ -779,7 +828,8 @@ function onVehicleTermsInput(){
   var flag=document.getElementById('vehicleTermsFlag');
   if(!v||!flag||!ta) return;
   var modified=(ta.value||'').trim()!==v.text.trim();
-  flag.textContent=modified?'(replaces standard T&C 1-15 \u00b7 MODIFIED from standard wording)':'(replaces standard T&C 1-15)';
+  var scope=v.clauses?'(Section 1; Sections 2+ are fixed for this vehicle)':'(replaces standard T&C 1-15)';
+  flag.textContent=modified?scope.replace(')',' \u00b7 MODIFIED from standard wording)'):scope;
   flag.style.color=modified?'#A32D2D':'#717174';
   autoSave();
 }
@@ -792,8 +842,12 @@ function refreshVehicleWarning(){
   var v=currentVehicle();
   if(v && bad.length){
     el.style.display='';
-    el.textContent='Not applied: this quote includes '+bad.join(', ')+'. The '+v.label+' reseller agreement covers '+v.oems.join(', ')+' only. Standard terms will print.';
+    el.textContent='Not applied: this quote includes '+bad.join(', ')+'. The '+v.label+' agreement covers '+v.oems.join(', ')+' only. Standard terms will print.';
   } else { el.style.display='none'; }
+  var aw=document.getElementById('vehicleAwsWrap'); if(aw) aw.style.display=(v&&v.aws)?'':'none';
+  var vm=document.getElementById('vehicleVerifyMsg');
+  if(vm){ var need=(v&&v.verify)||[]; vm.style.display=need.length?'':'none';
+    vm.textContent=need.length?'Verify against the source agreement before relying on: '+need.join('; ')+'.':''; }
 }
 
 function currentVehicle(){
@@ -819,9 +873,18 @@ function buildTermsList(){
       var _vtEl=document.getElementById('vehicleTerms');
       var _vt=_vtEl && _vtEl.value.trim() ? _vtEl.value.trim() : _v.text;
       var _vtcs=[{h:'1. Governing Agreement.', b:_vt}];
+      if(_v.clauses){
+        var _aws=!!(_v.aws && (document.getElementById('vehicleAws')||{}).checked);
+        var _list=_v.clauses(_aws), _num={};
+        _list.forEach(function(c,i){ if(c.k) _num[c.k]=i+2; });
+        _list.forEach(function(c,i){
+          var b=c.b.replace(/\{(AWS|LOL|CONF)\}/g,function(_m,k){return String(_num[k]||'');});
+          _vtcs.push({h:(i+2)+'. '+c.t, b:b});
+        });
+      }
       var _vatEl=document.getElementById('additionalTerms');
       var _vat=_vatEl ? _vatEl.value.trim() : '';
-      if(_vat){ _vtcs.push({h:'2. Additional Terms.', b:_vat}); }
+      if(_vat){ _vtcs.push({h:(_vtcs.length+1)+'. Additional Terms.', b:_vat}); }
       return _vtcs;
     }
     // Detect which OEMs are present based on SKUs (shared table: window.OEM_DEFS)
@@ -1309,7 +1372,7 @@ function loadRepSettings(){
 }
 
 function getQuoteState(){
-  return{customerName:document.getElementById('customerName').value,contactName:document.getElementById('contactName').value,contactEmail:document.getElementById('contactEmail').value,quoteNumber:document.getElementById('quoteNumber').value,quoteDate:document.getElementById('quoteDate').value,expiryDate:document.getElementById('expiryDate').value,marginPct:document.getElementById('marginPct').value,notes:document.getElementById('notes').value,terms:document.getElementById('terms').value,additionalTerms:(document.getElementById('additionalTerms')||{}).value||'',contractVehicle:(document.getElementById('contractVehicle')||{}).value||'',vehicleTerms:(document.getElementById('vehicleTerms')||{}).value||'',preparedByCompany:document.getElementById('preparedByCompany').value,preparedBy:document.getElementById('preparedBy').value,preparedByEmail:document.getElementById('preparedByEmail').value,pdfFileName:(document.getElementById('pdfFileName')||{}).value||'',quoteLabel:(document.getElementById('quoteLabel')||{}).value||'',fileSeq:window._fileSeq||null,shipToAddress:(document.getElementById('shipToAddress')||{}).value||'',shipToCityStateZip:(document.getElementById('shipToCityStateZip')||{}).value||'',shipToPhone:(document.getElementById('shipToPhone')||{}).value||'',vendorName:(document.getElementById('vendorName')||{}).value||'',commissionState:JSON.parse(JSON.stringify(window.commissionState||{servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0})),customerType:(document.getElementById('customerType')||{}).value||'',customerZip:(document.getElementById('customerZip')||{}).value||'',customerState:(document.getElementById('customerState')||{}).value||'',taxRate:(document.getElementById('taxRate')||{}).value||'',taxExempt:!!(document.getElementById('taxExempt')||{}).checked,lineItems:JSON.parse(JSON.stringify(window.lineItems))};
+  return{customerName:document.getElementById('customerName').value,contactName:document.getElementById('contactName').value,contactEmail:document.getElementById('contactEmail').value,quoteNumber:document.getElementById('quoteNumber').value,quoteDate:document.getElementById('quoteDate').value,expiryDate:document.getElementById('expiryDate').value,marginPct:document.getElementById('marginPct').value,notes:document.getElementById('notes').value,terms:document.getElementById('terms').value,additionalTerms:(document.getElementById('additionalTerms')||{}).value||'',contractVehicle:(document.getElementById('contractVehicle')||{}).value||'',vehicleTerms:(document.getElementById('vehicleTerms')||{}).value||'',vehicleAws:!!(document.getElementById('vehicleAws')||{}).checked,orderRouting:(document.getElementById('orderRouting')||{}).value||'',preparedByCompany:document.getElementById('preparedByCompany').value,preparedBy:document.getElementById('preparedBy').value,preparedByEmail:document.getElementById('preparedByEmail').value,pdfFileName:(document.getElementById('pdfFileName')||{}).value||'',quoteLabel:(document.getElementById('quoteLabel')||{}).value||'',fileSeq:window._fileSeq||null,shipToAddress:(document.getElementById('shipToAddress')||{}).value||'',shipToCityStateZip:(document.getElementById('shipToCityStateZip')||{}).value||'',shipToPhone:(document.getElementById('shipToPhone')||{}).value||'',vendorName:(document.getElementById('vendorName')||{}).value||'',commissionState:JSON.parse(JSON.stringify(window.commissionState||{servicesRevByGroup:{},aeMultiplier:20,contractCostPct:0})),customerType:(document.getElementById('customerType')||{}).value||'',customerZip:(document.getElementById('customerZip')||{}).value||'',customerState:(document.getElementById('customerState')||{}).value||'',taxRate:(document.getElementById('taxRate')||{}).value||'',taxExempt:!!(document.getElementById('taxExempt')||{}).checked,lineItems:JSON.parse(JSON.stringify(window.lineItems))};
 }
 function restoreQuoteState(s){
   window._suppressAutoSave=true;
@@ -1328,6 +1391,8 @@ function restoreQuoteState(s){
   var atEl=document.getElementById('additionalTerms');if(atEl)atEl.value=s.additionalTerms||'';
   var cvEl=document.getElementById('contractVehicle');if(cvEl)cvEl.value=s.contractVehicle||'';
   var vtEl=document.getElementById('vehicleTerms');if(vtEl)vtEl.value=s.vehicleTerms||'';
+  var vaEl=document.getElementById('vehicleAws');if(vaEl)vaEl.checked=!!s.vehicleAws;
+  var orEl=document.getElementById('orderRouting');if(orEl)orEl.value=s.orderRouting||'';
   var vwEl=document.getElementById('vehicleTermsWrap');if(vwEl)vwEl.style.display=(s.contractVehicle?'':'none');
   if(typeof onVehicleTermsInput==='function')onVehicleTermsInput();
   if(typeof refreshVehicleWarning==='function')refreshVehicleWarning();
@@ -2258,7 +2323,8 @@ function recalcLive(){
   autoSave();
 }
 function newQuote(){
-  ['customerName','contactName','contactEmail','notes','preparedBy','preparedByEmail','shipToAddress','shipToCityStateZip','shipToPhone','additionalTerms'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  ['customerName','contactName','contactEmail','notes','preparedBy','preparedByEmail','shipToAddress','shipToCityStateZip','shipToPhone','additionalTerms','orderRouting'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  var vaEl=document.getElementById('vehicleAws');if(vaEl)vaEl.checked=false;
   var vnEl=document.getElementById('vendorName');if(vnEl)vnEl.value='';
   // Item 10 fix: clear pdfFileName and its user-edited flag so auto-naming resumes for the new quote
   var pfEl=document.getElementById('pdfFileName');
@@ -2466,16 +2532,17 @@ async function confirmSfdcPush(){
     var qid=null;
     try{var qr=await window._sb.from('quotes').select('id').eq('owner_id',window._sbUser.id).eq('key',window._currentQuoteKey||qn).maybeSingle(); qid=(qr.data&&qr.data.id)||null;}catch(e){}
     var vendor=(document.getElementById('vendorName')||{}).value||'';
+    var routing=((document.getElementById('orderRouting')||{}).value||'').trim()||null;
     var rows=[], skipped=0;
     ps.forEach(function(p){
       var ex=window._sfdcExisting[p.key], amt=Math.round(sfdcAmount(p)*100)/100;
       var same=ex&&(ex.status==='created'||ex.status==='updated')&&ex.sfdc_opp_id
-        &&Number(ex.amount)===amt&&ex.close_date===p.close&&ex.stage===stage&&ex.opp_name===p.name&&ex.sfdc_account_id===acct;
+        &&Number(ex.amount)===amt&&ex.close_date===p.close&&ex.stage===stage&&ex.opp_name===p.name&&ex.sfdc_account_id===acct&&(ex.order_routing||null)===routing;
       if(same){skipped++;return;}
       rows.push({quote_id:qid,quote_number:qn,payment_key:p.key,payment_no:p.no,payment_count:p.count,
         opp_name:p.name,sfdc_account_id:acct,close_date:p.close,service_start:p.start||null,service_end:p.end||null,
         amount:amt,gross:Math.round(p.gross*100)/100,gross_margin:Math.round(p.gm*100)/100,stage:stage,opp_type:p.type,
-        customer_name:custName,vendor_name:vendor,status:'pending',error:null,
+        customer_name:custName,vendor_name:vendor,order_routing:routing,status:'pending',error:null,
         sfdc_opp_id:(ex&&ex.sfdc_opp_id)||null,requested_by:window._sbUser.id,requested_at:new Date().toISOString()});
     });
     if(rows.length){
